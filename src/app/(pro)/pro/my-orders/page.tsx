@@ -1,13 +1,12 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, Briefcase, History } from "lucide-react"
+import { Loader2, Briefcase, History, ChevronRight } from "lucide-react"
 import { getProOrders } from "./actions"
 import { OrderStatusCard } from "@/components/dashboard/order-status-card"
-import { CompleteOrderButton } from "../complete-order-button"
+import Link from "next/link"
 
 export default function ProOrdersPage() {
   const { data, isLoading } = useQuery({
@@ -26,16 +25,17 @@ export default function ProOrdersPage() {
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
-      <header className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">Мои работы</h1>
+      <header>
+        <h1 className="text-3xl font-black tracking-tight">Мои работы</h1>
+        <p className="text-muted-foreground">Список ваших активных и завершенных заказов</p>
       </header>
 
       <Tabs defaultValue="active" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
-          <TabsTrigger value="active" className="gap-2">
+        <TabsList className="grid w-full grid-cols-2 max-w-[400px] h-12">
+          <TabsTrigger value="active" className="gap-2 font-bold">
             <Briefcase className="w-4 h-4" /> В работе ({activeOrders.length})
           </TabsTrigger>
-          <TabsTrigger value="history" className="gap-2">
+          <TabsTrigger value="history" className="gap-2 font-bold">
             <History className="w-4 h-4" /> История ({completedOrders.length})
           </TabsTrigger>
         </TabsList>
@@ -44,13 +44,18 @@ export default function ProOrdersPage() {
         <TabsContent value="active" className="space-y-4 mt-6">
           {activeOrders.length > 0 ? (
             activeOrders.map((order) => (
-              <div key={order.id} className="relative">
-                <OrderStatusCard order={order} type="pro" />
-                <div className="absolute top-4 right-4">
-                    {/* Наша кнопка завершения из прошлого шага */}
-                    <CompleteOrderButton orderId={order.id} />
-                </div>
-              </div>
+              <Link 
+                key={order.id} 
+                href={`/pro/orders/${order.id}`} 
+                className="block group"
+              >
+                <Card className="overflow-hidden border-l-4 border-l-blue-600 transition-all hover:shadow-md active:scale-[0.99]">
+                  <CardContent className="p-5 flex items-center justify-between">
+                    <OrderStatusCard order={order} type="pro" />
+                    <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                  </CardContent>
+                </Card>
+              </Link>
             ))
           ) : (
             <EmptyState message="У вас пока нет активных заказов" />
@@ -61,7 +66,18 @@ export default function ProOrdersPage() {
         <TabsContent value="history" className="space-y-4 mt-6">
           {completedOrders.length > 0 ? (
             completedOrders.map((order) => (
-              <OrderStatusCard key={order.id} order={order} type="pro" />
+              <Link 
+                key={order.id} 
+                href={`/pro/orders/${order.id}`} 
+                className="block group"
+              >
+                <Card className="overflow-hidden border-l-4 border-slate-300 transition-all hover:shadow-md grayscale-[0.5] hover:grayscale-0">
+                  <CardContent className="p-5 flex items-center justify-between">
+                    <OrderStatusCard order={order} type="pro" />
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  </CardContent>
+                </Card>
+              </Link>
             ))
           ) : (
             <EmptyState message="История заказов пуста" />
@@ -74,10 +90,10 @@ export default function ProOrdersPage() {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <Card className="border-dashed shadow-none">
-      <CardContent className="py-12 flex flex-col items-center justify-center text-muted-foreground">
-        <Briefcase className="w-12 h-12 mb-4 opacity-20" />
-        <p>{message}</p>
+    <Card className="border-dashed bg-muted/20 shadow-none">
+      <CardContent className="py-16 flex flex-col items-center justify-center text-muted-foreground">
+        <Briefcase className="w-12 h-12 mb-4 opacity-10" />
+        <p className="font-medium">{message}</p>
       </CardContent>
     </Card>
   )

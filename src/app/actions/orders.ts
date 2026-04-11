@@ -6,54 +6,6 @@ import { revalidatePath } from "next/cache"
 import { OrderStatus } from "../../../prisma/generated"
 import { getServerSession } from "@/lib/get-session"
 
-// Имитация AI-функции (в будущем сюда можно подключить OpenAI API)
-async function classifyTaskWithAI(description: string): Promise<string> {
-  const text = description.toLowerCase()
-  if (text.includes("свет") || text.includes("розетк")) return "Электрик"
-  if (text.includes("кран") || text.includes("труб") || text.includes("подтекает")) return "Сантехник"
-  return "Общие работы"
-}
-
-export async function createOrder(formData: {
-  title: string
-  description: string
-  address: string
-  price: number
-}) {
-
-  const session = await getServerSession();
-  const user = session?.user;
-
-  if (!user) return { error: "Unauthorized" }
-
-  try {
-    // 1. AI определяет категорию
-    const category = await classifyTaskWithAI(formData.description)
-
-    // 2. Создаем запись в базе
-    const order = await prisma.order.create({
-      data: {
-        title: formData.title,
-        description: formData.description,
-        address: formData.address,
-        price: formData.price * 100, // Храним в копейках
-        category: category,
-        status: OrderStatus.PENDING,
-        clientId: user.id,
-        // Здесь можно добавить логику получения координат из адреса через GeoAPI
-        lat: 55.75,
-        lng: 37.61,
-      },
-    })
-
-    revalidatePath("/dashboard") // Обновляем кэш страницы
-    return { success: true, data: order }
-  } catch (error) {
-    console.error("Order creation error:", error)
-    return { success: false, error: "Ошибка при создании заказа" }
-  }
-}
-
 
 // Получить заказы, которые Я СОЗДАЛ (как клиент)
 export async function getClientOrders() {

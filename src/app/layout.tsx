@@ -29,26 +29,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-   <html
-      lang="en"
-      suppressHydrationWarning
-    >
-      <body className={`min-h-full flex flex-col  ${geistSans.className} h-full antialiased`} >
-        <TanstackProvider>
-          {/* <ThemeProvider 
-          attribute="class" 
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >  </ThemeProvider>*/}
-          <main className="mx-auto w-full max-w-7xl px-4 py-12 gap-4 flex flex-col">
-            <Navbar />
-            <div className="mx-auto w-full ">{children}</div>
-          </main>
+   <html lang="ru" suppressHydrationWarning className="h-full">
+  <body className={`${geistSans.className} antialiased min-h-screen flex flex-col`}>
+    <TanstackProvider>
+      {/* 1. Навбар теперь сверху всего */}
+      <Navbar /> 
 
-          <Toaster />
-        </TanstackProvider>
-      </body>
-    </html>
+      {/* 2. Контейнер для контента */}
+      <main className="flex-1 flex flex-col">
+        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+          {children}
+        </div>
+      </main>
+
+      <Toaster richColors closeButton />
+    </TanstackProvider>
+  </body>
+</html>
   );
 }
