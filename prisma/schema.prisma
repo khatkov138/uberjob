@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js" // Исправил на стандартный
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- АУТЕНТИФИКАЦИЯ (Твоя база) ---
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          Role      @default(CLIENT) // Изменил String на Enum для безопасности
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  sessions      Session[]
+  accounts      Account[]
+
+  // Связи для сервиса
+  workerProfile Profile?  @relation("WorkerProfile") // Если юзер — мастер
+  ordersCreated Order[]   @relation("ClientOrders")  // Заказы, которые он создал
+  ordersTaken   Order[]   @relation("WorkerOrders")  // Заказы, которые он взял (если он мастер)
+
+  @@map("user")
+}
+
+enum Role {
+  CLIENT
+  PRO
+  ADMIN
+}
+
+// --- СЕРВИСНАЯ ЛОГИКА (Новое) ---
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation("WorkerProfile", fields: [userId], references: [id], onDelete: Cascade)
+  
+  skills      String[] // Список навыков: ["электрик", "сварщик"]
+  bio         String?
+  rating      Float    @default(5.0)
+  isOnline    Boolean  @default(false)
+  
+  // Координаты для Uber-механики (поиск рядом)
+  lastLat     Float?   
+  lastLng     Float?   
+  
+  reviews     Review[] // Отзывы о мастере
+
+  @@map("profile")
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  status      OrderStatus @default(PENDING)
+  
+  title       String      // Краткая суть
+  description String      // AI может анализировать это поле
+  category    String      // Категория, определенная AI
+  price       Int         // Цена в копейках/рублях
+  address     String
+  
+  // Координаты заказа для поиска мастеров в радиусе
+  lat         Float?
+  lng         Float?
+
+  clientId    String
+  client      User        @relation("ClientOrders", fields: [clientId], references: [id])
+  
+  workerId    String?
+  worker      User?       @relation("WorkerOrders", fields: [workerId], references: [id])
+
+  @@map("order")
+}
+
+enum OrderStatus {
+  PENDING     // Ожидает подтверждения
+  SEARCHING   // Разослан мастерам рядом
+  ACCEPTED    // Мастер принял
+  IN_PROGRESS // В работе
+  COMPLETED   // Завершен
+  CANCELLED   // Отменен
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  
+  orderId   String   @unique
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id])
+
+  @@map("review")
+}
+
+// --- ТВОИ СЛУЖЕБНЫЕ ТАБЛИЦЫ ---
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
