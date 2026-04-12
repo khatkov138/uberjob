@@ -11,7 +11,7 @@ export async function getProOrderDetails(orderId: string) {
   if (!session?.user) return null
 
   return await prisma.order.findUnique({
-    where: { 
+    where: {
       id: orderId,
       // Заказ должен либо быть свободным, либо уже принадлежать этому мастеру
       OR: [
@@ -20,7 +20,10 @@ export async function getProOrderDetails(orderId: string) {
       ]
     },
     include: {
-      client: { select: { name: true, image: true } }
+      client: { select: { name: true, image: true } },
+      messages: {
+        orderBy: { createdAt: 'asc' }
+      }
     }
   })
 }
@@ -47,7 +50,7 @@ export async function acceptOrderDetails(orderId: string) {
   try {
     const updated = await prisma.order.update({
       where: { id: orderId, status: "PENDING" }, // Защита: взять можно только свободный
-      data: { 
+      data: {
         status: "ACCEPTED",
         workerId: userId
       }

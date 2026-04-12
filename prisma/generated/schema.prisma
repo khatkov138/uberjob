@@ -27,6 +27,9 @@ model User {
   ordersCreated Order[]  @relation("ClientOrders") // Заказы, которые он создал
   ordersTaken   Order[]  @relation("WorkerOrders") // Заказы, которые он взял (если он мастер)
 
+  notifications Notification[]
+  sentMessages  Message[]
+
   @@map("user")
 }
 
@@ -57,31 +60,6 @@ model Profile {
   @@map("profile")
 }
 
-model Order {
-  id        String      @id @default(cuid())
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  status    OrderStatus @default(PENDING)
-
-  title       String // Краткая суть
-  description String // AI может анализировать это поле
-  category    String // Категория, определенная AI
-  price       Int // Цена в копейках/рублях
-  address     String
-
-  // Координаты заказа для поиска мастеров в радиусе
-  lat Float?
-  lng Float?
-
-  clientId String
-  client   User   @relation("ClientOrders", fields: [clientId], references: [id])
-
-  workerId String?
-  worker   User?   @relation("WorkerOrders", fields: [workerId], references: [id])
-
-  @@map("order")
-}
-
 enum OrderStatus {
   PENDING // Ожидает подтверждения
   SEARCHING // Разослан мастерам рядом
@@ -91,13 +69,44 @@ enum OrderStatus {
   CANCELLED // Отменен
 }
 
+model Order {
+  id        String      @id @default(cuid())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  status    OrderStatus @default(PENDING)
+
+  title       String
+  description String
+  category    String
+  price       Int
+  address     String
+
+  lat Float?
+  lng Float?
+
+  clientId String
+  client   User   @relation("ClientOrders", fields: [clientId], references: [id])
+
+  workerId String?
+  worker   User?   @relation("WorkerOrders", fields: [workerId], references: [id])
+
+  // --- ДОБАВИТЬ ЭТУ СТРОКУ ---
+  review   Review? // У заказа может быть (а может и не быть) один отзыв
+  messages Message[]
+
+  @@map("order")
+}
+
 model Review {
   id        String   @id @default(cuid())
   rating    Int
   comment   String?
   createdAt DateTime @default(now())
 
-  orderId   String  @unique
+  orderId String @unique
+  // --- ИЗМЕНИТЬ ЭТУ СТРОКУ ---
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade) // Связываем с Order
+
   profileId String
   profile   Profile @relation(fields: [profileId], references: [id])
 
@@ -148,4 +157,36 @@ model Verification {
   updatedAt  DateTime @updatedAt
 
   @@map("verification")
+}
+
+model Notification {
+  id     String @id @default(cuid())
+  userId String // Кому пришло
+  user   User   @relation(fields: [userId], references: [id])
+
+  title   String
+  message String
+  type    String // 'NEW_ORDER', 'ORDER_ACCEPTED', 'REVIEW_RECEIVED'
+  isRead  Boolean @default(false)
+  link    String? // Ссылка, куда вести при клике
+
+  createdAt DateTime @default(now())
+
+  @@map("notification")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  text      String
+  createdAt DateTime @default(now())
+
+  // Кто отправил
+  senderId String
+  sender   User   @relation(fields: [senderId], references: [id])
+
+  // К какому заказу относится чат
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("message")
 }

@@ -10,22 +10,25 @@ datasource db {
 // --- АУТЕНТИФИКАЦИЯ (Твоя база) ---
 
 model User {
-  id            String    @id
+  id            String   @id
   name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  email         String   @unique
+  emailVerified Boolean  @default(false)
   image         String?
-  role          Role      @default(CLIENT) // Изменил String на Enum для безопасности
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  sessions      Session[]
-  accounts      Account[]
+  role          Role     @default(CLIENT) // Изменил String на Enum для безопасности
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions Session[]
+  accounts Account[]
 
   // Связи для сервиса
-  workerProfile Profile?  @relation("WorkerProfile") // Если юзер — мастер
-  ordersCreated Order[]   @relation("ClientOrders")  // Заказы, которые он создал
-  ordersTaken   Order[]   @relation("WorkerOrders")  // Заказы, которые он взял (если он мастер)
+  workerProfile Profile? @relation("WorkerProfile") // Если юзер — мастер
+  ordersCreated Order[]  @relation("ClientOrders") // Заказы, которые он создал
+  ordersTaken   Order[]  @relation("WorkerOrders") // Заказы, которые он взял (если он мастер)
+
+  notifications Notification[]
+  sentMessages Message[]
 
   @@map("user")
 }
@@ -39,56 +42,59 @@ enum Role {
 // --- СЕРВИСНАЯ ЛОГИКА (Новое) ---
 
 model Profile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation("WorkerProfile", fields: [userId], references: [id], onDelete: Cascade)
-  
-  skills      String[] // Список навыков: ["электрик", "сварщик"]
-  bio         String?
-  rating      Float    @default(5.0)
-  isOnline    Boolean  @default(false)
-  
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation("WorkerProfile", fields: [userId], references: [id], onDelete: Cascade)
+
+  skills   String[] // Список навыков: ["электрик", "сварщик"]
+  bio      String?
+  rating   Float    @default(5.0)
+  isOnline Boolean  @default(false)
+
   // Координаты для Uber-механики (поиск рядом)
-  lastLat     Float?   
-  lastLng     Float?   
-  
-  reviews     Review[] // Отзывы о мастере
+  lastLat Float?
+  lastLng Float?
+
+  reviews Review[] // Отзывы о мастере
 
   @@map("profile")
 }
 
-model Order {
-  id          String      @id @default(cuid())
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  status      OrderStatus @default(PENDING)
-  
-  title       String      // Краткая суть
-  description String      // AI может анализировать это поле
-  category    String      // Категория, определенная AI
-  price       Int         // Цена в копейках/рублях
-  address     String
-  
-  // Координаты заказа для поиска мастеров в радиусе
-  lat         Float?
-  lng         Float?
-
-  clientId    String
-  client      User        @relation("ClientOrders", fields: [clientId], references: [id])
-  
-  workerId    String?
-  worker      User?       @relation("WorkerOrders", fields: [workerId], references: [id])
-
-  @@map("order")
+enum OrderStatus {
+  PENDING // Ожидает подтверждения
+  SEARCHING // Разослан мастерам рядом
+  ACCEPTED // Мастер принял
+  IN_PROGRESS // В работе
+  COMPLETED // Завершен
+  CANCELLED // Отменен
 }
 
-enum OrderStatus {
-  PENDING     // Ожидает подтверждения
-  SEARCHING   // Разослан мастерам рядом
-  ACCEPTED    // Мастер принял
-  IN_PROGRESS // В работе
-  COMPLETED   // Завершен
-  CANCELLED   // Отменен
+model Order {
+  id        String      @id @default(cuid())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  status    OrderStatus @default(PENDING)
+
+  title       String
+  description String
+  category    String
+  price       Int
+  address     String
+
+  lat Float?
+  lng Float?
+
+  clientId String
+  client   User   @relation("ClientOrders", fields: [clientId], references: [id])
+
+  workerId String?
+  worker   User?   @relation("WorkerOrders", fields: [workerId], references: [id])
+
+  // --- ДОБАВИТЬ ЭТУ СТРОКУ ---
+  review Review? // У заказа может быть (а может и не быть) один отзыв
+  messages     Message[]
+
+  @@map("order")
 }
 
 model Review {
@@ -96,10 +102,13 @@ model Review {
   rating    Int
   comment   String?
   createdAt DateTime @default(now())
-  
-  orderId   String   @unique
+
+  orderId String @unique
+  // --- ИЗМЕНИТЬ ЭТУ СТРОКУ ---
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade) // Связываем с Order
+
   profileId String
-  profile   Profile  @relation(fields: [profileId], references: [id])
+  profile   Profile @relation(fields: [profileId], references: [id])
 
   @@map("review")
 }
@@ -148,4 +157,37 @@ model Verification {
   updatedAt  DateTime @updatedAt
 
   @@map("verification")
+}
+
+model Notification {
+  id     String @id @default(cuid())
+  userId String // Кому пришло
+  user   User   @relation(fields: [userId], references: [id])
+
+  title   String
+  message String
+  type    String // 'NEW_ORDER', 'ORDER_ACCEPTED', 'REVIEW_RECEIVED'
+  isRead  Boolean @default(false)
+  link    String? // Ссылка, куда вести при клике
+
+  createdAt DateTime @default(now())
+
+  @@map("notification")
+}
+
+
+model Message {
+  id        String   @id @default(cuid())
+  text      String
+  createdAt DateTime @default(now())
+
+  // Кто отправил
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+
+  // К какому заказу относится чат
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("message")
 }

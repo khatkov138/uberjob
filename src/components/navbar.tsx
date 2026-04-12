@@ -3,13 +3,13 @@ import { UserDropdown } from "@/components/user-dropdown";
 import { getServerSession } from "@/lib/get-session";
 import Link from "next/link";
 import { RoleSwitcher } from "./role-switcher";
+import { NotificationsBell } from "./notifications-bell"; // Импортируем колокольчик
 
 export default async function Navbar() {
     const session = await getServerSession();
     const user = session?.user;
 
     return (
-        // Добавляем липкость, фон и нижнюю границу
         <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                 
@@ -20,8 +20,6 @@ export default async function Navbar() {
                             Uber<span className="text-foreground">Job</span>
                         </span>
                     </Link>
-
-                    {/* Сюда можно добавить ссылки для десктопа, если нужно */}
                 </div>
 
                 {/* Правая часть */}
@@ -31,6 +29,10 @@ export default async function Navbar() {
                             <div className="hidden md:block">
                                 <RoleSwitcher currentRole={user.role} />
                             </div>
+                            
+                            {/* 🔔 Колокольчик уведомлений */}
+                            <NotificationsBell />
+                            
                             <UserDropdown user={user} />
                         </>
                     ) : (

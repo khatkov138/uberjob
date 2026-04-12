@@ -97,6 +97,7 @@ function SignOutItem() {
       toast.error(error.message || "Something went wrong")
     } else {
       toast.success("Signed out successfuly")
+      router.push('/')
       router.refresh()
     }
   }

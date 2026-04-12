@@ -203,6 +203,25 @@ exports.Prisma.VerificationScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.NotificationScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  title: 'title',
+  message: 'message',
+  type: 'type',
+  isRead: 'isRead',
+  link: 'link',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.MessageScalarFieldEnum = {
+  id: 'id',
+  text: 'text',
+  createdAt: 'createdAt',
+  senderId: 'senderId',
+  orderId: 'orderId'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -239,7 +258,9 @@ exports.Prisma.ModelName = {
   Review: 'Review',
   Session: 'Session',
   Account: 'Account',
-  Verification: 'Verification'
+  Verification: 'Verification',
+  Notification: 'Notification',
+  Message: 'Message'
 };
 
 /**
