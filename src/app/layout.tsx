@@ -4,6 +4,8 @@ import "./globals.css";
 import TanstackProvider from "@/providers/TanstackProvider";
 import Navbar from "@/components/navbar";
 import { Toaster } from "@/components/ui/sonner";
+import { Footer } from "@/components/footer";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,22 +31,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-   <html lang="ru" suppressHydrationWarning className="h-full">
-  <body className={`${geistSans.className} antialiased min-h-screen flex flex-col`}>
-    <TanstackProvider>
-      {/* 1. Навбар теперь сверху всего */}
-      <Navbar /> 
+    <html lang="ru" suppressHydrationWarning className="h-full">
+      
+      <body className={`${geistSans.className} antialiased min-h-screen flex flex-col`}>
+        <TanstackProvider>
+          {/* 1. Навбар теперь сверху всего */}
+          <Navbar />
 
-      {/* 2. Контейнер для контента */}
-      <main className="flex-1 flex flex-col">
-        <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-          {children}
-        </div>
-      </main>
-
-      <Toaster richColors closeButton />
-    </TanstackProvider>
-  </body>
-</html>
+          {/* 2. Контейнер для контента */}
+          <main className="flex-1 flex flex-col">
+            <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+              {children}
+            </div>
+          </main>
+          <Footer />
+          <Toaster richColors closeButton />
+        </TanstackProvider>
+       {/* <Script
+         src="https://api-maps.yandex.ru/2.1.44/?csp=true&lang=ru_RU&apikey=146c8bc2-4251-42ac-a7bc-137df54269ce&suggest_apikey=deeac62a-74fc-4898-8461-8909eda27a9b"
+          strategy="beforeInteractive" /> */}
+      </body>
+    </html>
   );
 }

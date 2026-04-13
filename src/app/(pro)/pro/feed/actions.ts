@@ -1,9 +1,28 @@
 "use server"
 
-import { getServerSession } from "@/lib/get-session"
-import prisma from "@/lib/prisma"
 
-export async function getSmartNearbyFeed(lat?: number, lng?: number, radiusKm: number = 30) {
+import { getServerSession } from "@/lib/get-session"
+import prisma from "@/lib/prisma";
+import { headers } from "next/headers";
+
+// Вспомогательная функция для расчета расстояния в км
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Радиус Земли
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+export async function getSmartNearbyFeed(
+  lat?: number,
+  lng?: number,
+  radiusKm: number = 60
+) {
   const session = await getServerSession()
   const userId = session?.user?.id
   if (!userId) return { success: false, error: "Unauthorized" }
@@ -13,45 +32,57 @@ export async function getSmartNearbyFeed(lat?: number, lng?: number, radiusKm: n
     select: { skills: true }
   })
 
-  if (!profile || !profile.skills.length) {
-    return { success: true, data: [], needsSkills: true }
+  const masterSkills = profile?.skills || []
+
+  try {
+    // 1. Берем ВСЕ активные заказы, кроме своих
+    const allOrders = await prisma.order.findMany({
+      where: {
+        status: "PENDING",
+        clientId: { not: userId }
+      },
+      include: {
+        client: {
+          select: { name: true, image: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+ 
+    // 2. Если нет координат мастера, возвращаем просто список (или пустой)
+    if (!lat || !lng) return { success: true, data: [] }
+
+
+
+    // 3. Фильтруем по радиусу и добавляем данные о совпадении и дистанции в JS
+    const ordersWithDistance = allOrders
+      .map(order => {
+        const orderLat = order.lat ?? 0;
+        const orderLng = order.lng ?? 0;
+        const distance = getDistance(lat, lng, orderLat, orderLng);
+
+        return {
+          ...order,
+          distance,
+          clientName: order.client.name, // Для совместимости с твоей версткой
+          clientImage: order.client.image,
+          isMatch: masterSkills.includes(order.category)
+        }
+      })
+      .filter(order => order.distance <= radiusKm) // Фильтр по радиусу
+      .sort((a, b) => {
+        // Сортировка: сначала те, что подходят по скиллам, потом по расстоянию
+        if (a.isMatch && !b.isMatch) return -1
+        if (!a.isMatch && b.isMatch) return 1
+        return a.distance - b.distance
+      })
+
+    return { success: true, data: ordersWithDistance }
+  } catch (error) {
+    console.error("FEED_PRISMA_ERROR:", error)
+    return { success: false, error: "Ошибка при получении ленты" }
   }
-
-  if (lat && lng) {
-    // Магия SQL: выбираем заказы + считаем дистанцию (distance)
-    const orders = await prisma.$queryRaw`
-      SELECT o.*, u.name as "clientName", u.image as "clientImage",
-      (6371 * acos(
-          cos(radians(${lat})) * cos(radians(o.lat)) * 
-          cos(radians(o.lng) - radians(${lng})) + 
-          sin(radians(${lat})) * sin(radians(o.lat))
-      )) AS distance
-      FROM "order" o
-      JOIN "user" u ON o."clientId" = u.id
-      WHERE o."status" = 'PENDING'
-      AND o."category" = ANY(${profile.skills})
-      AND o."clientId" != ${userId}
-      AND (6371 * acos(
-          cos(radians(${lat})) * cos(radians(o.lat)) * 
-          cos(radians(o.lng) - radians(${lng})) + 
-          sin(radians(${lat})) * sin(radians(o.lat))
-      )) <= ${radiusKm}
-      ORDER BY distance ASC
-      LIMIT 50
-    `
-    return { success: true, data: orders as any[], needsSkills: false }
-  }
-
-  // Если координат нет, просто отдаем по навыкам
-  const orders = await prisma.order.findMany({
-    where: {
-      status: "PENDING",
-      category: { in: profile.skills },
-      clientId: { not: userId }
-    },
-    include: { client: { select: { name: true, image: true } } },
-    orderBy: { createdAt: 'desc' }
-  })
-
-  return { success: true, data: orders, needsSkills: false }
 }
+
+

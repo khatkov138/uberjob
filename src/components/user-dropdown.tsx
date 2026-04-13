@@ -1,10 +1,13 @@
 "use client";
 
-import { LogOutIcon, SettingsIcon, ShieldIcon, UserIcon } from "lucide-react";
-import Image from "next/image";
+import { LogOutIcon, SettingsIcon, ShieldIcon, UserIcon, BriefcaseIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button } from "./ui/button";
+import { 
+  Avatar, 
+  AvatarFallback, 
+  AvatarImage 
+} from "./ui/avatar"; // Убедись, что компонент установлен
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,70 +24,63 @@ interface UserDropdownProps {
   user: User
 }
 
-//import { createAuthClient } from "better-auth/react"
-//const { useSession } = createAuthClient()
-
 export function UserDropdown({ user }: UserDropdownProps) {
-
-
-  /* const {
-     data: session,
-     isPending, //loading state
-     error, //error object 
-     refetch //refetch the session 
-   } = useSession()*/
-
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline">
-          {/*isPending ? "true" : "false"*/}
-          {/*user.image ? (
-            <Image
-              src={user.image}
-              alt={user.name}
-              width={16}
-              height={16}
-              className="rounded-full object-cover"
-            />
-          ) : (
-            <UserIcon />
-          )*/}
-          <UserIcon />
-          <span className="max-w-[12rem] truncate">{user.name}</span>
-        </Button>
+        {/* Делаем триггер более чистым: только аватар и имя */}
+        <button className="flex items-center gap-3 p-1 pr-3 rounded-full hover:bg-muted/50 transition-all outline-none group">
+          <Avatar className="h-9 w-9 border-2 border-background shadow-sm transition-transform group-active:scale-95">
+            <AvatarImage src={user.image || ""} alt={user.name} />
+            <AvatarFallback className="bg-blue-600 text-white font-bold">
+              {user.name?.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <span className="hidden sm:block text-sm font-bold max-w-[8rem] truncate">
+            {user.name}
+          </span>
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {/* TODO: Hide admin item for non-admin users */}
-        {user.role === "admin" && <AdminItem />}
-        <DropdownMenuItem asChild>
-          <Link href="/profile">
-            <UserIcon className="size-4" /> <span>Profile</span>
+      
+      <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl shadow-xl border-blue-50/50">
+        <DropdownMenuLabel className="font-normal p-3">
+          <div className="flex flex-col space-y-1">
+            <p className="text-sm font-black leading-none">{user.name}</p>
+            <p className="text-xs leading-none text-muted-foreground mt-1 italic">{user.email}</p>
+          </div>
+        </DropdownMenuLabel>
+        
+        <DropdownMenuSeparator className="my-2" />
+        
+        {/* Ссылки на кабинеты в зависимости от роли */}
+        <DropdownMenuItem asChild className="rounded-xl h-10 cursor-pointer">
+          <Link href={user.role === "PRO" ? "/pro/dashboard" : "/client/dashboard"}>
+            <BriefcaseIcon className="mr-2 size-4 text-blue-600" />
+            <span className="font-medium">Рабочий стол</span>
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
+
+        <DropdownMenuItem asChild className="rounded-xl h-10 cursor-pointer">
           <Link href="/settings">
-            <SettingsIcon className="size-4" /> <span>Settings</span>
+            <SettingsIcon className="mr-2 size-4 text-slate-500" />
+            <span className="font-medium">Настройки</span>
           </Link>
         </DropdownMenuItem>
 
+        {user.role === "admin" && (
+          <DropdownMenuItem asChild className="rounded-xl h-10 cursor-pointer text-red-600 focus:text-red-600">
+            <Link href="/admin">
+              <ShieldIcon className="mr-2 size-4" />
+              <span className="font-medium">Админ-панель</span>
+            </Link>
+          </DropdownMenuItem>
+        )}
 
+        <DropdownMenuSeparator className="my-2" />
+        
         <SignOutItem />
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-function AdminItem() {
-  return (
-    <DropdownMenuItem asChild>
-      <Link href="/admin">
-        <ShieldIcon className="size-4" /> <span>Admin</span>
-      </Link>
-    </DropdownMenuItem>
   );
 }
 
@@ -94,17 +90,21 @@ function SignOutItem() {
   async function handleSignOut() {
     const { error } = await authClient.signOut()
     if (error) {
-      toast.error(error.message || "Something went wrong")
+      toast.error(error.message || "Ошибка выхода")
     } else {
-      toast.success("Signed out successfuly")
+      toast.success("Вы вышли из системы")
       router.push('/')
       router.refresh()
     }
   }
 
   return (
-    <DropdownMenuItem onClick={handleSignOut}>
-      <LogOutIcon className="size-4" /> <span>Sign out</span>
+    <DropdownMenuItem 
+      onClick={handleSignOut} 
+      className="rounded-xl h-10 cursor-pointer text-slate-500 focus:bg-red-50 focus:text-red-600 transition-colors"
+    >
+      <LogOutIcon className="mr-2 size-4" />
+      <span className="font-bold">Выйти</span>
     </DropdownMenuItem>
   );
 }

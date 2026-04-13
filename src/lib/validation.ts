@@ -17,3 +17,16 @@ export const createOrderSchema = z.object({
   dateType: z.enum(["ASAP", "SCHEDULED"]),
   scheduledDate: z.date().optional(),
 });
+
+
+
+export const updateProfileSchema = z.object({
+  name: z.string().trim().min(1, "Имя обязательно"),
+  // Используем .catch(null) или объединение типов, чтобы TS не путался
+  image: z.union([z.string(), z.null()]).optional(),
+  bio: z.union([z.string(), z.null()]).optional(),
+  // Массив должен быть обязательным в схеме, чтобы совпадать с типом формы
+  skills: z.array(z.string()),
+});
+
+export type UpdateProfileValues = z.infer<typeof updateProfileSchema>;
