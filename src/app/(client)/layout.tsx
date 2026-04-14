@@ -8,7 +8,7 @@ export default async function ProLayout({ children }: { children: React.ReactNod
   if(!session) redirect("/sign-in")
 
   if (session?.user.role !== Role.CLIENT) {
-    redirect("/pro/dashboard");
+  //  redirect("/pro/dashboard");
   }
 
   return (

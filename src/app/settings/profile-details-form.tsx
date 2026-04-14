@@ -75,45 +75,7 @@ export function ProfileDetailsForm({ user }: { user: any }) {
           </Field>
         )}
       />
-      <Controller
-        control={form.control}
-        name="skills"
-        render={({ field }) => (
-          <Field>
-            <FieldLabel className="font-bold">Ваши специализации</FieldLabel>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {AVAILABLE_SKILLS.map((skill) => {
-                const isActive = field.value?.includes(skill);
-                return (
-                  <button
-                    key={skill}
-                    type="button"
-                    onClick={() => {
-                      const current = field.value || [];
-                      const next = isActive
-                        ? current.filter((s) => s !== skill)
-                        : [...current, skill];
-                      field.onChange(next);
-                    }}
-                    className={cn(
-                      "px-4 py-2 rounded-xl text-xs font-black transition-all border-2 uppercase tracking-tighter",
-                      isActive
-                        ? "bg-blue-600 border-blue-600 text-white shadow-md scale-105"
-                        : "bg-slate-50 border-slate-200 text-slate-500 hover:border-blue-300"
-                    )}
-                  >
-                    {skill}
-                    {isActive && " ✓"}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-2 italic font-medium">
-              Выберите навыки, чтобы мы могли подсвечивать подходящие заказы в вашей ленте.
-            </p>
-          </Field>
-        )}
-      />
+      
 
       {/* Кнопка сохранить теперь одна для всей формы */}
       <LoadingButton type="submit" loading={form.formState.isSubmitting}>

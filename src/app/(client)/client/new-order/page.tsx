@@ -7,138 +7,108 @@ import { useMutation } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
-// UI Components
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Field, FieldLabel, FieldError } from "@/components/ui/field"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-
-// Наш новый компонент
 import { AddressInput } from "@/components/geo/address-input"
 
-// Icons
 import { Sparkles, MapPin, Wallet, Clock, Rocket, Loader2 } from "lucide-react"
-
 import { createOrderSchema, type CreateOrderValues } from "@/lib/validation"
 import { createOrder } from "./actions"
-import { getServerLocation } from "@/app/actions/geo"
+import { useClientLocationStore } from "@/store/use-client-location-store"
 
 export default function NewOrderPage() {
     const router = useRouter()
     const [isLocating, setIsLocating] = React.useState(false);
-    const [locationSource, setLocationSource] = React.useState<"IP" | "GPS" | null>(null);
+
+    const { lastCity, lastLat, lastLng, setClientLocation } = useClientLocationStore()
+
+    console.log(lastCity, lastLat, lastLng)
 
     const form = useForm<CreateOrderValues>({
         resolver: zodResolver(createOrderSchema),
         defaultValues: {
-            title: "",
             description: "",
-            address: "",
-            lat: 0,
-            lng: 0,
+            // Подставляем данные из стора в дефолтные значения формы
+            address: lastCity || "",
+            lat: lastLat || 0,
+            lng: lastLng || 0,
             price: 1000,
-            priority: "MEDIUM",
             dateType: "ASAP",
         }
     })
 
-    // Инициализация локации (IP -> GPS)
     React.useEffect(() => {
-        async function initGeo() {
-            setIsLocating(true);
-            try {
-                const geo = await getServerLocation();
-                if (!form.getValues("address")) {
-                    form.setValue("address", geo.city, { shouldValidate: true });
-                    form.setValue("lat", geo.lat);
-                    form.setValue("lng", geo.lng);
-                    setLocationSource("IP");
-                }
-
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition((pos) => {
-                        form.setValue("lat", pos.coords.latitude);
-                        form.setValue("lng", pos.coords.longitude);
-                        setLocationSource("GPS");
-                    });
-                }
-            } catch (e) {
-                console.error("Geo init error", e);
-            } finally {
-                setIsLocating(false);
-            }
+        if (lastCity) {
+            form.setValue("address", lastCity);
+            form.setValue("lat", lastLat);
+            form.setValue("lng", lastLng);
         }
-        initGeo();
-    }, [form]);
+    }, [lastCity, lastLat, lastLng, form]);
+
 
     const mutation = useMutation({
         mutationFn: createOrder,
         onSuccess: (res) => {
             if (res.success) {
-                toast.success(`ИИ определил категорию: ${res.aiCategory}`)
+                toast.success(`Заказ создан! Категория: ${res.aiCategory}`)
                 router.push(`/client/orders/${res.orderId}`)
             } else {
-                toast.error(res.error)
+                toast.error(res.error || "Произошла ошибка")
             }
         }
     })
 
-    const onSubmit = (data: CreateOrderValues) => mutation.mutate(data);
+    const onSubmit = (data: CreateOrderValues) => {
+        mutation.mutate(data);
+    };
 
     return (
         <div className="max-w-2xl mx-auto py-10 space-y-8 px-4">
-            <div className="text-center space-y-2">
-                <h1 className="text-4xl font-black tracking-tight italic uppercase">Новая задача</h1>
-                <p className="text-muted-foreground font-medium italic">Опишите проблему, а AI сделает всё остальное</p>
-            </div>
+            <header className="text-center space-y-2">
+                <h1 className="text-4xl font-black tracking-tight italic uppercase italic">Создать заказ</h1>
+                <p className="text-muted-foreground font-medium italic text-sm">Расскажите, что случилось. Остальное сделает нейросеть.</p>
+            </header>
 
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <Card className="p-6 border-2 shadow-none rounded-[2.5rem]">
-                    <CardContent className="space-y-6 p-0">
+                <Card className="p-8 border-2 shadow-none rounded-[3rem] bg-white">
+                    <CardContent className="space-y-8 p-0">
 
-                        <Controller
-                            control={form.control}
-                            name="title"
-                            render={({ field, fieldState }) => (
-                                <Field>
-                                    <FieldLabel className="font-bold">Название задачи</FieldLabel>
-                                    <Input placeholder="Например: Починить розетку" {...field} className="h-12 rounded-2xl" />
-                                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                                </Field>
-                            )}
-                        />
-
+                        {/* ОПИСАНИЕ */}
                         <Controller
                             control={form.control}
                             name="description"
                             render={({ field, fieldState }) => (
                                 <Field>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <FieldLabel className="font-bold mb-0">Подробности</FieldLabel>
-                                        <Badge variant="secondary" className="gap-1 text-[10px] uppercase bg-blue-50 text-blue-600 border-none px-3 py-1">
-                                            <Sparkles className="w-3 h-3" /> AI Анализ
+                                    <div className="flex items-center justify-between mb-3">
+                                        <FieldLabel className="font-bold text-lg mb-0 italic">Что нужно сделать?</FieldLabel>
+                                        <Badge className="bg-blue-600 gap-1 px-3 py-1">
+                                            <Sparkles className="w-3 h-3 fill-current" /> AI Смарт
                                         </Badge>
                                     </div>
                                     <Textarea
-                                        placeholder="Опишите детали..."
-                                        className="min-h-[100px] rounded-2xl resize-none bg-muted/20 border-none focus-visible:ring-blue-500"
+                                        placeholder="Например: Повесить полку в ванной. Нужен свой перфоратор..."
+                                        className="min-h-[140px] rounded-[2rem] p-6 text-lg bg-slate-50 border-none focus-visible:ring-blue-600 transition-all resize-none shadow-inner"
                                         {...field}
                                     />
+                                    <p className="text-[10px] text-slate-400 mt-2 ml-2 italic">Опишите только суть работы — так AI точнее подберет специалиста</p>
                                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                                 </Field>
                             )}
                         />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {/* Бюджет */}
                             <Controller
                                 control={form.control}
                                 name="price"
                                 render={({ field: { onChange, value, ...field }, fieldState }) => (
                                     <Field>
-                                        <FieldLabel className="font-bold flex items-center gap-2">
+                                        <FieldLabel className="font-bold flex items-center gap-2 italic">
                                             <Wallet className="w-4 h-4 text-emerald-500" /> Бюджет (₽)
                                         </FieldLabel>
                                         <Input
@@ -146,61 +116,70 @@ export default function NewOrderPage() {
                                             {...field}
                                             value={value?.toString() ?? ""}
                                             onChange={(e) => onChange(e.target.valueAsNumber || 0)}
-                                            className="h-12 rounded-2xl"
+                                            className="h-14 rounded-2xl text-lg font-bold bg-slate-50 border-none shadow-inner"
                                         />
                                         {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                                     </Field>
                                 )}
                             />
+
+                            {/* Населенный пункт */}
 
                             <Controller
                                 control={form.control}
                                 name="address"
                                 render={({ field, fieldState }) => (
                                     <Field>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <FieldLabel className="font-bold mb-0 flex items-center gap-2">
-                                                <MapPin className="w-4 h-4 text-blue-500" /> Населенный пункт
-                                            </FieldLabel>
-                                            {locationSource && (
-                                                <span className="text-[9px] font-black uppercase text-blue-500 bg-blue-50 px-2 py-0.5 rounded transition-all animate-in fade-in">
-                                                    {locationSource}
-                                                </span>
-                                            )}
-                                        </div>
-
+                                        <FieldLabel className="font-bold italic">Населенный пункт</FieldLabel>
                                         <AddressInput
-                                          
+                                            placeholder="Название города или поселка..."
                                             defaultValue={field.value}
                                             onSelect={(data) => {
+                                                // 1. Обновляем форму
                                                 form.setValue("address", data.address, { shouldValidate: true });
-                                                form.setValue("lat", data.lat);
-                                                form.setValue("lng", data.lng);
-                                                setLocationSource(null); 
+                                                form.setValue("lat", data.lat, { shouldValidate: true });
+                                                form.setValue("lng", data.lng, { shouldValidate: true });
+
+                                                // 2. Сохраняем в Zustand для следующего раза
+                                                setClientLocation(data.address, data.lat, data.lng);
+                                            }}
+                                            // НОВОЕ: Если пользователь просто ТИПАЕТ текст (не выбрал из списка)
+                                            onChange={(val) => {
+                                                form.setValue("address", val);
+                                                // СБРАСЫВАЕМ координаты в 0, чтобы форма стала невалидной
+                                                form.setValue("lat", 0);
+                                                form.setValue("lng", 0);
                                             }}
                                         />
-                                        <p className="text-[10px] text-muted-foreground mt-2 italic leading-tight">
-                                            Укажите только ваш город или район. Точный адрес (дом/кв) вы сообщите мастеру позже в чате.
-                                        </p>
-                                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+
+                                        {/* Выводим ошибку, если город не выбран из списка */}
+                                        {(fieldState.error || form.formState.errors.lat) && (
+                                            <p className="text-[12px] text-red-500 mt-2 font-bold animate-pulse">
+                                                ⚠️ Пожалуйста, выберите город из выпадающего списка
+                                            </p>
+                                        )}
                                     </Field>
                                 )}
                             />
-
                         </div>
 
+                        {/* ВЫБОР СРОКОВ */}
                         <Controller
                             control={form.control}
                             name="dateType"
                             render={({ field }) => (
                                 <Field>
-                                    <FieldLabel className="font-bold flex items-center gap-2">
-                                        <Clock className="w-4 h-4 text-slate-500" /> Срочность
+                                    <FieldLabel className="font-bold flex items-center gap-2 italic mb-3">
+                                        <Clock className="w-4 h-4 text-slate-500" /> Когда приступить?
                                     </FieldLabel>
                                     <Tabs onValueChange={field.onChange} defaultValue={field.value} className="w-full">
-                                        <TabsList className="grid w-full grid-cols-2 h-12 rounded-2xl bg-muted/50 p-1">
-                                            <TabsTrigger value="ASAP" className="rounded-xl data-[state=active]:bg-background font-bold transition-all">Срочно</TabsTrigger>
-                                            <TabsTrigger value="SCHEDULED" className="rounded-xl data-[state=active]:bg-background font-bold transition-all">В срок</TabsTrigger>
+                                        <TabsList className="grid w-full grid-cols-2 h-14 rounded-2xl bg-slate-100 p-1">
+                                            <TabsTrigger value="ASAP" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-md font-black italic transition-all uppercase">
+                                                Срочно
+                                            </TabsTrigger>
+                                            <TabsTrigger value="SCHEDULED" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-md font-black italic transition-all uppercase">
+                                                В срок
+                                            </TabsTrigger>
                                         </TabsList>
                                     </Tabs>
                                 </Field>
@@ -212,15 +191,15 @@ export default function NewOrderPage() {
                 <Button
                     type="submit"
                     disabled={mutation.isPending || isLocating}
-                    className="w-full h-14 text-lg font-black rounded-[1.5rem] shadow-xl shadow-blue-500/10 transition-all active:scale-[0.98]"
+                    className="w-full h-16 text-xl font-black rounded-[2rem] bg-slate-900 hover:bg-blue-600 text-white shadow-2xl transition-all active:scale-95 uppercase italic"
                 >
                     {mutation.isPending ? (
-                        <div className="flex items-center gap-2 italic">
-                            <Loader2 className="w-5 h-5 animate-spin" /> Анализируем...
+                        <div className="flex items-center gap-3">
+                            <Loader2 className="w-6 h-6 animate-spin" /> Анализируем...
                         </div>
                     ) : (
-                        <span className="flex items-center gap-2">
-                            Опубликовать задачу <Rocket className="w-5 h-5" />
+                        <span className="flex items-center gap-3">
+                            Опубликовать <Rocket className="w-6 h-6" />
                         </span>
                     )}
                 </Button>

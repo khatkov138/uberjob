@@ -1,150 +1,242 @@
 "use client"
 
 import * as React from "react"
-import { useQuery } from "@tanstack/react-query"
-import { getSmartNearbyFeed } from "./actions"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { getSmartNearbyFeed, toggleMasterSkill } from "./actions"
 import { OrderStatusCard } from "@/components/dashboard/order-status-card"
 import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, MapPin, Navigation, Sparkles, Filter, ChevronDown, Tag } from "lucide-react"
+import { 
+  Loader2, 
+  MapPin, 
+  Navigation, 
+  Sparkles, 
+  ChevronDown, 
+  X, 
+  Plus, 
+  Check,
+  Zap
+} from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { authClient } from "@/lib/auth-client"
 import { useLocationStore } from "@/store/use-location-store" 
 import { LocationModal } from "@/components/geo/location-modal"
-import { Badge } from "@/components/ui/badge"
 
 export default function SmartFeedPage() {
+  const queryClient = useQueryClient()
   const { data: session, isPending: isAuthLoading } = authClient.useSession()
-  const { lat, lng, radius, city, setRadius, isModalOpen, openModal, closeModal } = useLocationStore()
-  const [showOnlySkills, setShowOnlySkills] = React.useState(false)
+  
+  // Гео-данные из Zustand
+  const { lat, lng, radius, city, setRadius, openModal } = useLocationStore()
+  
+  // Режим фильтрации: "Все категории" или "Мои категории"
+  const [filterMode, setFilterMode] = React.useState<"ALL" | "MY">("ALL")
 
-  const { data, isLoading: isQueryLoading } = useQuery({
+  // 1. Загрузка заказов
+  const { data: ordersData, isLoading: isQueryLoading } = useQuery({
     queryKey: ["pro-feed", lat, lng, radius, session?.user?.id],
     queryFn: () => getSmartNearbyFeed(lat, lng, radius),
     enabled: !!lat && !!session?.user,
   })
 
-  const allOrders = data?.data || []
-  const filteredOrders = showOnlySkills ? allOrders.filter((o: any) => o.isMatch) : allOrders
-  const isLoading = isAuthLoading || (isQueryLoading && !data)
+  // 2. Загрузка профиля (чтобы знать выбранные категории мастера)
+  const { data: profile } = useQuery({
+    queryKey: ["user-profile", session?.user?.id],
+    queryFn: async () => {
+      const res = await fetch("/api/user/profile")
+      return res.json()
+    },
+    enabled: !!session?.user?.id
+  })
+
+  // 3. Мутация для мгновенного переключения категорий
+  const toggleMutation = useMutation({
+    mutationFn: toggleMasterSkill,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] })
+      queryClient.invalidateQueries({ queryKey: ["pro-feed"] })
+    }
+  })
+
+  const userCategories = profile?.skills || []
+  const allOrders = ordersData?.data || []
+  
+  // Фильтрация списка на клиенте
+  const filteredOrders = filterMode === "MY" 
+    ? allOrders.filter((o: any) => userCategories.includes(o.category)) 
+    : allOrders
+
+  const isLoading = isAuthLoading || (isQueryLoading && !ordersData)
 
   if (isLoading) return (
     <div className="flex flex-col items-center justify-center p-20 gap-4">
       <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
-      <p className="text-sm font-bold text-muted-foreground animate-pulse italic">Загрузка заказов...</p>
+      <p className="text-sm font-bold text-muted-foreground animate-pulse italic">Настраиваем вашу ленту категорий...</p>
     </div>
   )
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 p-4 md:p-6">
+    <div className="max-w-4xl mx-auto space-y-8 p-4 md:p-6 pb-32">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-        <div className="space-y-1">
+        <div className="space-y-4 w-full md:w-auto">
           <h1 className="text-4xl font-black flex items-center gap-3 italic tracking-tighter uppercase">
-            Лента <Navigation className="w-8 h-8 text-blue-600 fill-current" />
+            Лента <Zap className="w-8 h-8 text-blue-600 fill-current" />
           </h1>
-          <button 
-            onClick={openModal}
-            className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-blue-100 shadow-sm hover:bg-blue-50 transition-all group active:scale-95"
-          >
-            <MapPin className="w-3.5 h-3.5 text-blue-500" />
-            <span className="text-blue-700 text-[11px] font-black uppercase tracking-wider">{city}</span>
-            <ChevronDown className="w-3 h-3 text-blue-400 group-hover:translate-y-0.5 transition-transform" />
-          </button>
+          
+          <div className="flex flex-wrap gap-2">
+            {/* Выбор города */}
+            <button 
+              onClick={openModal}
+              className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-blue-100 shadow-sm hover:bg-blue-50 transition-all active:scale-95"
+            >
+              <MapPin className="w-3.5 h-3.5 text-blue-500" />
+              <span className="text-blue-700 text-[11px] font-black uppercase tracking-wider">{city}</span>
+              <ChevronDown className="w-3 h-3 text-blue-400" />
+            </button>
+
+            {/* Выбор радиуса */}
+            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+              {[10, 30, 60, 100].map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRadius(r)}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-black rounded-lg transition-all uppercase",
+                    radius === r 
+                      ? "bg-white text-blue-600 shadow-sm" 
+                      : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  {r} км
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
+        {/* Переключатель ленты */}
         <div className="flex bg-muted/50 p-1.5 rounded-2xl border backdrop-blur-sm">
-          {[10, 30, 60, 100].map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRadius(r)}
-              className={cn(
-                "px-5 py-2 text-xs font-black rounded-xl transition-all duration-300",
-                radius === r ? "bg-white text-blue-600 shadow-sm ring-1 ring-black/5 scale-105" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {r} км
-            </button>
-          ))}
+          <button
+            onClick={() => setFilterMode("ALL")}
+            className={cn(
+              "px-6 py-2 text-[10px] font-black rounded-xl transition-all uppercase",
+              filterMode === "ALL" ? "bg-white text-blue-600 shadow-sm" : "text-muted-foreground"
+            )}
+          >
+            Все подряд
+          </button>
+          <button
+            onClick={() => setFilterMode("MY")}
+            className={cn(
+              "px-6 py-2 text-[10px] font-black rounded-xl transition-all uppercase",
+              filterMode === "MY" ? "bg-blue-600 text-white shadow-lg shadow-blue-200" : "text-muted-foreground"
+            )}
+          >
+            Мои категории
+          </button>
         </div>
       </header>
 
-      {/* ФИЛЬТР ПО НАВЫКАМ */}
-      <div className="flex items-center justify-between bg-slate-50 p-4 rounded-[2rem] border-2 border-dashed border-slate-200">
-        <div className="flex items-center gap-3">
-          <div className={cn("p-2 rounded-xl shadow-sm", showOnlySkills ? "bg-blue-600 text-white" : "bg-white text-slate-400 border")}>
-            <Filter className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="text-sm font-black italic leading-none">Умный фильтр</p>
-            <p className="text-[9px] text-muted-foreground uppercase font-bold mt-1 tracking-tighter">
-              {showOnlySkills ? "Только ваши навыки" : "Все заказы в радиусе"}
-            </p>
-          </div>
+      {/* Горизонтальный список активных категорий мастера */}
+      <div className="space-y-3">
+        <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 px-2">Ваши активные категории</h3>
+        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+          {userCategories.length > 0 ? (
+            userCategories.map((skill: string) => (
+              <button
+                key={skill}
+                onClick={() => toggleMutation.mutate(skill)}
+                className="group flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase whitespace-nowrap shadow-md shadow-blue-100 transition-all hover:bg-red-500"
+              >
+                {skill} <X className="w-3.5 h-3.5 opacity-70" />
+              </button>
+            ))
+          ) : (
+            <div className="flex items-center gap-2 px-2 py-1 text-[10px] font-bold text-slate-400 italic">
+              Подпишитесь на категории работ, нажимая на теги в заказах.
+            </div>
+          )}
         </div>
-        <button 
-          onClick={() => setShowOnlySkills(!showOnlySkills)}
-          className={cn("relative inline-flex h-8 w-14 items-center rounded-full transition-all duration-500", showOnlySkills ? "bg-blue-600" : "bg-slate-200")}
-        >
-          <span className={cn("inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform duration-300", showOnlySkills ? "translate-x-7" : "translate-x-1")} />
-        </button>
       </div>
 
-      <div className="grid gap-6 pb-20">
+      <div className="grid gap-6">
         {filteredOrders.length > 0 ? (
-          filteredOrders.map((order: any) => (
-            <Link key={order.id} href={`/pro/orders/${order.id}`} className="block group relative">
-              
-              {/* КАРТОЧКА ЗАКАЗА */}
-              <Card className={cn(
-                "overflow-hidden border-2 transition-all duration-500 rounded-[2.5rem]",
-                order.isMatch ? "border-blue-500/30 shadow-xl shadow-blue-500/5 bg-white" : "border-transparent opacity-90 hover:opacity-100"
-              )}>
-                <CardContent className="p-8">
-                  {/* ВЕРХНЯЯ ПАНЕЛЬ С БЕЙДЖЕМ КАТЕГОРИИ */}
-                  <div className="flex justify-between items-center mb-6">
-                    <div className={cn(
-                        "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border-2",
-                        order.isMatch 
-                          ? "bg-blue-50 border-blue-100 text-blue-600 shadow-sm shadow-blue-100" 
-                          : "bg-slate-50 border-slate-100 text-slate-500"
-                    )}>
-                      <Tag className="w-3 h-3" />
-                      {order.category || "Общие работы"}
-                    </div>
-                    
-                    {order.isMatch && (
-                      <div className="flex items-center gap-1 text-blue-600 animate-pulse">
-                         <Sparkles className="w-3.5 h-3.5 fill-current" />
-                         <span className="text-[10px] font-black uppercase italic">Для вас</span>
-                      </div>
-                    )}
+          filteredOrders.map((order: any) => {
+            const isMatched = userCategories.includes(order.category)
+            
+            return (
+              <div key={order.id} className="relative group">
+                {isMatched && (
+                  <div className="absolute -top-3 left-8 z-10 bg-blue-600 text-white text-[9px] font-black px-4 py-1.5 rounded-full shadow-xl flex items-center gap-1.5 uppercase tracking-tighter">
+                    <Sparkles className="w-3 h-3 fill-current" /> Для вас
                   </div>
+                )}
 
-                  <OrderStatusCard order={order} type="pro" />
-                  
-                  <div className="mt-6 pt-6 border-t flex items-center justify-between">
-                    <div className={cn(
-                      "flex items-center gap-2 font-black px-4 py-2 rounded-full text-xs transition-all",
-                      order.isMatch ? "bg-blue-600 text-white shadow-md" : "bg-slate-100 text-slate-600"
-                    )}>
-                      <MapPin className="w-4 h-4" />
-                      {order.distance ? `${order.distance.toFixed(1)} км` : "Рядом"}
+                <Card className={cn(
+                  "overflow-hidden border-2 transition-all duration-500 rounded-[2.5rem]",
+                  isMatched 
+                    ? "border-blue-500/30 shadow-xl bg-white" 
+                    : "border-transparent opacity-90 hover:opacity-100"
+                )}>
+                  <CardContent className="p-8">
+                    <div className="flex justify-between items-start mb-6">
+                      
+                      {/* Интерактивный тег категории */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          toggleMutation.mutate(order.category)
+                        }}
+                        className={cn(
+                          "group/tag flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all active:scale-95",
+                          isMatched 
+                            ? "bg-blue-50 border-blue-100 text-blue-600 shadow-sm" 
+                            : "bg-slate-50 border-slate-100 text-slate-500 hover:border-blue-400 hover:text-blue-600"
+                        )}
+                      >
+                        <div className="relative w-3.5 h-3.5">
+                           {isMatched ? (
+                             <Check className="w-3.5 h-3.5 transition-all group-hover/tag:scale-0 opacity-100 group-hover/tag:opacity-0" />
+                           ) : (
+                             <Plus className="w-3.5 h-3.5 transition-all group-hover/tag:scale-125" />
+                           )}
+                           {isMatched && <X className="w-3.5 h-3.5 absolute inset-0 opacity-0 group-hover/tag:opacity-100 group-hover/tag:scale-100 scale-50 transition-all text-red-500" />}
+                        </div>
+                        {order.category}
+                      </button>
+
+                      {isMatched && <div className="text-blue-600 animate-pulse"><Sparkles className="w-4 h-4 fill-current" /></div>}
                     </div>
-                    <span className="font-bold text-xs group-hover:translate-x-1 transition-transform flex items-center gap-1 text-slate-500">
-                      Смотреть детали <Navigation className="w-4 h-4 rotate-90 fill-slate-500" />
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))
+
+                    <Link href={`/pro/orders/${order.id}`}>
+                      <OrderStatusCard order={order} type="pro" />
+                    </Link>
+                    
+                    <div className="mt-6 pt-6 border-t flex items-center justify-between">
+                      <div className={cn(
+                        "flex items-center gap-2 font-black px-4 py-2 rounded-full text-xs transition-all",
+                        isMatched ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
+                      )}>
+                        <MapPin className="w-4 h-4" />
+                        {order.distance ? `${order.distance.toFixed(1)} км` : "Рядом"}
+                      </div>
+                      <Link 
+                        href={`/pro/orders/${order.id}`}
+                        className="font-bold text-[10px] flex items-center gap-1.5 text-slate-400 hover:text-blue-600 transition-colors uppercase tracking-[0.1em]"
+                      >
+                        Детали заказа <Navigation className="w-3.5 h-3.5 rotate-90" />
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          })
         ) : (
-          <div className="py-24 text-center border-4 border-dashed rounded-[3rem] bg-muted/10 space-y-4 px-6">
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm">
-              <MapPin className="w-8 h-8 text-slate-300" />
-            </div>
-            <p className="font-black text-xl italic tracking-tight">В этом районе пока тихо</p>
+          <div className="py-24 text-center border-4 border-dashed rounded-[3rem] bg-muted/10 space-y-4">
+            <p className="font-black text-lg italic text-slate-400">
+              {filterMode === "MY" ? "Нет заказов по вашим категориям" : "В этом радиусе пока тихо"}
+            </p>
           </div>
         )}
       </div>

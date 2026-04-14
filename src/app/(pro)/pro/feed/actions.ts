@@ -3,6 +3,7 @@
 
 import { getServerSession } from "@/lib/get-session"
 import prisma from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
 // Вспомогательная функция для расчета расстояния в км
@@ -39,7 +40,7 @@ export async function getSmartNearbyFeed(
     const allOrders = await prisma.order.findMany({
       where: {
         status: "PENDING",
-        clientId: { not: userId }
+      //  clientId: { not: userId }
       },
       include: {
         client: {
@@ -84,5 +85,35 @@ export async function getSmartNearbyFeed(
     return { success: false, error: "Ошибка при получении ленты" }
   }
 }
+
+
+export async function toggleMasterSkill(skill: string) {
+  const session = await getServerSession()
+  const userId = session?.user?.id
+  if (!userId) return { success: false }
+
+  // Ищем профиль мастера по userId
+  const profile = await prisma.profile.findUnique({
+    where: { userId },
+    select: { skills: true }
+  })
+
+  if (!profile) return { success: false, error: "Профиль не найден" }
+
+  const isExist = profile.skills.includes(skill)
+  const newSkills = isExist 
+    ? profile.skills.filter(s => s !== skill) 
+    : [...profile.skills, skill]
+
+  // Обновляем массив навыков в таблице profile
+  await prisma.profile.update({
+    where: { userId },
+    data: { skills: newSkills }
+  })
+
+  revalidatePath("/pro/feed")
+  return { success: true }
+}
+
 
 

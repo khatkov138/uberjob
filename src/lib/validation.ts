@@ -8,16 +8,19 @@ export const passwordSchema = z
     message: "Password must contain at least one special character",
   });
 
+
+
 export const createOrderSchema = z.object({
-  title: z.string().min(5, "Слишком короткое название"),
-  description: z.string().min(10, "Опишите задачу подробнее"),
-  address: z.string().min(2, "Выберите населенный пункт"), 
-  lat: z.number().refine(v => v !== 0, "Координаты не определены"),
-  lng: z.number().refine(v => v !== 0, "Координаты не определены"),
-  price: z.number().min(100),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH"]),
+  description: z.string().min(10, "Опишите задачу подробнее (минимум 10 символов)"),
+  address: z.string().min(1, "Укажите населенный пункт"),
+  // Валидация координат: не должны быть 0
+  lat: z.number().refine(val => val !== 0, "Нужно выбрать город из списка"),
+  lng: z.number().refine(val => val !== 0, "Нужно выбрать город из списка"),
+  price: z.number().min(100, "Минимальный бюджет 100₽"),
   dateType: z.enum(["ASAP", "SCHEDULED"]),
 });
+
+
 
 export type CreateOrderValues = z.infer<typeof createOrderSchema>;
 

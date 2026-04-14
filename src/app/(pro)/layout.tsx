@@ -8,7 +8,7 @@ export default async function ProLayout({ children }: { children: React.ReactNod
   
   // Если не мастер — выкидываем в клиентскую часть
   if (session?.user.role !== Role.PRO) {
-    redirect("/client/dashboard");
+   // redirect("/client/dashboard");
   }
 
   return (
