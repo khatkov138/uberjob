@@ -4,27 +4,37 @@ import { LogoutEverywhereButton } from "./logout-everywhere-button";
 import { PasswordForm } from "./password-form";
 import { ProfileDetailsForm } from "./profile-details-form";
 import { getServerSession } from "@/lib/get-session";
-import { unauthorized } from "next/navigation";
+import { forbidden, unauthorized } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { MailIcon, ShieldCheckIcon, UserCircleIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import prisma from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "Настройки профиля",
 };
 
 export default async function SettingsPage() {
-  const session = await getServerSession();
-  const user = session?.user;
 
-  if (!user) unauthorized();
+  const session = await getServerSession()
+
+  if(!session) return unauthorized()
+  // Достаем пользователя и связанные данные профиля
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    include: {
+      workerProfile: true // Убедись, что связь называется так в schema.prisma
+    }
+  })
+
+  if(!user) return forbidden()
 
   return (
     // Добавляем контейнер с максимальной шириной и отступами для чистого вида
     <main className="max-w-6xl mx-auto p-4 md:p-8 space-y-10">
-      
+
       {/* Секция предупреждения: теперь более "чистая" и акцентная */}
       {!user.emailVerified && <EmailVerificationAlert />}
 
@@ -36,12 +46,12 @@ export default async function SettingsPage() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-        
+
         {/* Левая колонка: Основные данные профиля */}
         <div className="lg:col-span-7 space-y-6">
           <div className="flex items-center gap-2 mb-4">
-             <UserCircleIcon className="w-5 h-5 text-blue-600" />
-             <h2 className="text-xl font-bold uppercase tracking-widest text-sm">Профиль</h2>
+            <UserCircleIcon className="w-5 h-5 text-blue-600" />
+            <h2 className="text-xl font-bold uppercase tracking-widest text-sm">Профиль</h2>
           </div>
           <div className="bg-card border-2 rounded-[2rem] p-6 md:p-8 shadow-sm">
             <ProfileDetailsForm user={user} />
@@ -50,13 +60,13 @@ export default async function SettingsPage() {
 
         {/* Правая колонка: Безопасность и аккаунт */}
         <div className="lg:col-span-5 space-y-8">
-          
+
           <div className="space-y-6">
             <div className="flex items-center gap-2 mb-4">
-               <ShieldCheckIcon className="w-5 h-5 text-emerald-600" />
-               <h2 className="text-xl font-bold uppercase tracking-widest text-sm">Безопасность</h2>
+              <ShieldCheckIcon className="w-5 h-5 text-emerald-600" />
+              <h2 className="text-xl font-bold uppercase tracking-widest text-sm">Безопасность</h2>
             </div>
-            
+
             <div className="space-y-6">
               <section className="bg-muted/30 rounded-[2rem] p-6 border">
                 <EmailForm currentEmail={user.email} />

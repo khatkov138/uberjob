@@ -9,14 +9,17 @@ export const passwordSchema = z
   });
 
 export const createOrderSchema = z.object({
-  title: z.string().min(5, "Заголовок слишком короткий"),
-  description: z.string().min(20, "Опишите задачу подробнее для AI"),
-  address: z.string().min(3, "Введите адрес"),
-  price: z.coerce.number().min(500, "Минимальный бюджет — 500 ₽"),
+  title: z.string().min(5, "Слишком короткое название"),
+  description: z.string().min(10, "Опишите задачу подробнее"),
+  address: z.string().min(2, "Выберите населенный пункт"), 
+  lat: z.number().refine(v => v !== 0, "Координаты не определены"),
+  lng: z.number().refine(v => v !== 0, "Координаты не определены"),
+  price: z.number().min(100),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]),
   dateType: z.enum(["ASAP", "SCHEDULED"]),
-  scheduledDate: z.date().optional(),
 });
+
+export type CreateOrderValues = z.infer<typeof createOrderSchema>;
 
 
 
