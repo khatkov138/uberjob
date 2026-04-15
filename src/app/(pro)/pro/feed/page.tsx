@@ -9,6 +9,7 @@ import { useLocationStore } from "@/store/use-location-store"
 import { LocationModal } from "@/components/geo/location-modal"
 import { FeedHeader } from "./feed-header"
 import { OrderCard } from "./order-card"
+import { Container } from "@/components/shared/container"
 
 export default function SmartFeedPage() {
   const queryClient = useQueryClient()
@@ -62,10 +63,9 @@ export default function SmartFeedPage() {
   )
 
   return (
-    // ДОБАВИЛ ФОН И МИНИМАЛЬНУЮ ВЫСОТУ
-    <main className="min-h-screen bg-slate-50/50">
-      <div className="max-w-4xl mx-auto space-y-10 p-4 md:p-8 pb-32">
-        
+    <Container className="bg-slate-50/50">
+      {/* Ограничитель ширины 4xl и вертикальные отступы внутри контейнера */}
+      <div className="space-y-10">
         <FeedHeader
           userCategories={userCategories}
           toggleCategory={(skill: string) => toggleMutation.mutate(skill)}
@@ -85,14 +85,14 @@ export default function SmartFeedPage() {
               />
             ))
           ) : (
-            <div className="py-32 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
+            <div className="py-32 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-200 shadow-sm">
               <div className="flex flex-col items-center gap-4">
                 <Inbox className="w-12 h-12 text-slate-200" />
                 <div className="space-y-1">
-                    <p className="font-black text-xl italic text-slate-400 uppercase tracking-tighter">
-                      {filterMode === "MY" ? "Нет подходящих заказов" : "В этом районе пока тихо"}
-                    </p>
-                    <p className="text-xs font-bold text-slate-300 uppercase tracking-widest">Попробуйте увеличить радиус поиска</p>
+                  <p className="font-black text-xl italic text-slate-400 uppercase tracking-tighter">
+                    {filterMode === "MY" ? "Нет подходящих заказов" : "В этом районе пока тихо"}
+                  </p>
+                  <p className="text-xs font-bold text-slate-300 uppercase tracking-widest">Попробуйте увеличить радиус поиска</p>
                 </div>
               </div>
             </div>
@@ -101,6 +101,6 @@ export default function SmartFeedPage() {
 
         <LocationModal />
       </div>
-    </main>
+    </Container>
   )
 }

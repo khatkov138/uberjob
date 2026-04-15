@@ -31,17 +31,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-     <html lang="ru" suppressHydrationWarning className="h-full">
-      <body className={`${geistSans.className} antialiased h-full flex flex-col overflow-hidden`}>
+          <html lang="ru" className="h-full">
+      <body className={`${geistSans.className} antialiased h-full flex flex-col overflow-hidden bg-white`}>
         <TanstackProvider>
-          <Navbar />
-          <LivePulseMarquee />
           
-          {/* 
-              flex-1 и min-h-0 позволяют контенту занимать 
-              всё место между хедером и футером.
-          */}
-          <main className="flex-1 flex flex-col min-h-0 relative bg-white">
+          {/* HEADER: flex-none значит, что он всегда будет занимать ровно свою высоту и не пикселем больше */}
+          <header className="flex-none z-50">
+            <Navbar />
+            <LivePulseMarquee />
+          </header>
+
+          {/* MAIN: flex-1 забирает ВСЁ оставшееся пространство экрана */}
+          <main className="flex-1 overflow-y-auto no-scrollbar relative">
               {children}
           </main>
 
