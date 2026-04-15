@@ -1,4 +1,3 @@
-// app/(pro)/pro/feed/page.tsx
 "use client"
 
 import * as React from "react"
@@ -10,29 +9,37 @@ import { useLocationStore } from "@/store/use-location-store"
 import { LocationModal } from "@/components/geo/location-modal"
 import { OrderCard } from "./order-card"
 import { FeedHeader } from "./feed-header"
-import { CategoryBar } from "./category-bar"
 
 export default function SmartFeedPage() {
   const queryClient = useQueryClient()
   const { data: session } = authClient.useSession()
   const { lat, lng, radius } = useLocationStore()
+
+  // Режим фильтрации: "ALL" - все заказы, "MY" - только по моим категориям
   const [filterMode, setFilterMode] = React.useState<"ALL" | "MY">("ALL")
 
+  // 1. Загружаем заказы в радиусе
   const { data: ordersData, isLoading: isQueryLoading } = useQuery({
     queryKey: ["pro-feed", lat, lng, radius, session?.user?.id],
     queryFn: () => getSmartNearbyFeed(lat, lng, radius),
     enabled: !!lat && !!session?.user,
   })
 
-  const { data: profile } = useQuery({
+  // 2. Загружаем профиль мастера, чтобы знать его категории (skills)
+  const { data: profile, isLoading: isProfileLoading } = useQuery({
     queryKey: ["user-profile", session?.user?.id],
-    queryFn: async () => (await fetch("/api/user/profile")).json(),
+    queryFn: async () => {
+      const res = await fetch("/api/user/profile")
+      return res.json()
+    },
     enabled: !!session?.user?.id
   })
 
+  // 3. Мутация для добавления/удаления категории
   const toggleMutation = useMutation({
     mutationFn: toggleMasterSkill,
     onSuccess: () => {
+      // Обновляем данные профиля и ленты после изменения
       queryClient.invalidateQueries({ queryKey: ["user-profile"] })
       queryClient.invalidateQueries({ queryKey: ["pro-feed"] })
     }
@@ -40,40 +47,54 @@ export default function SmartFeedPage() {
 
   const userCategories = profile?.skills || []
   const allOrders = ordersData?.data || []
+
+  // 4. Логика фильтрации: 
+  // Если режим "MY", оставляем только те заказы, где хотя бы одна категория совпадает с навыками мастера
   const filteredOrders = filterMode === "MY"
-    ? allOrders.filter((o: any) => userCategories.includes(o.categories))
+    ? allOrders.filter((order: any) =>
+      order.categories.some((cat: string) => userCategories.includes(cat))
+    )
     : allOrders
 
-  if (isQueryLoading && !ordersData) return (
+  const isLoading = isQueryLoading || isProfileLoading
+
+  if (isLoading && !ordersData) return (
     <div className="flex flex-col items-center justify-center p-20 gap-4">
       <Loader2 className="animate-spin text-blue-600 w-10 h-10" />
-      <p className="text-sm font-bold text-muted-foreground italic">Загружаем ленту...</p>
+      <p className="text-sm font-bold text-muted-foreground italic">Синхронизируем заказы...</p>
     </div>
   )
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 p-4 md:p-6 pb-32">
-      <FeedHeader filterMode={filterMode} setFilterMode={setFilterMode} />
-
-      <CategoryBar
-        userCategories={userCategories}
-        onRemove={(skill: string) => toggleMutation.mutate(skill)}
+      {/* Хедер с выбором города и радиуса */}
+      <FeedHeader
+        userCategories={profile?.skills || []} // Если profile еще undefined, уйдет []
+        toggleCategory={(skill: string) => toggleMutation.mutate(skill)}
+        filterMode={filterMode}
+        setFilterMode={setFilterMode}
       />
 
+     
+
+      {/* Список заказов */}
       <div className="grid gap-6">
         {filteredOrders.length > 0 ? (
           filteredOrders.map((order: any) => (
             <OrderCard
-              userCategories={profile.skills}
               key={order.id}
               order={order}
-              isMatched={userCategories.includes(order.category)}
+              userCategories={userCategories} // Массив строк ["Электрика", ...]
+              // Проверяем, подходит ли заказ (есть ли пересечение категорий)
+              isMatched={order.categories.some((cat: string) => userCategories.includes(cat))}
               toggleCategory={(skill: string) => toggleMutation.mutate(skill)}
             />
           ))
         ) : (
           <div className="py-24 text-center border-4 border-dashed rounded-[3rem] bg-muted/10">
-            <p className="font-black text-lg italic text-slate-400 uppercase">Здесь пока пусто</p>
+            <p className="font-black text-lg italic text-slate-400 uppercase">
+              {filterMode === "MY" ? "Нет подходящих категорий" : "В этом районе пока тихо"}
+            </p>
           </div>
         )}
       </div>

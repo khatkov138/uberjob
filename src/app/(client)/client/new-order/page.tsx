@@ -6,7 +6,7 @@ export default function NewOrderPage() {
       <header className="text-center space-y-2">
         <h1 className="text-4xl font-black tracking-tight italic uppercase italic">Создать заказ</h1>
         <p className="text-muted-foreground font-medium italic text-sm">
-          Расскажите, что случилось. Остальное сделает нейросеть.
+          Расскажите, что нужно сделать. ИИ сам подберет категорию работ.
         </p>
       </header>
 

@@ -116,4 +116,17 @@ export async function toggleMasterSkill(skill: string) {
 }
 
 
+export async function getAllCategories() {
+  try {
+    const categories = await prisma.category.findMany({
+      orderBy: { name: 'asc' }
+    });
+    return categories;
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    return [];
+  }
+}
+
+
 

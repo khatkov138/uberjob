@@ -75,13 +75,13 @@ export function CreateOrderForm() {
                         render={({ field, fieldState }) => (
                             <Field>
                                 <div className="flex items-center justify-between mb-3">
-                                    <FieldLabel className="font-bold text-lg mb-0 italic">Что случилось?</FieldLabel>
+                                    <FieldLabel className="font-bold text-lg mb-0 italic">Что нужно сделать?</FieldLabel>
                                     <Badge className="bg-blue-600 gap-1 px-3 py-1">
                                         <Sparkles className="w-3 h-3 fill-current" /> AI Смарт
                                     </Badge>
                                 </div>
                                 <Textarea
-                                    placeholder="Например: Нужно починить кран на кухне, начал подтекать снизу..."
+                                    placeholder="Например: Нужно починить кран на кухне..."
                                     className="min-h-[140px] rounded-[2rem] p-6 text-lg bg-slate-50 border-none focus-visible:ring-blue-600 transition-all resize-none shadow-inner"
                                     {...field}
                                 />

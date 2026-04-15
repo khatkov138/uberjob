@@ -74,6 +74,15 @@ enum DateType {
   SCHEDULED
 }
 
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  keywords  String[] // Для нашего фолбек-алгоритма
+  createdAt DateTime @default(now())
+
+  @@map("category")
+}
+
 model Order {
   id        String      @id @default(cuid())
   createdAt DateTime    @default(now())

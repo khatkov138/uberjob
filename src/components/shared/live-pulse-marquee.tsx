@@ -3,7 +3,17 @@
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 import { getLatestPublicOrders } from "@/app/actions/public-orders"
-import { Zap, MapPin } from "lucide-react"
+import { Zap, MapPin, Clock } from "lucide-react"
+
+function formatRelativeTime(date: Date) {
+  const diffInSeconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
+  if (diffInSeconds < 60) return 'только что';
+  const mins = Math.floor(diffInSeconds / 60);
+  if (mins < 60) return `${mins} мин. назад`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} ч. назад`;
+  return 'сегодня';
+}
 
 export function LivePulseMarquee() {
   const { data: orders } = useQuery({
@@ -14,49 +24,70 @@ export function LivePulseMarquee() {
 
   if (!orders || orders.length === 0) return null
 
-  // Тройной массив для бесконечной бесшовной прокрутки
   const displayOrders = [...orders, ...orders, ...orders]
 
   return (
     <div className="sticky top-[64px] z-40 w-full h-[48px] border-b bg-white/95 backdrop-blur-md overflow-hidden flex items-center shadow-sm">
       <div className="max-w-7xl mx-auto w-full px-4 flex items-center">
-        
-        {/* СТАТИЧНЫЙ ЗАГОЛОВОК (Пояснение) */}
+
+        {/* СТАТИЧНЫЙ ЗАГОЛОВОК */}
         <div className="flex items-center gap-3 pr-6 border-r border-slate-100 shrink-0 bg-white z-10 py-1">
-          <div className="relative flex items-center justify-center">
+          <div className="relative">
             <Zap className="w-4 h-4 text-blue-600 fill-current" />
-            <span className="absolute w-2 h-2 bg-blue-400 rounded-full animate-ping" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-600 rounded-full animate-ping" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-900 leading-none">
-              Сейчас заказывают
-            </span>
-            <span className="text-[8px] font-bold text-blue-600 uppercase italic leading-tight">
-              Live Pulse
-            </span>
-          </div>
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-900 leading-none">
+            Сейчас заказывают
+          </span>
         </div>
 
         {/* БЕГУЩАЯ СТРОКА */}
-        <div className="flex-1 overflow-hidden relative">
-          {/* Градиент для мягкого появления текста из-за заголовка */}
-          <div className="absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
-          
-          <div className="flex animate-marquee whitespace-nowrap gap-16 items-center">
+        <div className="flex-1 overflow-hidden relative h-full flex items-center">
+          {/* Градиент для плавного выплывания текста */}
+          <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+
+          <div className="flex animate-marquee whitespace-nowrap items-center">
             {displayOrders.map((order, idx) => (
-              <div key={`${order.id}-${idx}`} className="flex items-center gap-3">
-                <span className="text-[9px] font-black uppercase text-blue-500/50 tracking-tighter">
-                  #{order.category}
-                </span>
-                <span className="text-[11px] font-bold text-slate-700 tracking-tight">
-                  {order.title}
-                </span>
-                <div className="flex items-center gap-1 text-slate-300">
-                  <MapPin className="w-2.5 h-2.5" />
-                  <span className="text-[8px] font-black uppercase tracking-widest">
-                    {order.address}
+              <div key={`${order.id}-${idx}`} className="flex items-center">
+                
+                {/* КОНТЕНТ ЗАКАЗА */}
+                <div className="flex items-center gap-6 px-8">
+                  
+                  {/* ВРЕМЯ */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Clock className="w-3 h-3 text-slate-300" />
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-tighter">
+                      {formatRelativeTime(order.createdAt)}
+                    </span>
+                  </div>
+
+                  {/* КАТЕГОРИИ */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {order.categories?.map((cat: string, i: number) => (
+                      <span key={i} className="text-[11px] font-black uppercase text-blue-600 tracking-tighter">
+                        #{cat.replace(/\s+/g, '')}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* СУТЬ */}
+                  <span className="text-[13px] font-bold text-slate-800 tracking-tight">
+                    {order.title}
                   </span>
+
+                  {/* ГОРОД */}
+                  <div className="flex items-center gap-1.5 text-slate-400 shrink-0">
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-black uppercase tracking-widest italic">
+                      {order.address}
+                    </span>
+                  </div>
+
                 </div>
+
+                {/* ВЕРТИКАЛЬНЫЙ РАЗДЕЛИТЕЛЬ */}
+                <div className="h-4 w-px bg-slate-200" />
+                
               </div>
             ))}
           </div>

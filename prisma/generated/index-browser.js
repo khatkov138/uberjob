@@ -142,6 +142,13 @@ exports.Prisma.ProfileScalarFieldEnum = {
   lastLng: 'lastLng'
 };
 
+exports.Prisma.CategoryScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  keywords: 'keywords',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.OrderScalarFieldEnum = {
   id: 'id',
   createdAt: 'createdAt',
@@ -260,6 +267,7 @@ exports.DateType = exports.$Enums.DateType = {
 exports.Prisma.ModelName = {
   User: 'User',
   Profile: 'Profile',
+  Category: 'Category',
   Order: 'Order',
   Review: 'Review',
   Session: 'Session',
