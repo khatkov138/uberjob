@@ -85,7 +85,7 @@ export default async function ProDashboard() {
                   <Card className="overflow-hidden border-l-4 border-l-blue-600 transition-all hover:shadow-md active:scale-[0.99]">
                     <CardContent className="p-5">
                       <div className="transition-all group-hover:translate-x-1">
-                        <OrderStatusCard order={order} type="pro" />
+                       <OrderStatusCard order={order} showPrice={true} />
                       </div>
                     </CardContent>
                   </Card>

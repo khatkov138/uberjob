@@ -68,7 +68,7 @@ export async function getSmartNearbyFeed(
           distance,
           clientName: order.client.name, // Для совместимости с твоей версткой
           clientImage: order.client.image,
-          isMatch: masterSkills.includes(order.category)
+          isMatch: masterSkills.includes(order.categories[0])
         }
       })
       .filter(order => order.distance <= radiusKm) // Фильтр по радиусу

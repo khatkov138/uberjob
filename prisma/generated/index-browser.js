@@ -147,9 +147,10 @@ exports.Prisma.OrderScalarFieldEnum = {
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   status: 'status',
+  dateType: 'dateType',
   title: 'title',
   description: 'description',
-  category: 'category',
+  categories: 'categories',
   price: 'price',
   address: 'address',
   lat: 'lat',
@@ -249,6 +250,11 @@ exports.OrderStatus = exports.$Enums.OrderStatus = {
   IN_PROGRESS: 'IN_PROGRESS',
   COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED'
+};
+
+exports.DateType = exports.$Enums.DateType = {
+  ASAP: 'ASAP',
+  SCHEDULED: 'SCHEDULED'
 };
 
 exports.Prisma.ModelName = {

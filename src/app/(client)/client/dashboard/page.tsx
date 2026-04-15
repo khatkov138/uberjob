@@ -65,7 +65,7 @@ export default function ClientDashboard() {
                 {/* ДОБАВЛЯЕМ ОБЕРТКУ CARD ЗДЕСЬ */}
                 <Card className="overflow-hidden border-l-4 border-l-blue-500 transition-all hover:shadow-md hover:border-l-blue-600 active:scale-[0.99]">
                   <CardContent className="p-5">
-                    <OrderStatusCard order={order} type="client" />
+                   <OrderStatusCard order={order} showPrice={true} />
                   </CardContent>
                 </Card>
               </Link>
@@ -85,7 +85,7 @@ export default function ClientDashboard() {
                 {/* ДОБАВЛЯЕМ ОБЕРТКУ CARD ЗДЕСЬ */}
                 <Card className="overflow-hidden border-l-4 border-slate-300 transition-all hover:shadow-md active:scale-[0.99]">
                   <CardContent className="p-5">
-                    <OrderStatusCard order={order} type="client" />
+                  <OrderStatusCard order={order} showPrice={true} />
                   </CardContent>
                 </Card>
               </Link>

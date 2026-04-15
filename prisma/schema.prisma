@@ -69,15 +69,22 @@ enum OrderStatus {
   CANCELLED // Отменен
 }
 
+enum DateType {
+  ASAP
+  SCHEDULED
+}
+
 model Order {
   id        String      @id @default(cuid())
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   status    OrderStatus @default(PENDING)
 
+dateType    DateType    @default(ASAP)
+
   title       String
   description String
-  category    String
+   categories String[] 
   price       Int
   address     String
 

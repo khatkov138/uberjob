@@ -5,8 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Loader2, Briefcase, History, ChevronRight } from "lucide-react"
 import { getProOrders } from "./actions"
-import { OrderStatusCard } from "@/components/dashboard/order-status-card"
+
 import Link from "next/link"
+import { OrderStatusCard } from "@/components/dashboard/order-status-card"
 
 export default function ProOrdersPage() {
   const { data, isLoading } = useQuery({
@@ -51,7 +52,7 @@ export default function ProOrdersPage() {
               >
                 <Card className="overflow-hidden border-l-4 border-l-blue-600 transition-all hover:shadow-md active:scale-[0.99]">
                   <CardContent className="p-5 flex items-center justify-between">
-                    <OrderStatusCard order={order} type="pro" />
+                   <OrderStatusCard order={order} showPrice={true} />
                     <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                   </CardContent>
                 </Card>
@@ -73,7 +74,7 @@ export default function ProOrdersPage() {
               >
                 <Card className="overflow-hidden border-l-4 border-slate-300 transition-all hover:shadow-md grayscale-[0.5] hover:grayscale-0">
                   <CardContent className="p-5 flex items-center justify-between">
-                    <OrderStatusCard order={order} type="pro" />
+                  <OrderStatusCard order={order} showPrice={true} />
                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
                   </CardContent>
                 </Card>

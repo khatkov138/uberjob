@@ -83,6 +83,14 @@ export const OrderStatus: {
 
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus]
 
+
+export const DateType: {
+  ASAP: 'ASAP',
+  SCHEDULED: 'SCHEDULED'
+};
+
+export type DateType = (typeof DateType)[keyof typeof DateType]
+
 }
 
 export type Role = $Enums.Role
@@ -92,6 +100,10 @@ export const Role: typeof $Enums.Role
 export type OrderStatus = $Enums.OrderStatus
 
 export const OrderStatus: typeof $Enums.OrderStatus
+
+export type DateType = $Enums.DateType
+
+export const DateType: typeof $Enums.DateType
 
 /**
  * ##  Prisma Client ʲˢ
@@ -4231,9 +4243,9 @@ export namespace Prisma {
     createdAt: Date | null
     updatedAt: Date | null
     status: $Enums.OrderStatus | null
+    dateType: $Enums.DateType | null
     title: string | null
     description: string | null
-    category: string | null
     price: number | null
     address: string | null
     lat: number | null
@@ -4247,9 +4259,9 @@ export namespace Prisma {
     createdAt: Date | null
     updatedAt: Date | null
     status: $Enums.OrderStatus | null
+    dateType: $Enums.DateType | null
     title: string | null
     description: string | null
-    category: string | null
     price: number | null
     address: string | null
     lat: number | null
@@ -4263,9 +4275,10 @@ export namespace Prisma {
     createdAt: number
     updatedAt: number
     status: number
+    dateType: number
     title: number
     description: number
-    category: number
+    categories: number
     price: number
     address: number
     lat: number
@@ -4293,9 +4306,9 @@ export namespace Prisma {
     createdAt?: true
     updatedAt?: true
     status?: true
+    dateType?: true
     title?: true
     description?: true
-    category?: true
     price?: true
     address?: true
     lat?: true
@@ -4309,9 +4322,9 @@ export namespace Prisma {
     createdAt?: true
     updatedAt?: true
     status?: true
+    dateType?: true
     title?: true
     description?: true
-    category?: true
     price?: true
     address?: true
     lat?: true
@@ -4325,9 +4338,10 @@ export namespace Prisma {
     createdAt?: true
     updatedAt?: true
     status?: true
+    dateType?: true
     title?: true
     description?: true
-    category?: true
+    categories?: true
     price?: true
     address?: true
     lat?: true
@@ -4428,9 +4442,10 @@ export namespace Prisma {
     createdAt: Date
     updatedAt: Date
     status: $Enums.OrderStatus
+    dateType: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories: string[]
     price: number
     address: string
     lat: number | null
@@ -4463,9 +4478,10 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     status?: boolean
+    dateType?: boolean
     title?: boolean
     description?: boolean
-    category?: boolean
+    categories?: boolean
     price?: boolean
     address?: boolean
     lat?: boolean
@@ -4484,9 +4500,10 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     status?: boolean
+    dateType?: boolean
     title?: boolean
     description?: boolean
-    category?: boolean
+    categories?: boolean
     price?: boolean
     address?: boolean
     lat?: boolean
@@ -4502,9 +4519,10 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     status?: boolean
+    dateType?: boolean
     title?: boolean
     description?: boolean
-    category?: boolean
+    categories?: boolean
     price?: boolean
     address?: boolean
     lat?: boolean
@@ -4520,9 +4538,10 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     status?: boolean
+    dateType?: boolean
     title?: boolean
     description?: boolean
-    category?: boolean
+    categories?: boolean
     price?: boolean
     address?: boolean
     lat?: boolean
@@ -4531,7 +4550,7 @@ export namespace Prisma {
     workerId?: boolean
   }
 
-  export type OrderOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdAt" | "updatedAt" | "status" | "title" | "description" | "category" | "price" | "address" | "lat" | "lng" | "clientId" | "workerId", ExtArgs["result"]["order"]>
+  export type OrderOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "createdAt" | "updatedAt" | "status" | "dateType" | "title" | "description" | "categories" | "price" | "address" | "lat" | "lng" | "clientId" | "workerId", ExtArgs["result"]["order"]>
   export type OrderInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     client?: boolean | UserDefaultArgs<ExtArgs>
     worker?: boolean | Order$workerArgs<ExtArgs>
@@ -4561,9 +4580,10 @@ export namespace Prisma {
       createdAt: Date
       updatedAt: Date
       status: $Enums.OrderStatus
+      dateType: $Enums.DateType
       title: string
       description: string
-      category: string
+      categories: string[]
       price: number
       address: string
       lat: number | null
@@ -5001,9 +5021,10 @@ export namespace Prisma {
     readonly createdAt: FieldRef<"Order", 'DateTime'>
     readonly updatedAt: FieldRef<"Order", 'DateTime'>
     readonly status: FieldRef<"Order", 'OrderStatus'>
+    readonly dateType: FieldRef<"Order", 'DateType'>
     readonly title: FieldRef<"Order", 'String'>
     readonly description: FieldRef<"Order", 'String'>
-    readonly category: FieldRef<"Order", 'String'>
+    readonly categories: FieldRef<"Order", 'String[]'>
     readonly price: FieldRef<"Order", 'Int'>
     readonly address: FieldRef<"Order", 'String'>
     readonly lat: FieldRef<"Order", 'Float'>
@@ -12076,9 +12097,10 @@ export namespace Prisma {
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     status: 'status',
+    dateType: 'dateType',
     title: 'title',
     description: 'description',
-    category: 'category',
+    categories: 'categories',
     price: 'price',
     address: 'address',
     lat: 'lat',
@@ -12279,6 +12301,20 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'DateType'
+   */
+  export type EnumDateTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateType'>
+    
+
+
+  /**
+   * Reference to a field of type 'DateType[]'
+   */
+  export type ListEnumDateTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateType[]'>
+    
+
+
+  /**
    * Reference to a field of type 'Int'
    */
   export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
@@ -12466,9 +12502,10 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Order"> | Date | string
     updatedAt?: DateTimeFilter<"Order"> | Date | string
     status?: EnumOrderStatusFilter<"Order"> | $Enums.OrderStatus
+    dateType?: EnumDateTypeFilter<"Order"> | $Enums.DateType
     title?: StringFilter<"Order"> | string
     description?: StringFilter<"Order"> | string
-    category?: StringFilter<"Order"> | string
+    categories?: StringNullableListFilter<"Order">
     price?: IntFilter<"Order"> | number
     address?: StringFilter<"Order"> | string
     lat?: FloatNullableFilter<"Order"> | number | null
@@ -12486,9 +12523,10 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     status?: SortOrder
+    dateType?: SortOrder
     title?: SortOrder
     description?: SortOrder
-    category?: SortOrder
+    categories?: SortOrder
     price?: SortOrder
     address?: SortOrder
     lat?: SortOrderInput | SortOrder
@@ -12509,9 +12547,10 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Order"> | Date | string
     updatedAt?: DateTimeFilter<"Order"> | Date | string
     status?: EnumOrderStatusFilter<"Order"> | $Enums.OrderStatus
+    dateType?: EnumDateTypeFilter<"Order"> | $Enums.DateType
     title?: StringFilter<"Order"> | string
     description?: StringFilter<"Order"> | string
-    category?: StringFilter<"Order"> | string
+    categories?: StringNullableListFilter<"Order">
     price?: IntFilter<"Order"> | number
     address?: StringFilter<"Order"> | string
     lat?: FloatNullableFilter<"Order"> | number | null
@@ -12529,9 +12568,10 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     status?: SortOrder
+    dateType?: SortOrder
     title?: SortOrder
     description?: SortOrder
-    category?: SortOrder
+    categories?: SortOrder
     price?: SortOrder
     address?: SortOrder
     lat?: SortOrderInput | SortOrder
@@ -12553,9 +12593,10 @@ export namespace Prisma {
     createdAt?: DateTimeWithAggregatesFilter<"Order"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Order"> | Date | string
     status?: EnumOrderStatusWithAggregatesFilter<"Order"> | $Enums.OrderStatus
+    dateType?: EnumDateTypeWithAggregatesFilter<"Order"> | $Enums.DateType
     title?: StringWithAggregatesFilter<"Order"> | string
     description?: StringWithAggregatesFilter<"Order"> | string
-    category?: StringWithAggregatesFilter<"Order"> | string
+    categories?: StringNullableListFilter<"Order">
     price?: IntWithAggregatesFilter<"Order"> | number
     address?: StringWithAggregatesFilter<"Order"> | string
     lat?: FloatNullableWithAggregatesFilter<"Order"> | number | null
@@ -13169,9 +13210,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -13187,9 +13229,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -13205,9 +13248,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -13223,9 +13267,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -13241,9 +13286,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -13257,9 +13303,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -13271,9 +13318,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -14064,6 +14112,13 @@ export namespace Prisma {
     not?: NestedEnumOrderStatusFilter<$PrismaModel> | $Enums.OrderStatus
   }
 
+  export type EnumDateTypeFilter<$PrismaModel = never> = {
+    equals?: $Enums.DateType | EnumDateTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.DateType[] | ListEnumDateTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.DateType[] | ListEnumDateTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumDateTypeFilter<$PrismaModel> | $Enums.DateType
+  }
+
   export type IntFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel>
     in?: number[] | ListIntFieldRefInput<$PrismaModel>
@@ -14090,9 +14145,10 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     status?: SortOrder
+    dateType?: SortOrder
     title?: SortOrder
     description?: SortOrder
-    category?: SortOrder
+    categories?: SortOrder
     price?: SortOrder
     address?: SortOrder
     lat?: SortOrder
@@ -14112,9 +14168,9 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     status?: SortOrder
+    dateType?: SortOrder
     title?: SortOrder
     description?: SortOrder
-    category?: SortOrder
     price?: SortOrder
     address?: SortOrder
     lat?: SortOrder
@@ -14128,9 +14184,9 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     status?: SortOrder
+    dateType?: SortOrder
     title?: SortOrder
     description?: SortOrder
-    category?: SortOrder
     price?: SortOrder
     address?: SortOrder
     lat?: SortOrder
@@ -14153,6 +14209,16 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumOrderStatusFilter<$PrismaModel>
     _max?: NestedEnumOrderStatusFilter<$PrismaModel>
+  }
+
+  export type EnumDateTypeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.DateType | EnumDateTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.DateType[] | ListEnumDateTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.DateType[] | ListEnumDateTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumDateTypeWithAggregatesFilter<$PrismaModel> | $Enums.DateType
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumDateTypeFilter<$PrismaModel>
+    _max?: NestedEnumDateTypeFilter<$PrismaModel>
   }
 
   export type IntWithAggregatesFilter<$PrismaModel = never> = {
@@ -14791,6 +14857,10 @@ export namespace Prisma {
     deleteMany?: ReviewScalarWhereInput | ReviewScalarWhereInput[]
   }
 
+  export type OrderCreatecategoriesInput = {
+    set: string[]
+  }
+
   export type UserCreateNestedOneWithoutOrdersCreatedInput = {
     create?: XOR<UserCreateWithoutOrdersCreatedInput, UserUncheckedCreateWithoutOrdersCreatedInput>
     connectOrCreate?: UserCreateOrConnectWithoutOrdersCreatedInput
@@ -14831,6 +14901,15 @@ export namespace Prisma {
 
   export type EnumOrderStatusFieldUpdateOperationsInput = {
     set?: $Enums.OrderStatus
+  }
+
+  export type EnumDateTypeFieldUpdateOperationsInput = {
+    set?: $Enums.DateType
+  }
+
+  export type OrderUpdatecategoriesInput = {
+    set?: string[]
+    push?: string | string[]
   }
 
   export type IntFieldUpdateOperationsInput = {
@@ -15209,6 +15288,13 @@ export namespace Prisma {
     not?: NestedEnumOrderStatusFilter<$PrismaModel> | $Enums.OrderStatus
   }
 
+  export type NestedEnumDateTypeFilter<$PrismaModel = never> = {
+    equals?: $Enums.DateType | EnumDateTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.DateType[] | ListEnumDateTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.DateType[] | ListEnumDateTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumDateTypeFilter<$PrismaModel> | $Enums.DateType
+  }
+
   export type NestedEnumOrderStatusWithAggregatesFilter<$PrismaModel = never> = {
     equals?: $Enums.OrderStatus | EnumOrderStatusFieldRefInput<$PrismaModel>
     in?: $Enums.OrderStatus[] | ListEnumOrderStatusFieldRefInput<$PrismaModel>
@@ -15217,6 +15303,16 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumOrderStatusFilter<$PrismaModel>
     _max?: NestedEnumOrderStatusFilter<$PrismaModel>
+  }
+
+  export type NestedEnumDateTypeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.DateType | EnumDateTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.DateType[] | ListEnumDateTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.DateType[] | ListEnumDateTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumDateTypeWithAggregatesFilter<$PrismaModel> | $Enums.DateType
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumDateTypeFilter<$PrismaModel>
+    _max?: NestedEnumDateTypeFilter<$PrismaModel>
   }
 
   export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
@@ -15362,9 +15458,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -15379,9 +15476,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -15406,9 +15504,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -15423,9 +15522,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -15621,9 +15721,10 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Order"> | Date | string
     updatedAt?: DateTimeFilter<"Order"> | Date | string
     status?: EnumOrderStatusFilter<"Order"> | $Enums.OrderStatus
+    dateType?: EnumDateTypeFilter<"Order"> | $Enums.DateType
     title?: StringFilter<"Order"> | string
     description?: StringFilter<"Order"> | string
-    category?: StringFilter<"Order"> | string
+    categories?: StringNullableListFilter<"Order">
     price?: IntFilter<"Order"> | number
     address?: StringFilter<"Order"> | string
     lat?: FloatNullableFilter<"Order"> | number | null
@@ -16104,9 +16205,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -16121,9 +16223,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -16181,9 +16284,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -16198,9 +16302,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -16539,9 +16644,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -16556,9 +16662,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -16634,9 +16741,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -16651,9 +16759,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -16693,9 +16802,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -16708,9 +16818,10 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     status?: $Enums.OrderStatus
+    dateType?: $Enums.DateType
     title: string
     description: string
-    category: string
+    categories?: OrderCreatecategoriesInput | string[]
     price: number
     address: string
     lat?: number | null
@@ -16815,9 +16926,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -16832,9 +16944,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -16849,9 +16962,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -16864,9 +16978,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -16881,9 +16996,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -16898,9 +17014,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     status?: EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+    dateType?: EnumDateTypeFieldUpdateOperationsInput | $Enums.DateType
     title?: StringFieldUpdateOperationsInput | string
     description?: StringFieldUpdateOperationsInput | string
-    category?: StringFieldUpdateOperationsInput | string
+    categories?: OrderUpdatecategoriesInput | string[]
     price?: IntFieldUpdateOperationsInput | number
     address?: StringFieldUpdateOperationsInput | string
     lat?: NullableFloatFieldUpdateOperationsInput | number | null
