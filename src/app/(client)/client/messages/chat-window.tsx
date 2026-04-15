@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { getChatMessages, sendMessage } from "./actions"
 
-
 export function ChatWindow({ orderId, workerId, currentUserId }: any) {
     const [text, setText] = React.useState("")
     const scrollAreaRef = React.useRef<HTMLDivElement>(null)
@@ -19,7 +18,6 @@ export function ChatWindow({ orderId, workerId, currentUserId }: any) {
         refetchInterval: 3000,
     })
 
-    // Умный скролл
     const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
         if (scrollAreaRef.current) {
             scrollAreaRef.current.scrollTo({
@@ -32,7 +30,6 @@ export function ChatWindow({ orderId, workerId, currentUserId }: any) {
     React.useEffect(() => {
         if (!messages || !scrollAreaRef.current) return
         const container = scrollAreaRef.current
-        // Если пользователь не сильно отскроллил вверх, докручиваем до конца
         const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 200
         if (isAtBottom) {
             setTimeout(() => scrollToBottom("smooth"), 100)
@@ -44,30 +41,37 @@ export function ChatWindow({ orderId, workerId, currentUserId }: any) {
         onSuccess: () => {
             setText("")
             queryClient.invalidateQueries({ queryKey: ["chat"] })
-            setTimeout(() => scrollToBottom("smooth"), 100) // После своего сообщения — всегда вниз
+            setTimeout(() => scrollToBottom("smooth"), 100)
         }
     })
 
-    return (
-        <div className="flex flex-col h-full"> {/* h-full теперь берется от родителя */}
+    const handleSend = () => {
+        if (!text.trim() || mutation.isPending) return
+        mutation.mutate({ orderId, recipientId: workerId, text: text.trim() })
+    }
 
-            {/* 1. СООБЩЕНИЯ (скроллятся только они) */}
+    return (
+       <div className="flex flex-col h-full min-h-0 bg-white relative">
+
+            {/* 1. ОБЛАСТЬ СООБЩЕНИЙ (Скроллится) */}
             <div
                 ref={scrollAreaRef}
-                className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/30 no-scrollbar"
+                className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 bg-slate-50/10 no-scrollbar min-h-0"
             >
-                <div className="max-w-4xl mx-auto space-y-6">
+                <div className="max-w-2xl mx-auto space-y-6 pt-4 pb-10">
                     {messages?.map((msg: any) => {
                         const isMe = msg.senderId === currentUserId
                         return (
                             <div key={msg.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
                                 <div className={cn(
-                                    "max-w-[80%] p-4 rounded-[1.5rem] text-[15px] font-medium shadow-sm",
-                                    isMe ? "bg-blue-600 text-white rounded-br-none" : "bg-white text-slate-900 border border-slate-100 rounded-bl-none"
+                                    "max-w-[85%] p-4 px-6 rounded-3xl text-[15px] font-medium transition-all border break-words",
+                                    isMe 
+                                        ? "bg-blue-600 text-white border-blue-600 rounded-br-none shadow-sm" 
+                                        : "bg-white text-slate-900 border-slate-200 rounded-bl-none shadow-sm"
                                 )}>
                                     {msg.text}
                                 </div>
-                                <span className="text-[9px] font-black uppercase text-slate-300 mt-2 px-2">
+                                <span className="text-[9px] font-black uppercase text-slate-300 mt-2 px-3 tracking-widest">
                                     {format(new Date(msg.createdAt), "HH:mm")}
                                 </span>
                             </div>
@@ -76,23 +80,30 @@ export function ChatWindow({ orderId, workerId, currentUserId }: any) {
                 </div>
             </div>
 
-            {/* 2. ПОЛЕ ВВОДА (всегда прижато к низу) */}
-            <div className="flex-shrink-0 p-6 bg-white border-t border-slate-100">
-                <div className="max-w-4xl mx-auto relative flex items-center gap-3">
-                    <input
-                        className="flex-1 h-14 pl-6 pr-16 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-blue-600 font-medium transition-all"
-                        placeholder="Напишите сообщение..."
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && text && mutation.mutate({ orderId, recipientId: workerId, text })}
-                    />
-                    <button
-                        disabled={!text.trim() || mutation.isPending}
-                        onClick={() => mutation.mutate({ orderId, recipientId: workerId, text })}
-                        className="absolute right-2 w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50"
-                    >
-                        {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    </button>
+            {/* 2. ПАНЕЛЬ ВВОДА (Жестко внизу) */}
+            <div className="flex-none p-4 md:p-6 bg-white border-t border-slate-100 z-10">
+                <div className="max-w-2xl mx-auto">
+                    <div className="relative flex items-center gap-3 bg-slate-50 p-2 pl-5 rounded-2xl border-2 border-slate-100 transition-all focus-within:border-blue-600 focus-within:bg-white focus-within:shadow-lg focus-within:shadow-blue-500/5">
+                        <input
+                            className="flex-1 h-12 bg-transparent outline-none font-medium text-slate-900 placeholder:text-slate-400 text-sm"
+                            placeholder="Напишите сообщение..."
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                        />
+                        <button
+                            disabled={!text.trim() || mutation.isPending}
+                            onClick={handleSend}
+                            className={cn(
+                                "w-12 h-12 rounded-xl flex items-center justify-center transition-all shrink-0",
+                                text.trim() 
+                                    ? "bg-slate-900 text-white hover:bg-blue-600 active:scale-95 shadow-md" 
+                                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                            )}
+                        >
+                            {mutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

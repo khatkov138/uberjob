@@ -1,22 +1,31 @@
+"use client"
 import Link from "next/link";
-import { 
-  Rocket, 
-  
-  Mail, 
-  MapPin, 
-  ExternalLink, 
+import {
+  Rocket,
+
+  Mail,
+  MapPin,
+  ExternalLink,
   XIcon
 } from "lucide-react";
 import { GitHubIcon } from "./icons/GitHubIcon";
+import { usePathname } from "next/navigation";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+
+  const pathname = usePathname()
+
+  // Список страниц, где футер НЕ НУЖЕН (например, в чате)
+  const isChat = pathname.includes("/messages/")
+
+  if (isChat) return null
 
   return (
     <footer className="w-full border-t bg-background mt-20">
       <div className="max-w-7xl mx-auto px-4 py-12 md:py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-8">
-          
+
           {/* 1. БРЕНД И ОПИСАНИЕ */}
           <div className="col-span-1 md:col-span-1 space-y-4">
             <Link href="/" className="transition-transform hover:scale-105 active:scale-95 inline-block">

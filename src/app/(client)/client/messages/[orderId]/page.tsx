@@ -43,36 +43,32 @@ export default async function ChatPage({
     }
 
     return (
-         <main className="h-full bg-slate-50/50 flex flex-col items-center overflow-hidden">
+      <div className="fixed inset-x-0 bottom-0 top-[104px] z-40 bg-slate-50/50 flex justify-center overflow-hidden">
             
-            {/* ОГРАНИЧИТЕЛЬ ШИРИНЫ ДЛЯ ВСЕЙ СТРАНИЦЫ */}
-            <div className="w-full max-w-5xl bg-white h-full flex flex-col border-x border-slate-100 shadow-sm overflow-hidden">
+            {/* Ограничитель ширины */}
+            <div className="w-full max-w-4xl h-full flex flex-col bg-white border-x border-slate-200 relative shadow-xl">
                 
-                {/* HEADER ЧАТА (Внутри контейнера) */}
+                {/* HEADER ЧАТА (flex-none — не двигается) */}
                 <div className="flex-none p-4 md:p-6 border-b border-slate-100 flex items-center justify-between bg-white z-10">
                     <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black text-xl shadow-lg border-2 border-slate-800 shrink-0">
+                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black text-xl shadow-lg shrink-0">
                             {worker.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">
-                                Переписка
-                            </p>
-                            <h1 className="text-lg md:text-xl font-black uppercase italic tracking-tighter text-slate-900 truncate">
+                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1 italic">CHAT</p>
+                            <h1 className="text-lg md:text-xl font-black uppercase italic tracking-tighter text-slate-900 truncate leading-none">
                                 {worker.name}
                             </h1>
                         </div>
                     </div>
-                    
                     <div className="text-right hidden sm:block">
-                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-0.5">Контекст заказа</p>
-                        <p className="text-xs font-bold text-slate-500 truncate max-w-[200px] italic leading-none">
-                            {order.title}
+                        <p className="text-xs font-bold text-slate-400 italic truncate max-w-[200px]">
+                           {order.title}
                         </p>
                     </div>
                 </div>
 
-                {/* MESSAGES AREA */}
+                {/* MESSAGES + INPUT (занимает всё пространство) */}
                 <div className="flex-1 min-h-0 relative"> 
                     <ChatWindow 
                         orderId={orderId} 
@@ -81,6 +77,6 @@ export default async function ChatPage({
                     />
                 </div>
             </div>
-        </main>
+        </div>
     )
 }

@@ -31,10 +31,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-          <html lang="ru" className="h-full">
+    <html lang="ru" className="h-full">
       <body className={`${geistSans.className} antialiased h-full flex flex-col overflow-hidden bg-white`}>
         <TanstackProvider>
-          
+
           {/* HEADER: flex-none значит, что он всегда будет занимать ровно свою высоту и не пикселем больше */}
           <header className="flex-none z-50">
             <Navbar />
@@ -42,8 +42,14 @@ export default function RootLayout({
           </header>
 
           {/* MAIN: flex-1 забирает ВСЁ оставшееся пространство экрана */}
-          <main className="flex-1 overflow-y-auto no-scrollbar relative">
+          <main className="flex-1 overflow-y-auto no-scrollbar relative flex flex-col">
+            {/* Контент страницы */}
+            <div className="flex-1">
               {children}
+            </div>
+
+            {/* FOOTER: В самом низу контента */}
+            <Footer />
           </main>
 
           <Toaster richColors closeButton />
