@@ -1,14 +1,13 @@
 "use server"
 
-
 import { getServerSession } from "@/lib/get-session"
 import prisma from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 
-// Вспомогательная функция для расчета расстояния в км
+import { revalidatePath } from "next/cache";
+
+// Вспомогательная функция для расчета расстояния
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; // Радиус Земли
+  const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a =
@@ -28,71 +27,86 @@ export async function getSmartNearbyFeed(
   const userId = session?.user?.id
   if (!userId) return { success: false, error: "Unauthorized" }
 
-  const profile = await prisma.profile.findUnique({
-    where: { userId },
-    select: { skills: true }
-  })
-
-  const masterSkills = profile?.skills || []
-
   try {
-    // 1. Берем ВСЕ активные заказы, кроме своих
+    // 1. Получаем навыки мастера
+    const profile = await prisma.profile.findUnique({
+      where: { userId },
+      select: { skills: true }
+    })
+    const masterSkills = profile?.skills || []
+
+    // 2. Берем заказы со статусом PENDING или SEARCHING
+    // Добавляем статистику клиента (кол-во созданных заказов)
     const allOrders = await prisma.order.findMany({
-      where: {
-        status: "PENDING",
-      //  clientId: { not: userId }
-      },
+      where: { status: "PENDING" },
       include: {
         client: {
-          select: { name: true, image: true }
+          select: {
+            name: true,
+            image: true,
+            // _count должен быть именно здесь, внутри select клиента
+            _count: {
+              select: { ordersCreated: true }
+            }
+          }
+        },
+        _count: {
+          select: { offers: true } // А этот _count относится к самому заказу
         }
       },
       orderBy: { createdAt: 'desc' }
     })
-
- 
-    // 2. Если нет координат мастера, возвращаем просто список (или пустой)
+    
     if (!lat || !lng) return { success: true, data: [] }
 
-
-
-    // 3. Фильтруем по радиусу и добавляем данные о совпадении и дистанции в JS
+    // 3. Обработка и фильтрация
     const ordersWithDistance = allOrders
       .map(order => {
-        const orderLat = order.lat ?? 0;
-        const orderLng = order.lng ?? 0;
-        const distance = getDistance(lat, lng, orderLat, orderLng);
+        const distance = getDistance(lat, lng, order.lat ?? 0, order.lng ?? 0);
+
+        // Проверяем совпадение хотя бы одной категории
+        const isMatch = order.categories.some(cat => masterSkills.includes(cat));
 
         return {
           ...order,
           distance,
-          clientName: order.client.name, // Для совместимости с твоей версткой
-          clientImage: order.client.image,
-          isMatch: masterSkills.includes(order.categories[0])
+          isMatch,
+          // Собираем объект клиента так, как его ждет OrderCard
+          client: {
+            name: order.client?.name || "Заказчик",
+            image: order.client?.image,
+            projects: order.client?._count.ordersCreated || 0,
+            hireRate: 0 // Пока заглушка, позже посчитаем реально
+          },
+          offersCount: order._count?.offers || 0
         }
       })
-      .filter(order => order.distance <= radiusKm) // Фильтр по радиусу
+      .filter(order => order.distance <= radiusKm)
       .sort((a, b) => {
-        // Сортировка: сначала те, что подходят по скиллам, потом по расстоянию
-        if (a.isMatch && !b.isMatch) return -1
-        if (!a.isMatch && b.isMatch) return 1
-        return a.distance - b.distance
-      })
+        // ПРИОРИТЕТ 1: Сначала самые новые
+        const timeA = new Date(a.createdAt).getTime();
+        const timeB = new Date(b.createdAt).getTime();
+        if (timeB !== timeA) return timeB - timeA;
+
+        // ПРИОРИТЕТ 2: Сначала те, что подходят по навыкам
+        if (a.isMatch && !b.isMatch) return -1;
+        if (!a.isMatch && b.isMatch) return 1;
+
+        return a.distance - b.distance;
+      });
 
     return { success: true, data: ordersWithDistance }
   } catch (error) {
-    console.error("FEED_PRISMA_ERROR:", error)
-    return { success: false, error: "Ошибка при получении ленты" }
+    console.error("FEED_ERROR:", error)
+    return { success: false, error: "Не удалось обновить ленту" }
   }
 }
-
 
 export async function toggleMasterSkill(skill: string) {
   const session = await getServerSession()
   const userId = session?.user?.id
   if (!userId) return { success: false }
 
-  // Ищем профиль мастера по userId
   const profile = await prisma.profile.findUnique({
     where: { userId },
     select: { skills: true }
@@ -100,12 +114,10 @@ export async function toggleMasterSkill(skill: string) {
 
   if (!profile) return { success: false, error: "Профиль не найден" }
 
-  const isExist = profile.skills.includes(skill)
-  const newSkills = isExist 
-    ? profile.skills.filter(s => s !== skill) 
+  const newSkills = profile.skills.includes(skill)
+    ? profile.skills.filter(s => s !== skill)
     : [...profile.skills, skill]
 
-  // Обновляем массив навыков в таблице profile
   await prisma.profile.update({
     where: { userId },
     data: { skills: newSkills }
@@ -115,18 +127,13 @@ export async function toggleMasterSkill(skill: string) {
   return { success: true }
 }
 
-
 export async function getAllCategories() {
   try {
-    const categories = await prisma.category.findMany({
-      orderBy: { name: 'asc' }
+    return await prisma.category.findMany({
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true }
     });
-    return categories;
   } catch (error) {
-    console.error("Error fetching categories:", error);
     return [];
   }
 }
-
-
-

@@ -1,34 +1,47 @@
 generator client {
-  provider = "prisma-client-js" // Исправил на стандартный
-  output   = "./generated"
+  provider = "prisma-client-js"
+   output   = "./generated"
 }
 
 datasource db {
   provider = "postgresql"
+
 }
 
-// --- АУТЕНТИФИКАЦИЯ (Твоя база) ---
+// --- ПОЛЬЗОВАТЕЛИ И РОЛИ ---
 
 model User {
-  id            String   @id
+  id            String    @id
   name          String
-  email         String   @unique
-  emailVerified Boolean  @default(false)
+  email         String    @unique
+  emailVerified Boolean   @default(false)
   image         String?
-  role          Role     @default(CLIENT) // Изменил String на Enum для безопасности
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  role          Role      @default(CLIENT)
+  
+  // ФИНАНСЫ (в копейках)
+  balance       Int       @default(0)
 
-  sessions Session[]
-  accounts Account[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  // Связи для сервиса
-  workerProfile Profile? @relation("WorkerProfile") // Если юзер — мастер
-  ordersCreated Order[]  @relation("ClientOrders") // Заказы, которые он создал
-  ordersTaken   Order[]  @relation("WorkerOrders") // Заказы, которые он взял (если он мастер)
+  // Связи Better-Auth
+  sessions      Session[]
+  accounts      Account[]
 
+  // Профиль мастера
+  workerProfile Profile?  @relation("WorkerProfile")
+  
+  // Заказы и отклики
+  ordersCreated Order[]   @relation("ClientOrders") // Заказы, где юзер — клиент
+  ordersTaken   Order[]   @relation("WorkerOrders") // Заказы, где юзер — выбранный исполнитель
+  offers        Offer[]   // Отклики, которые оставил юзер (как мастер)
+  
+  // История денег
+  transactions  Transaction[]
+
+  // Общение и уведомления
   notifications Notification[]
-  sentMessages Message[]
+  sentMessages  Message[]
 
   @@map("user")
 }
@@ -39,77 +52,105 @@ enum Role {
   ADMIN
 }
 
-// --- СЕРВИСНАЯ ЛОГИКА (Новое) ---
-
 model Profile {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation("WorkerProfile", fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation("WorkerProfile", fields: [userId], references: [id], onDelete: Cascade)
 
-  skills   String[] // Список навыков: ["электрик", "сварщик"]
-  bio      String?
-  rating   Float    @default(5.0)
-  isOnline Boolean  @default(false)
+  skills    String[] // Массив навыков для мэтчинга
+  bio       String?
+  rating    Float    @default(5.0)
+  isOnline  Boolean  @default(false)
 
-  // Координаты для Uber-механики (поиск рядом)
-  lastLat Float?
-  lastLng Float?
+  // Геопозиция для Uber-механики
+  lastLat   Float?
+  lastLng   Float?
 
-  reviews Review[] // Отзывы о мастере
+  reviews   Review[]
 
   @@map("profile")
 }
 
-enum OrderStatus {
-  PENDING // Ожидает подтверждения
-  SEARCHING // Разослан мастерам рядом
-  ACCEPTED // Мастер принял
-  IN_PROGRESS // В работе
-  COMPLETED // Завершен
-  CANCELLED // Отменен
+// --- СИСТЕМА ЗАКАЗОВ ---
+
+model Order {
+  id          String      @id @default(cuid())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  status      OrderStatus @default(PENDING)
+  dateType    DateType    @default(ASAP)
+
+  title       String
+  description String
+  categories  String[]    // Храним названия категорий массивом
+  price       Int         // Бюджет в копейках
+  address     String
+
+  lat         Float?
+  lng         Float?
+
+  // Кто создал
+  clientId    String
+  client      User        @relation("ClientOrders", fields: [clientId], references: [id])
+
+  // Кто выполняет (выбирается из откликов)
+  workerId    String?
+  worker      User?       @relation("WorkerOrders", fields: [workerId], references: [id])
+
+  offers       Offer[]     // Все предложения от мастеров
+  review       Review?
+  messages     Message[]
+  transactions Transaction[]
+
+  @@map("order")
 }
 
-enum DateType {
-  ASAP
-  SCHEDULED
+// МОДЕЛЬ ОТКЛИКА (Bid/Offer)
+model Offer {
+  id        String      @id @default(cuid())
+  price     Int         // Какую цену предложил мастер
+  message   String?     // Сопроводительный текст
+  status    OfferStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  workerId  String
+  worker    User        @relation(fields: [workerId], references: [id])
+
+  @@map("offer")
 }
+
+// --- ФИНАНСОВЫЙ КОШЕЛЕК ---
+
+model Transaction {
+  id          String            @id @default(cuid())
+  amount      Int               // Сумма: положительная (приход), отрицательная (расход)
+  type        TransactionType
+  status      TransactionStatus @default(COMPLETED)
+  description String?           // "Оплата заказа #..." или "Пополнение через карту"
+  createdAt   DateTime          @default(now())
+
+  userId      String
+  user        User              @relation(fields: [userId], references: [id])
+
+  orderId     String?
+  order       Order?            @relation(fields: [orderId], references: [id])
+
+  @@map("transaction")
+}
+
+// --- СПРАВОЧНИКИ И ОТЗЫВЫ ---
 
 model Category {
   id        String   @id @default(cuid())
   name      String   @unique
-  keywords  String[] // Для нашего фолбек-алгоритма
+  keywords  String[] // Для умного поиска и пре-фильтрации ИИ
   createdAt DateTime @default(now())
+
   @@map("category")
-}
-
-model Order {
-  id        String      @id @default(cuid())
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  status    OrderStatus @default(PENDING)
-
-dateType    DateType    @default(ASAP)
-
-  title       String
-  description String
-   categories String[] 
-  price       Int
-  address     String
-
-  lat Float?
-  lng Float?
-
-  clientId String
-  client   User   @relation("ClientOrders", fields: [clientId], references: [id])
-
-  workerId String?
-  worker   User?   @relation("WorkerOrders", fields: [workerId], references: [id])
-
-  // --- ДОБАВИТЬ ЭТУ СТРОКУ ---
-  review Review? // У заказа может быть (а может и не быть) один отзыв
-  messages     Message[]
-
-  @@map("order")
+  @@index([keywords]) // Ускоряет поиск, когда категорий станет много
 }
 
 model Review {
@@ -118,17 +159,16 @@ model Review {
   comment   String?
   createdAt DateTime @default(now())
 
-  orderId String @unique
-  // --- ИЗМЕНИТЬ ЭТУ СТРОКУ ---
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade) // Связываем с Order
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   profileId String
-  profile   Profile @relation(fields: [profileId], references: [id])
+  profile   Profile  @relation(fields: [profileId], references: [id])
 
   @@map("review")
 }
 
-// --- ТВОИ СЛУЖЕБНЫЕ ТАБЛИЦЫ ---
+// --- СЛУЖЕБНЫЕ ТАБЛИЦЫ (Better-Auth & System) ---
 
 model Session {
   id        String   @id
@@ -175,34 +215,64 @@ model Verification {
 }
 
 model Notification {
-  id     String @id @default(cuid())
-  userId String // Кому пришло
-  user   User   @relation(fields: [userId], references: [id])
-
-  title   String
-  message String
-  type    String // 'NEW_ORDER', 'ORDER_ACCEPTED', 'REVIEW_RECEIVED'
-  isRead  Boolean @default(false)
-  link    String? // Ссылка, куда вести при клике
-
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      String   // 'NEW_ORDER', 'OFFER_ACCEPTED' и т.д.
+  isRead    Boolean  @default(false)
+  link      String?
   createdAt DateTime @default(now())
 
   @@map("notification")
 }
 
-
 model Message {
   id        String   @id @default(cuid())
   text      String
   createdAt DateTime @default(now())
-
-  // Кто отправил
   senderId  String
   sender    User     @relation(fields: [senderId], references: [id])
-
-  // К какому заказу относится чат
   orderId   String
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("message")
+}
+
+// --- ENUMS ---
+
+enum OrderStatus {
+  PENDING     // Ожидает откликов
+  SEARCHING   // Активный поиск (в ленте)
+  ACCEPTED    // Исполнитель выбран
+  IN_PROGRESS // В процессе выполнения
+  COMPLETED   // Завершен успешно
+  CANCELLED   // Отменен
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum DateType {
+  ASAP
+  SCHEDULED
+}
+
+enum TransactionType {
+  DEPOSIT  // Пополнение
+  WITHDRAW // Вывод
+  PAYMENT  // Оплата (списание)
+  EARNING  // Заработок (приход)
+  HOLD     // Заморозка
+  REFUND   // Возврат
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
 }

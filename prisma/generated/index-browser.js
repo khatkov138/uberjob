@@ -127,6 +127,7 @@ exports.Prisma.UserScalarFieldEnum = {
   emailVerified: 'emailVerified',
   image: 'image',
   role: 'role',
+  balance: 'balance',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -140,13 +141,6 @@ exports.Prisma.ProfileScalarFieldEnum = {
   isOnline: 'isOnline',
   lastLat: 'lastLat',
   lastLng: 'lastLng'
-};
-
-exports.Prisma.CategoryScalarFieldEnum = {
-  id: 'id',
-  name: 'name',
-  keywords: 'keywords',
-  createdAt: 'createdAt'
 };
 
 exports.Prisma.OrderScalarFieldEnum = {
@@ -164,6 +158,34 @@ exports.Prisma.OrderScalarFieldEnum = {
   lng: 'lng',
   clientId: 'clientId',
   workerId: 'workerId'
+};
+
+exports.Prisma.OfferScalarFieldEnum = {
+  id: 'id',
+  price: 'price',
+  message: 'message',
+  status: 'status',
+  createdAt: 'createdAt',
+  orderId: 'orderId',
+  workerId: 'workerId'
+};
+
+exports.Prisma.TransactionScalarFieldEnum = {
+  id: 'id',
+  amount: 'amount',
+  type: 'type',
+  status: 'status',
+  description: 'description',
+  createdAt: 'createdAt',
+  userId: 'userId',
+  orderId: 'orderId'
+};
+
+exports.Prisma.CategoryScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  keywords: 'keywords',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.ReviewScalarFieldEnum = {
@@ -264,11 +286,34 @@ exports.DateType = exports.$Enums.DateType = {
   SCHEDULED: 'SCHEDULED'
 };
 
+exports.OfferStatus = exports.$Enums.OfferStatus = {
+  PENDING: 'PENDING',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED'
+};
+
+exports.TransactionType = exports.$Enums.TransactionType = {
+  DEPOSIT: 'DEPOSIT',
+  WITHDRAW: 'WITHDRAW',
+  PAYMENT: 'PAYMENT',
+  EARNING: 'EARNING',
+  HOLD: 'HOLD',
+  REFUND: 'REFUND'
+};
+
+exports.TransactionStatus = exports.$Enums.TransactionStatus = {
+  PENDING: 'PENDING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED'
+};
+
 exports.Prisma.ModelName = {
   User: 'User',
   Profile: 'Profile',
-  Category: 'Category',
   Order: 'Order',
+  Offer: 'Offer',
+  Transaction: 'Transaction',
+  Category: 'Category',
   Review: 'Review',
   Session: 'Session',
   Account: 'Account',
