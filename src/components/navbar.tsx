@@ -17,7 +17,7 @@ export default async function Navbar() {
                 <div className="flex items-center gap-8">
                     <Link href="/" className="transition-transform hover:scale-105 active:scale-95">
                         <span className="font-black text-2xl tracking-tighter text-blue-600">
-                            Uber<span className="text-foreground">Job</span>
+                            Z<span className="text-foreground">WORK</span>
                         </span>
                     </Link>
                 </div>

@@ -27,20 +27,23 @@ model User {
   sessions Session[]
   accounts Account[]
 
-  // Профиль мастера
+  // Профиль исполнителя
   workerProfile Profile? @relation("WorkerProfile")
 
   // Заказы и отклики
   ordersCreated Order[] @relation("ClientOrders") // Заказы, где юзер — клиент
   ordersTaken   Order[] @relation("WorkerOrders") // Заказы, где юзер — выбранный исполнитель
-  offers        Offer[] // Отклики, которые оставил юзер (как мастер)
+  offers        Offer[] // Отклики, которые оставил юзер (как исполнитель)
 
   // История денег
   transactions Transaction[]
 
   // Общение и уведомления
   notifications Notification[]
-  sentMessages  Message[]
+
+  // ЧАТЫ: Именованные связи для отправителя и получателя
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
 
   @@map("user")
 }
@@ -96,7 +99,7 @@ model Order {
   workerId String?
   worker   User?   @relation("WorkerOrders", fields: [workerId], references: [id])
 
-  offers       Offer[] // Все предложения от мастеров
+  offers       Offer[] // Все предложения от исполнителей
   review       Review?
   messages     Message[]
   transactions Transaction[]
@@ -107,7 +110,7 @@ model Order {
 // МОДЕЛЬ ОТКЛИКА (Bid/Offer)
 model Offer {
   id        String      @id @default(cuid())
-  price     Int // Какую цену предложил мастер
+  price     Int // Какую цену предложил исполнитель
   message   String? // Сопроводительный текст
   status    OfferStatus @default(PENDING)
   createdAt DateTime    @default(now())
@@ -167,7 +170,7 @@ model Review {
   @@map("review")
 }
 
-// --- СЛУЖЕБНЫЕ ТАБЛИЦЫ (Better-Auth & System) ---
+// --- СЛУЖЕБНЫЕ ТАБЛИЦЫ ---
 
 model Session {
   id        String   @id
@@ -219,7 +222,7 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id])
   title     String
   message   String
-  type      String // 'NEW_ORDER', 'OFFER_ACCEPTED' и т.д.
+  type      String
   isRead    Boolean  @default(false)
   link      String?
   createdAt DateTime @default(now())
@@ -227,14 +230,23 @@ model Notification {
   @@map("notification")
 }
 
+// ОБНОВЛЕННАЯ МОДЕЛЬ СООБЩЕНИЯ
 model Message {
   id        String   @id @default(cuid())
   text      String
   createdAt DateTime @default(now())
-  senderId  String
-  sender    User     @relation(fields: [senderId], references: [id])
-  orderId   String
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // КТО ОТПРАВИЛ
+  senderId String
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
+
+  // КТО ПОЛУЧАЕТ
+  recipientId String
+  recipient   User   @relation("ReceivedMessages", fields: [recipientId], references: [id])
+
+  // КОНТЕКСТ ЗАКАЗА
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("message")
 }
@@ -242,12 +254,12 @@ model Message {
 // --- ENUMS ---
 
 enum OrderStatus {
-  PENDING // Ожидает откликов
-  SEARCHING // Активный поиск (в ленте)
-  ACCEPTED // Исполнитель выбран
-  IN_PROGRESS // В процессе выполнения
-  COMPLETED // Завершен успешно
-  CANCELLED // Отменен
+  PENDING
+  SEARCHING
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }
 
 enum OfferStatus {
@@ -262,12 +274,12 @@ enum DateType {
 }
 
 enum TransactionType {
-  DEPOSIT // Пополнение
-  WITHDRAW // Вывод
-  PAYMENT // Оплата (списание)
-  EARNING // Заработок (приход)
-  HOLD // Заморозка
-  REFUND // Возврат
+  DEPOSIT
+  WITHDRAW
+  PAYMENT
+  EARNING
+  HOLD
+  REFUND
 }
 
 enum TransactionStatus {
