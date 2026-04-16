@@ -1,7 +1,4 @@
 
-import { getServerSession } from "@/lib/get-session";
-import { Role } from "../../../prisma/generated";
-import { redirect } from "next/navigation";
 
 export default async function ProLayout({ children }: { children: React.ReactNode }) {
 

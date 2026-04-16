@@ -1,5 +1,5 @@
 import * as React from "react"
-import { getProStats, getActiveWorkSummary } from "./actions"
+
 import { Container } from "@/components/shared/container"
 import { getServerSession } from "@/lib/get-session"
 import { 
@@ -16,6 +16,7 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { OrderStatusCard } from "@/components/dashboard/order-status-card"
+import { getActiveWorkSummary, getProStats } from "@/actions/pro"
 
 export default async function ProDashboardPage() {
   const session = await getServerSession()

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getSmartNearbyFeed, toggleMasterSkill } from "./actions"
+
 import { Loader2, Inbox } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import { useLocationStore } from "@/store/use-location-store"
@@ -10,6 +10,7 @@ import { LocationModal } from "@/components/geo/location-modal"
 import { FeedHeader } from "./feed-header"
 import { OrderCard } from "./order-card"
 import { Container } from "@/components/shared/container"
+import { getSmartNearbyFeed, toggleMasterSkill } from "@/actions/pro"
 
 export default function SmartFeedPage() {
   const queryClient = useQueryClient()

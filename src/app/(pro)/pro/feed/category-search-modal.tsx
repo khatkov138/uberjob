@@ -4,7 +4,8 @@ import * as React from "react"
 import { X, Search, Plus, Check, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
-import { getAllCategories } from "./actions"
+import { getAllCategories } from "@/actions/pro"
+
 
 interface Category {
   id: string

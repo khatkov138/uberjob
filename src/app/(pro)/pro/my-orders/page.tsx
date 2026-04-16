@@ -4,10 +4,11 @@ import { useQuery } from "@tanstack/react-query"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Loader2, Briefcase, History, ChevronRight } from "lucide-react"
-import { getProOrders } from "./actions"
+
 
 import Link from "next/link"
 import { OrderStatusCard } from "@/components/dashboard/order-status-card"
+import { getProOrders } from "@/actions/pro"
 
 export default function ProOrdersPage() {
   const { data, isLoading } = useQuery({

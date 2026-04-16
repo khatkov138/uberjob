@@ -4,7 +4,7 @@ import { getServerSession } from "@/lib/get-session"
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { CreateOrderValues } from "@/lib/validation"
-import { OrderStatus } from "../../../../../prisma/generated"
+import { OrderStatus } from "../../../prisma/generated"
 
 async function getRelevantContext(description: string) {
   const searchTerms = description

@@ -17,7 +17,7 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Container } from "@/components/shared/container"
-import { getClientOrders } from "@/actions/orders"
+import { getClientOrders } from "@/actions/orders/orders"
 
 export default function ClientDashboardPage() {
   const { data: session } = authClient.useSession()
@@ -31,8 +31,7 @@ export default function ClientDashboardPage() {
   // 2. Рассчитываем статистику
   const orders = data?.data || []
   const activeCount = orders.filter((o: any) => o.status !== "COMPLETED" && o.status !== "CANCELLED").length
-  const balance = (session?.user as any)?.balance / 100 || 0
-
+ 
   // Состояние загрузки
   if (isLoading) return (
     <Container className="bg-white flex items-center justify-center min-h-[400px]">
