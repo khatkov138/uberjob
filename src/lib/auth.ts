@@ -12,6 +12,22 @@ export const auth = betterAuth({
     database: prismaAdapter(prisma, {
         provider: "postgresql"
     }),
+    databaseHooks: {
+        user: {
+            create: {
+                after: async (user) => {
+                    try {
+                        await prisma.profile.create({
+                            data: { userId: user.id, skills: [] }
+                        });
+                    } catch (e) {
+                        // Если упало здесь, не страшно — getOrCreateProfile исправит это позже
+                        console.error(`CRITICAL: Profile creation failed for user ${user.id}`, e);
+                    }
+                },
+            },
+        },
+    },
     socialProviders: {
         google: {
             clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -39,7 +55,7 @@ export const auth = betterAuth({
         // sendOnSignUp: true,
         autoSignInAfterVerification: true,
         async sendVerificationEmail({ user, url, }) {
-           
+
             await sendEmail({
                 to: user.email,
                 subject: "Verify your email",

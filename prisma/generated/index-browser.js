@@ -135,12 +135,18 @@ exports.Prisma.UserScalarFieldEnum = {
 exports.Prisma.ProfileScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
-  skills: 'skills',
+  phone: 'phone',
+  city: 'city',
+  avatarUrl: 'avatarUrl',
   bio: 'bio',
+  skills: 'skills',
   rating: 'rating',
   isOnline: 'isOnline',
+  completedCount: 'completedCount',
   lastLat: 'lastLat',
-  lastLng: 'lastLng'
+  lastLng: 'lastLng',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.OrderScalarFieldEnum = {
@@ -267,10 +273,10 @@ exports.Prisma.NullsOrder = {
   first: 'first',
   last: 'last'
 };
-exports.Role = exports.$Enums.Role = {
-  CLIENT: 'CLIENT',
-  PRO: 'PRO',
-  ADMIN: 'ADMIN'
+exports.UserRole = exports.$Enums.UserRole = {
+  USER: 'USER',
+  ADMIN: 'ADMIN',
+  SUPERADMIN: 'SUPERADMIN'
 };
 
 exports.OrderStatus = exports.$Enums.OrderStatus = {

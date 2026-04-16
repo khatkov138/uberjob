@@ -78,13 +78,13 @@ export type Message = $Result.DefaultSelection<Prisma.$MessagePayload>
  * Enums
  */
 export namespace $Enums {
-  export const Role: {
-  CLIENT: 'CLIENT',
-  PRO: 'PRO',
-  ADMIN: 'ADMIN'
+  export const UserRole: {
+  USER: 'USER',
+  ADMIN: 'ADMIN',
+  SUPERADMIN: 'SUPERADMIN'
 };
 
-export type Role = (typeof Role)[keyof typeof Role]
+export type UserRole = (typeof UserRole)[keyof typeof UserRole]
 
 
 export const OrderStatus: {
@@ -138,9 +138,9 @@ export type TransactionStatus = (typeof TransactionStatus)[keyof typeof Transact
 
 }
 
-export type Role = $Enums.Role
+export type UserRole = $Enums.UserRole
 
-export const Role: typeof $Enums.Role
+export const UserRole: typeof $Enums.UserRole
 
 export type OrderStatus = $Enums.OrderStatus
 
@@ -2163,7 +2163,7 @@ export namespace Prisma {
     email: string | null
     emailVerified: boolean | null
     image: string | null
-    role: $Enums.Role | null
+    role: $Enums.UserRole | null
     balance: number | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -2175,7 +2175,7 @@ export namespace Prisma {
     email: string | null
     emailVerified: boolean | null
     image: string | null
-    role: $Enums.Role | null
+    role: $Enums.UserRole | null
     balance: number | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -2332,7 +2332,7 @@ export namespace Prisma {
     email: string
     emailVerified: boolean
     image: string | null
-    role: $Enums.Role
+    role: $Enums.UserRole
     balance: number
     createdAt: Date
     updatedAt: Date
@@ -2369,7 +2369,7 @@ export namespace Prisma {
     updatedAt?: boolean
     sessions?: boolean | User$sessionsArgs<ExtArgs>
     accounts?: boolean | User$accountsArgs<ExtArgs>
-    workerProfile?: boolean | User$workerProfileArgs<ExtArgs>
+    profile?: boolean | User$profileArgs<ExtArgs>
     ordersCreated?: boolean | User$ordersCreatedArgs<ExtArgs>
     ordersTaken?: boolean | User$ordersTakenArgs<ExtArgs>
     offers?: boolean | User$offersArgs<ExtArgs>
@@ -2420,7 +2420,7 @@ export namespace Prisma {
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     sessions?: boolean | User$sessionsArgs<ExtArgs>
     accounts?: boolean | User$accountsArgs<ExtArgs>
-    workerProfile?: boolean | User$workerProfileArgs<ExtArgs>
+    profile?: boolean | User$profileArgs<ExtArgs>
     ordersCreated?: boolean | User$ordersCreatedArgs<ExtArgs>
     ordersTaken?: boolean | User$ordersTakenArgs<ExtArgs>
     offers?: boolean | User$offersArgs<ExtArgs>
@@ -2438,7 +2438,7 @@ export namespace Prisma {
     objects: {
       sessions: Prisma.$SessionPayload<ExtArgs>[]
       accounts: Prisma.$AccountPayload<ExtArgs>[]
-      workerProfile: Prisma.$ProfilePayload<ExtArgs> | null
+      profile: Prisma.$ProfilePayload<ExtArgs> | null
       ordersCreated: Prisma.$OrderPayload<ExtArgs>[]
       ordersTaken: Prisma.$OrderPayload<ExtArgs>[]
       offers: Prisma.$OfferPayload<ExtArgs>[]
@@ -2453,7 +2453,7 @@ export namespace Prisma {
       email: string
       emailVerified: boolean
       image: string | null
-      role: $Enums.Role
+      role: $Enums.UserRole
       balance: number
       createdAt: Date
       updatedAt: Date
@@ -2853,7 +2853,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     sessions<T extends User$sessionsArgs<ExtArgs> = {}>(args?: Subset<T, User$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     accounts<T extends User$accountsArgs<ExtArgs> = {}>(args?: Subset<T, User$accountsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AccountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-    workerProfile<T extends User$workerProfileArgs<ExtArgs> = {}>(args?: Subset<T, User$workerProfileArgs<ExtArgs>>): Prisma__ProfileClient<$Result.GetResult<Prisma.$ProfilePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    profile<T extends User$profileArgs<ExtArgs> = {}>(args?: Subset<T, User$profileArgs<ExtArgs>>): Prisma__ProfileClient<$Result.GetResult<Prisma.$ProfilePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     ordersCreated<T extends User$ordersCreatedArgs<ExtArgs> = {}>(args?: Subset<T, User$ordersCreatedArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     ordersTaken<T extends User$ordersTakenArgs<ExtArgs> = {}>(args?: Subset<T, User$ordersTakenArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     offers<T extends User$offersArgs<ExtArgs> = {}>(args?: Subset<T, User$offersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OfferPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2895,7 +2895,7 @@ export namespace Prisma {
     readonly email: FieldRef<"User", 'String'>
     readonly emailVerified: FieldRef<"User", 'Boolean'>
     readonly image: FieldRef<"User", 'String'>
-    readonly role: FieldRef<"User", 'Role'>
+    readonly role: FieldRef<"User", 'UserRole'>
     readonly balance: FieldRef<"User", 'Int'>
     readonly createdAt: FieldRef<"User", 'DateTime'>
     readonly updatedAt: FieldRef<"User", 'DateTime'>
@@ -3335,9 +3335,9 @@ export namespace Prisma {
   }
 
   /**
-   * User.workerProfile
+   * User.profile
    */
-  export type User$workerProfileArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+  export type User$profileArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     /**
      * Select specific fields to fetch from the Profile
      */
@@ -3554,12 +3554,14 @@ export namespace Prisma {
 
   export type ProfileAvgAggregateOutputType = {
     rating: number | null
+    completedCount: number | null
     lastLat: number | null
     lastLng: number | null
   }
 
   export type ProfileSumAggregateOutputType = {
     rating: number | null
+    completedCount: number | null
     lastLat: number | null
     lastLng: number | null
   }
@@ -3567,44 +3569,64 @@ export namespace Prisma {
   export type ProfileMinAggregateOutputType = {
     id: string | null
     userId: string | null
+    phone: string | null
+    city: string | null
+    avatarUrl: string | null
     bio: string | null
     rating: number | null
     isOnline: boolean | null
+    completedCount: number | null
     lastLat: number | null
     lastLng: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
   }
 
   export type ProfileMaxAggregateOutputType = {
     id: string | null
     userId: string | null
+    phone: string | null
+    city: string | null
+    avatarUrl: string | null
     bio: string | null
     rating: number | null
     isOnline: boolean | null
+    completedCount: number | null
     lastLat: number | null
     lastLng: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
   }
 
   export type ProfileCountAggregateOutputType = {
     id: number
     userId: number
-    skills: number
+    phone: number
+    city: number
+    avatarUrl: number
     bio: number
+    skills: number
     rating: number
     isOnline: number
+    completedCount: number
     lastLat: number
     lastLng: number
+    createdAt: number
+    updatedAt: number
     _all: number
   }
 
 
   export type ProfileAvgAggregateInputType = {
     rating?: true
+    completedCount?: true
     lastLat?: true
     lastLng?: true
   }
 
   export type ProfileSumAggregateInputType = {
     rating?: true
+    completedCount?: true
     lastLat?: true
     lastLng?: true
   }
@@ -3612,32 +3634,50 @@ export namespace Prisma {
   export type ProfileMinAggregateInputType = {
     id?: true
     userId?: true
+    phone?: true
+    city?: true
+    avatarUrl?: true
     bio?: true
     rating?: true
     isOnline?: true
+    completedCount?: true
     lastLat?: true
     lastLng?: true
+    createdAt?: true
+    updatedAt?: true
   }
 
   export type ProfileMaxAggregateInputType = {
     id?: true
     userId?: true
+    phone?: true
+    city?: true
+    avatarUrl?: true
     bio?: true
     rating?: true
     isOnline?: true
+    completedCount?: true
     lastLat?: true
     lastLng?: true
+    createdAt?: true
+    updatedAt?: true
   }
 
   export type ProfileCountAggregateInputType = {
     id?: true
     userId?: true
-    skills?: true
+    phone?: true
+    city?: true
+    avatarUrl?: true
     bio?: true
+    skills?: true
     rating?: true
     isOnline?: true
+    completedCount?: true
     lastLat?: true
     lastLng?: true
+    createdAt?: true
+    updatedAt?: true
     _all?: true
   }
 
@@ -3730,12 +3770,18 @@ export namespace Prisma {
   export type ProfileGroupByOutputType = {
     id: string
     userId: string
-    skills: string[]
+    phone: string | null
+    city: string | null
+    avatarUrl: string | null
     bio: string | null
+    skills: string[]
     rating: number
     isOnline: boolean
+    completedCount: number
     lastLat: number | null
     lastLng: number | null
+    createdAt: Date
+    updatedAt: Date
     _count: ProfileCountAggregateOutputType | null
     _avg: ProfileAvgAggregateOutputType | null
     _sum: ProfileSumAggregateOutputType | null
@@ -3760,12 +3806,18 @@ export namespace Prisma {
   export type ProfileSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     userId?: boolean
-    skills?: boolean
+    phone?: boolean
+    city?: boolean
+    avatarUrl?: boolean
     bio?: boolean
+    skills?: boolean
     rating?: boolean
     isOnline?: boolean
+    completedCount?: boolean
     lastLat?: boolean
     lastLng?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
     reviews?: boolean | Profile$reviewsArgs<ExtArgs>
     _count?: boolean | ProfileCountOutputTypeDefaultArgs<ExtArgs>
@@ -3774,39 +3826,57 @@ export namespace Prisma {
   export type ProfileSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     userId?: boolean
-    skills?: boolean
+    phone?: boolean
+    city?: boolean
+    avatarUrl?: boolean
     bio?: boolean
+    skills?: boolean
     rating?: boolean
     isOnline?: boolean
+    completedCount?: boolean
     lastLat?: boolean
     lastLng?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["profile"]>
 
   export type ProfileSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     userId?: boolean
-    skills?: boolean
+    phone?: boolean
+    city?: boolean
+    avatarUrl?: boolean
     bio?: boolean
+    skills?: boolean
     rating?: boolean
     isOnline?: boolean
+    completedCount?: boolean
     lastLat?: boolean
     lastLng?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["profile"]>
 
   export type ProfileSelectScalar = {
     id?: boolean
     userId?: boolean
-    skills?: boolean
+    phone?: boolean
+    city?: boolean
+    avatarUrl?: boolean
     bio?: boolean
+    skills?: boolean
     rating?: boolean
     isOnline?: boolean
+    completedCount?: boolean
     lastLat?: boolean
     lastLng?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
   }
 
-  export type ProfileOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "skills" | "bio" | "rating" | "isOnline" | "lastLat" | "lastLng", ExtArgs["result"]["profile"]>
+  export type ProfileOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "phone" | "city" | "avatarUrl" | "bio" | "skills" | "rating" | "isOnline" | "completedCount" | "lastLat" | "lastLng" | "createdAt" | "updatedAt", ExtArgs["result"]["profile"]>
   export type ProfileInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     reviews?: boolean | Profile$reviewsArgs<ExtArgs>
@@ -3828,12 +3898,18 @@ export namespace Prisma {
     scalars: $Extensions.GetPayloadResult<{
       id: string
       userId: string
-      skills: string[]
+      phone: string | null
+      city: string | null
+      avatarUrl: string | null
       bio: string | null
+      skills: string[]
       rating: number
       isOnline: boolean
+      completedCount: number
       lastLat: number | null
       lastLng: number | null
+      createdAt: Date
+      updatedAt: Date
     }, ExtArgs["result"]["profile"]>
     composites: {}
   }
@@ -4261,12 +4337,18 @@ export namespace Prisma {
   interface ProfileFieldRefs {
     readonly id: FieldRef<"Profile", 'String'>
     readonly userId: FieldRef<"Profile", 'String'>
-    readonly skills: FieldRef<"Profile", 'String[]'>
+    readonly phone: FieldRef<"Profile", 'String'>
+    readonly city: FieldRef<"Profile", 'String'>
+    readonly avatarUrl: FieldRef<"Profile", 'String'>
     readonly bio: FieldRef<"Profile", 'String'>
+    readonly skills: FieldRef<"Profile", 'String[]'>
     readonly rating: FieldRef<"Profile", 'Float'>
     readonly isOnline: FieldRef<"Profile", 'Boolean'>
+    readonly completedCount: FieldRef<"Profile", 'Int'>
     readonly lastLat: FieldRef<"Profile", 'Float'>
     readonly lastLng: FieldRef<"Profile", 'Float'>
+    readonly createdAt: FieldRef<"Profile", 'DateTime'>
+    readonly updatedAt: FieldRef<"Profile", 'DateTime'>
   }
     
 
@@ -15912,12 +15994,18 @@ export namespace Prisma {
   export const ProfileScalarFieldEnum: {
     id: 'id',
     userId: 'userId',
-    skills: 'skills',
+    phone: 'phone',
+    city: 'city',
+    avatarUrl: 'avatarUrl',
     bio: 'bio',
+    skills: 'skills',
     rating: 'rating',
     isOnline: 'isOnline',
+    completedCount: 'completedCount',
     lastLat: 'lastLat',
-    lastLng: 'lastLng'
+    lastLng: 'lastLng',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
   };
 
   export type ProfileScalarFieldEnum = (typeof ProfileScalarFieldEnum)[keyof typeof ProfileScalarFieldEnum]
@@ -16114,16 +16202,16 @@ export namespace Prisma {
 
 
   /**
-   * Reference to a field of type 'Role'
+   * Reference to a field of type 'UserRole'
    */
-  export type EnumRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Role'>
+  export type EnumUserRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'UserRole'>
     
 
 
   /**
-   * Reference to a field of type 'Role[]'
+   * Reference to a field of type 'UserRole[]'
    */
-  export type ListEnumRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Role[]'>
+  export type ListEnumUserRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'UserRole[]'>
     
 
 
@@ -16251,13 +16339,13 @@ export namespace Prisma {
     email?: StringFilter<"User"> | string
     emailVerified?: BoolFilter<"User"> | boolean
     image?: StringNullableFilter<"User"> | string | null
-    role?: EnumRoleFilter<"User"> | $Enums.Role
+    role?: EnumUserRoleFilter<"User"> | $Enums.UserRole
     balance?: IntFilter<"User"> | number
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     sessions?: SessionListRelationFilter
     accounts?: AccountListRelationFilter
-    workerProfile?: XOR<ProfileNullableScalarRelationFilter, ProfileWhereInput> | null
+    profile?: XOR<ProfileNullableScalarRelationFilter, ProfileWhereInput> | null
     ordersCreated?: OrderListRelationFilter
     ordersTaken?: OrderListRelationFilter
     offers?: OfferListRelationFilter
@@ -16279,7 +16367,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     sessions?: SessionOrderByRelationAggregateInput
     accounts?: AccountOrderByRelationAggregateInput
-    workerProfile?: ProfileOrderByWithRelationInput
+    profile?: ProfileOrderByWithRelationInput
     ordersCreated?: OrderOrderByRelationAggregateInput
     ordersTaken?: OrderOrderByRelationAggregateInput
     offers?: OfferOrderByRelationAggregateInput
@@ -16298,13 +16386,13 @@ export namespace Prisma {
     name?: StringFilter<"User"> | string
     emailVerified?: BoolFilter<"User"> | boolean
     image?: StringNullableFilter<"User"> | string | null
-    role?: EnumRoleFilter<"User"> | $Enums.Role
+    role?: EnumUserRoleFilter<"User"> | $Enums.UserRole
     balance?: IntFilter<"User"> | number
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     sessions?: SessionListRelationFilter
     accounts?: AccountListRelationFilter
-    workerProfile?: XOR<ProfileNullableScalarRelationFilter, ProfileWhereInput> | null
+    profile?: XOR<ProfileNullableScalarRelationFilter, ProfileWhereInput> | null
     ordersCreated?: OrderListRelationFilter
     ordersTaken?: OrderListRelationFilter
     offers?: OfferListRelationFilter
@@ -16340,7 +16428,7 @@ export namespace Prisma {
     email?: StringWithAggregatesFilter<"User"> | string
     emailVerified?: BoolWithAggregatesFilter<"User"> | boolean
     image?: StringNullableWithAggregatesFilter<"User"> | string | null
-    role?: EnumRoleWithAggregatesFilter<"User"> | $Enums.Role
+    role?: EnumUserRoleWithAggregatesFilter<"User"> | $Enums.UserRole
     balance?: IntWithAggregatesFilter<"User"> | number
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
@@ -16352,12 +16440,18 @@ export namespace Prisma {
     NOT?: ProfileWhereInput | ProfileWhereInput[]
     id?: StringFilter<"Profile"> | string
     userId?: StringFilter<"Profile"> | string
-    skills?: StringNullableListFilter<"Profile">
+    phone?: StringNullableFilter<"Profile"> | string | null
+    city?: StringNullableFilter<"Profile"> | string | null
+    avatarUrl?: StringNullableFilter<"Profile"> | string | null
     bio?: StringNullableFilter<"Profile"> | string | null
+    skills?: StringNullableListFilter<"Profile">
     rating?: FloatFilter<"Profile"> | number
     isOnline?: BoolFilter<"Profile"> | boolean
+    completedCount?: IntFilter<"Profile"> | number
     lastLat?: FloatNullableFilter<"Profile"> | number | null
     lastLng?: FloatNullableFilter<"Profile"> | number | null
+    createdAt?: DateTimeFilter<"Profile"> | Date | string
+    updatedAt?: DateTimeFilter<"Profile"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
     reviews?: ReviewListRelationFilter
   }
@@ -16365,12 +16459,18 @@ export namespace Prisma {
   export type ProfileOrderByWithRelationInput = {
     id?: SortOrder
     userId?: SortOrder
-    skills?: SortOrder
+    phone?: SortOrderInput | SortOrder
+    city?: SortOrderInput | SortOrder
+    avatarUrl?: SortOrderInput | SortOrder
     bio?: SortOrderInput | SortOrder
+    skills?: SortOrder
     rating?: SortOrder
     isOnline?: SortOrder
+    completedCount?: SortOrder
     lastLat?: SortOrderInput | SortOrder
     lastLng?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
     user?: UserOrderByWithRelationInput
     reviews?: ReviewOrderByRelationAggregateInput
   }
@@ -16381,12 +16481,18 @@ export namespace Prisma {
     AND?: ProfileWhereInput | ProfileWhereInput[]
     OR?: ProfileWhereInput[]
     NOT?: ProfileWhereInput | ProfileWhereInput[]
-    skills?: StringNullableListFilter<"Profile">
+    phone?: StringNullableFilter<"Profile"> | string | null
+    city?: StringNullableFilter<"Profile"> | string | null
+    avatarUrl?: StringNullableFilter<"Profile"> | string | null
     bio?: StringNullableFilter<"Profile"> | string | null
+    skills?: StringNullableListFilter<"Profile">
     rating?: FloatFilter<"Profile"> | number
     isOnline?: BoolFilter<"Profile"> | boolean
+    completedCount?: IntFilter<"Profile"> | number
     lastLat?: FloatNullableFilter<"Profile"> | number | null
     lastLng?: FloatNullableFilter<"Profile"> | number | null
+    createdAt?: DateTimeFilter<"Profile"> | Date | string
+    updatedAt?: DateTimeFilter<"Profile"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
     reviews?: ReviewListRelationFilter
   }, "id" | "userId">
@@ -16394,12 +16500,18 @@ export namespace Prisma {
   export type ProfileOrderByWithAggregationInput = {
     id?: SortOrder
     userId?: SortOrder
-    skills?: SortOrder
+    phone?: SortOrderInput | SortOrder
+    city?: SortOrderInput | SortOrder
+    avatarUrl?: SortOrderInput | SortOrder
     bio?: SortOrderInput | SortOrder
+    skills?: SortOrder
     rating?: SortOrder
     isOnline?: SortOrder
+    completedCount?: SortOrder
     lastLat?: SortOrderInput | SortOrder
     lastLng?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
     _count?: ProfileCountOrderByAggregateInput
     _avg?: ProfileAvgOrderByAggregateInput
     _max?: ProfileMaxOrderByAggregateInput
@@ -16413,12 +16525,18 @@ export namespace Prisma {
     NOT?: ProfileScalarWhereWithAggregatesInput | ProfileScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"Profile"> | string
     userId?: StringWithAggregatesFilter<"Profile"> | string
-    skills?: StringNullableListFilter<"Profile">
+    phone?: StringNullableWithAggregatesFilter<"Profile"> | string | null
+    city?: StringNullableWithAggregatesFilter<"Profile"> | string | null
+    avatarUrl?: StringNullableWithAggregatesFilter<"Profile"> | string | null
     bio?: StringNullableWithAggregatesFilter<"Profile"> | string | null
+    skills?: StringNullableListFilter<"Profile">
     rating?: FloatWithAggregatesFilter<"Profile"> | number
     isOnline?: BoolWithAggregatesFilter<"Profile"> | boolean
+    completedCount?: IntWithAggregatesFilter<"Profile"> | number
     lastLat?: FloatNullableWithAggregatesFilter<"Profile"> | number | null
     lastLng?: FloatNullableWithAggregatesFilter<"Profile"> | number | null
+    createdAt?: DateTimeWithAggregatesFilter<"Profile"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"Profile"> | Date | string
   }
 
   export type OrderWhereInput = {
@@ -17159,13 +17277,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionCreateNestedManyWithoutUserInput
     accounts?: AccountCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileCreateNestedOneWithoutUserInput
+    profile?: ProfileCreateNestedOneWithoutUserInput
     ordersCreated?: OrderCreateNestedManyWithoutClientInput
     ordersTaken?: OrderCreateNestedManyWithoutWorkerInput
     offers?: OfferCreateNestedManyWithoutWorkerInput
@@ -17181,13 +17299,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileUncheckedCreateNestedOneWithoutUserInput
+    profile?: ProfileUncheckedCreateNestedOneWithoutUserInput
     ordersCreated?: OrderUncheckedCreateNestedManyWithoutClientInput
     ordersTaken?: OrderUncheckedCreateNestedManyWithoutWorkerInput
     offers?: OfferUncheckedCreateNestedManyWithoutWorkerInput
@@ -17203,13 +17321,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUpdateManyWithoutUserNestedInput
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUpdateOneWithoutUserNestedInput
+    profile?: ProfileUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUpdateManyWithoutWorkerNestedInput
     offers?: OfferUpdateManyWithoutWorkerNestedInput
@@ -17225,13 +17343,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
+    profile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUncheckedUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUncheckedUpdateManyWithoutWorkerNestedInput
     offers?: OfferUncheckedUpdateManyWithoutWorkerNestedInput
@@ -17247,7 +17365,7 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -17259,7 +17377,7 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -17271,7 +17389,7 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -17279,82 +17397,124 @@ export namespace Prisma {
 
   export type ProfileCreateInput = {
     id?: string
-    skills?: ProfileCreateskillsInput | string[]
+    phone?: string | null
+    city?: string | null
+    avatarUrl?: string | null
     bio?: string | null
+    skills?: ProfileCreateskillsInput | string[]
     rating?: number
     isOnline?: boolean
+    completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
-    user: UserCreateNestedOneWithoutWorkerProfileInput
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutProfileInput
     reviews?: ReviewCreateNestedManyWithoutProfileInput
   }
 
   export type ProfileUncheckedCreateInput = {
     id?: string
     userId: string
-    skills?: ProfileCreateskillsInput | string[]
+    phone?: string | null
+    city?: string | null
+    avatarUrl?: string | null
     bio?: string | null
+    skills?: ProfileCreateskillsInput | string[]
     rating?: number
     isOnline?: boolean
+    completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
     reviews?: ReviewUncheckedCreateNestedManyWithoutProfileInput
   }
 
   export type ProfileUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
-    skills?: ProfileUpdateskillsInput | string[]
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
     isOnline?: BoolFieldUpdateOperationsInput | boolean
+    completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
-    user?: UserUpdateOneRequiredWithoutWorkerProfileNestedInput
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutProfileNestedInput
     reviews?: ReviewUpdateManyWithoutProfileNestedInput
   }
 
   export type ProfileUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
-    skills?: ProfileUpdateskillsInput | string[]
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
     isOnline?: BoolFieldUpdateOperationsInput | boolean
+    completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reviews?: ReviewUncheckedUpdateManyWithoutProfileNestedInput
   }
 
   export type ProfileCreateManyInput = {
     id?: string
     userId: string
-    skills?: ProfileCreateskillsInput | string[]
+    phone?: string | null
+    city?: string | null
+    avatarUrl?: string | null
     bio?: string | null
+    skills?: ProfileCreateskillsInput | string[]
     rating?: number
     isOnline?: boolean
+    completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
   }
 
   export type ProfileUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
-    skills?: ProfileUpdateskillsInput | string[]
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
     isOnline?: BoolFieldUpdateOperationsInput | boolean
+    completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProfileUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
-    skills?: ProfileUpdateskillsInput | string[]
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
     isOnline?: BoolFieldUpdateOperationsInput | boolean
+    completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type OrderCreateInput = {
@@ -18164,11 +18324,11 @@ export namespace Prisma {
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
   }
 
-  export type EnumRoleFilter<$PrismaModel = never> = {
-    equals?: $Enums.Role | EnumRoleFieldRefInput<$PrismaModel>
-    in?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
-    notIn?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
-    not?: NestedEnumRoleFilter<$PrismaModel> | $Enums.Role
+  export type EnumUserRoleFilter<$PrismaModel = never> = {
+    equals?: $Enums.UserRole | EnumUserRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.UserRole[] | ListEnumUserRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.UserRole[] | ListEnumUserRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumUserRoleFilter<$PrismaModel> | $Enums.UserRole
   }
 
   export type IntFilter<$PrismaModel = never> = {
@@ -18361,14 +18521,14 @@ export namespace Prisma {
     _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
-  export type EnumRoleWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: $Enums.Role | EnumRoleFieldRefInput<$PrismaModel>
-    in?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
-    notIn?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
-    not?: NestedEnumRoleWithAggregatesFilter<$PrismaModel> | $Enums.Role
+  export type EnumUserRoleWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.UserRole | EnumUserRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.UserRole[] | ListEnumUserRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.UserRole[] | ListEnumUserRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumUserRoleWithAggregatesFilter<$PrismaModel> | $Enums.UserRole
     _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedEnumRoleFilter<$PrismaModel>
-    _max?: NestedEnumRoleFilter<$PrismaModel>
+    _min?: NestedEnumUserRoleFilter<$PrismaModel>
+    _max?: NestedEnumUserRoleFilter<$PrismaModel>
   }
 
   export type IntWithAggregatesFilter<$PrismaModel = never> = {
@@ -18449,16 +18609,23 @@ export namespace Prisma {
   export type ProfileCountOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
-    skills?: SortOrder
+    phone?: SortOrder
+    city?: SortOrder
+    avatarUrl?: SortOrder
     bio?: SortOrder
+    skills?: SortOrder
     rating?: SortOrder
     isOnline?: SortOrder
+    completedCount?: SortOrder
     lastLat?: SortOrder
     lastLng?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
   }
 
   export type ProfileAvgOrderByAggregateInput = {
     rating?: SortOrder
+    completedCount?: SortOrder
     lastLat?: SortOrder
     lastLng?: SortOrder
   }
@@ -18466,25 +18633,38 @@ export namespace Prisma {
   export type ProfileMaxOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
+    phone?: SortOrder
+    city?: SortOrder
+    avatarUrl?: SortOrder
     bio?: SortOrder
     rating?: SortOrder
     isOnline?: SortOrder
+    completedCount?: SortOrder
     lastLat?: SortOrder
     lastLng?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
   }
 
   export type ProfileMinOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
+    phone?: SortOrder
+    city?: SortOrder
+    avatarUrl?: SortOrder
     bio?: SortOrder
     rating?: SortOrder
     isOnline?: SortOrder
+    completedCount?: SortOrder
     lastLat?: SortOrder
     lastLng?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
   }
 
   export type ProfileSumOrderByAggregateInput = {
     rating?: SortOrder
+    completedCount?: SortOrder
     lastLat?: SortOrder
     lastLng?: SortOrder
   }
@@ -19168,8 +19348,8 @@ export namespace Prisma {
     set?: string | null
   }
 
-  export type EnumRoleFieldUpdateOperationsInput = {
-    set?: $Enums.Role
+  export type EnumUserRoleFieldUpdateOperationsInput = {
+    set?: $Enums.UserRole
   }
 
   export type IntFieldUpdateOperationsInput = {
@@ -19460,9 +19640,9 @@ export namespace Prisma {
     set: string[]
   }
 
-  export type UserCreateNestedOneWithoutWorkerProfileInput = {
-    create?: XOR<UserCreateWithoutWorkerProfileInput, UserUncheckedCreateWithoutWorkerProfileInput>
-    connectOrCreate?: UserCreateOrConnectWithoutWorkerProfileInput
+  export type UserCreateNestedOneWithoutProfileInput = {
+    create?: XOR<UserCreateWithoutProfileInput, UserUncheckedCreateWithoutProfileInput>
+    connectOrCreate?: UserCreateOrConnectWithoutProfileInput
     connect?: UserWhereUniqueInput
   }
 
@@ -19501,12 +19681,12 @@ export namespace Prisma {
     divide?: number
   }
 
-  export type UserUpdateOneRequiredWithoutWorkerProfileNestedInput = {
-    create?: XOR<UserCreateWithoutWorkerProfileInput, UserUncheckedCreateWithoutWorkerProfileInput>
-    connectOrCreate?: UserCreateOrConnectWithoutWorkerProfileInput
-    upsert?: UserUpsertWithoutWorkerProfileInput
+  export type UserUpdateOneRequiredWithoutProfileNestedInput = {
+    create?: XOR<UserCreateWithoutProfileInput, UserUncheckedCreateWithoutProfileInput>
+    connectOrCreate?: UserCreateOrConnectWithoutProfileInput
+    upsert?: UserUpsertWithoutProfileInput
     connect?: UserWhereUniqueInput
-    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutWorkerProfileInput, UserUpdateWithoutWorkerProfileInput>, UserUncheckedUpdateWithoutWorkerProfileInput>
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutProfileInput, UserUpdateWithoutProfileInput>, UserUncheckedUpdateWithoutProfileInput>
   }
 
   export type ReviewUpdateManyWithoutProfileNestedInput = {
@@ -19970,11 +20150,11 @@ export namespace Prisma {
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
   }
 
-  export type NestedEnumRoleFilter<$PrismaModel = never> = {
-    equals?: $Enums.Role | EnumRoleFieldRefInput<$PrismaModel>
-    in?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
-    notIn?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
-    not?: NestedEnumRoleFilter<$PrismaModel> | $Enums.Role
+  export type NestedEnumUserRoleFilter<$PrismaModel = never> = {
+    equals?: $Enums.UserRole | EnumUserRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.UserRole[] | ListEnumUserRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.UserRole[] | ListEnumUserRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumUserRoleFilter<$PrismaModel> | $Enums.UserRole
   }
 
   export type NestedIntFilter<$PrismaModel = never> = {
@@ -20052,14 +20232,14 @@ export namespace Prisma {
     not?: NestedIntNullableFilter<$PrismaModel> | number | null
   }
 
-  export type NestedEnumRoleWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: $Enums.Role | EnumRoleFieldRefInput<$PrismaModel>
-    in?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
-    notIn?: $Enums.Role[] | ListEnumRoleFieldRefInput<$PrismaModel>
-    not?: NestedEnumRoleWithAggregatesFilter<$PrismaModel> | $Enums.Role
+  export type NestedEnumUserRoleWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.UserRole | EnumUserRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.UserRole[] | ListEnumUserRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.UserRole[] | ListEnumUserRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumUserRoleWithAggregatesFilter<$PrismaModel> | $Enums.UserRole
     _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedEnumRoleFilter<$PrismaModel>
-    _max?: NestedEnumRoleFilter<$PrismaModel>
+    _min?: NestedEnumUserRoleFilter<$PrismaModel>
+    _max?: NestedEnumUserRoleFilter<$PrismaModel>
   }
 
   export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
@@ -20328,23 +20508,35 @@ export namespace Prisma {
 
   export type ProfileCreateWithoutUserInput = {
     id?: string
-    skills?: ProfileCreateskillsInput | string[]
+    phone?: string | null
+    city?: string | null
+    avatarUrl?: string | null
     bio?: string | null
+    skills?: ProfileCreateskillsInput | string[]
     rating?: number
     isOnline?: boolean
+    completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
     reviews?: ReviewCreateNestedManyWithoutProfileInput
   }
 
   export type ProfileUncheckedCreateWithoutUserInput = {
     id?: string
-    skills?: ProfileCreateskillsInput | string[]
+    phone?: string | null
+    city?: string | null
+    avatarUrl?: string | null
     bio?: string | null
+    skills?: ProfileCreateskillsInput | string[]
     rating?: number
     isOnline?: boolean
+    completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
     reviews?: ReviewUncheckedCreateNestedManyWithoutProfileInput
   }
 
@@ -20671,23 +20863,35 @@ export namespace Prisma {
 
   export type ProfileUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
-    skills?: ProfileUpdateskillsInput | string[]
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
     isOnline?: BoolFieldUpdateOperationsInput | boolean
+    completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reviews?: ReviewUpdateManyWithoutProfileNestedInput
   }
 
   export type ProfileUncheckedUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
-    skills?: ProfileUpdateskillsInput | string[]
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
     isOnline?: BoolFieldUpdateOperationsInput | boolean
+    completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reviews?: ReviewUncheckedUpdateManyWithoutProfileNestedInput
   }
 
@@ -20876,13 +21080,13 @@ export namespace Prisma {
     data: XOR<MessageUpdateManyMutationInput, MessageUncheckedUpdateManyWithoutRecipientInput>
   }
 
-  export type UserCreateWithoutWorkerProfileInput = {
+  export type UserCreateWithoutProfileInput = {
     id: string
     name: string
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -20897,13 +21101,13 @@ export namespace Prisma {
     receivedMessages?: MessageCreateNestedManyWithoutRecipientInput
   }
 
-  export type UserUncheckedCreateWithoutWorkerProfileInput = {
+  export type UserUncheckedCreateWithoutProfileInput = {
     id: string
     name: string
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -20918,9 +21122,9 @@ export namespace Prisma {
     receivedMessages?: MessageUncheckedCreateNestedManyWithoutRecipientInput
   }
 
-  export type UserCreateOrConnectWithoutWorkerProfileInput = {
+  export type UserCreateOrConnectWithoutProfileInput = {
     where: UserWhereUniqueInput
-    create: XOR<UserCreateWithoutWorkerProfileInput, UserUncheckedCreateWithoutWorkerProfileInput>
+    create: XOR<UserCreateWithoutProfileInput, UserUncheckedCreateWithoutProfileInput>
   }
 
   export type ReviewCreateWithoutProfileInput = {
@@ -20949,24 +21153,24 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
-  export type UserUpsertWithoutWorkerProfileInput = {
-    update: XOR<UserUpdateWithoutWorkerProfileInput, UserUncheckedUpdateWithoutWorkerProfileInput>
-    create: XOR<UserCreateWithoutWorkerProfileInput, UserUncheckedCreateWithoutWorkerProfileInput>
+  export type UserUpsertWithoutProfileInput = {
+    update: XOR<UserUpdateWithoutProfileInput, UserUncheckedUpdateWithoutProfileInput>
+    create: XOR<UserCreateWithoutProfileInput, UserUncheckedCreateWithoutProfileInput>
     where?: UserWhereInput
   }
 
-  export type UserUpdateToOneWithWhereWithoutWorkerProfileInput = {
+  export type UserUpdateToOneWithWhereWithoutProfileInput = {
     where?: UserWhereInput
-    data: XOR<UserUpdateWithoutWorkerProfileInput, UserUncheckedUpdateWithoutWorkerProfileInput>
+    data: XOR<UserUpdateWithoutProfileInput, UserUncheckedUpdateWithoutProfileInput>
   }
 
-  export type UserUpdateWithoutWorkerProfileInput = {
+  export type UserUpdateWithoutProfileInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -20981,13 +21185,13 @@ export namespace Prisma {
     receivedMessages?: MessageUpdateManyWithoutRecipientNestedInput
   }
 
-  export type UserUncheckedUpdateWithoutWorkerProfileInput = {
+  export type UserUncheckedUpdateWithoutProfileInput = {
     id?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -21036,13 +21240,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionCreateNestedManyWithoutUserInput
     accounts?: AccountCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileCreateNestedOneWithoutUserInput
+    profile?: ProfileCreateNestedOneWithoutUserInput
     ordersTaken?: OrderCreateNestedManyWithoutWorkerInput
     offers?: OfferCreateNestedManyWithoutWorkerInput
     transactions?: TransactionCreateNestedManyWithoutUserInput
@@ -21057,13 +21261,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileUncheckedCreateNestedOneWithoutUserInput
+    profile?: ProfileUncheckedCreateNestedOneWithoutUserInput
     ordersTaken?: OrderUncheckedCreateNestedManyWithoutWorkerInput
     offers?: OfferUncheckedCreateNestedManyWithoutWorkerInput
     transactions?: TransactionUncheckedCreateNestedManyWithoutUserInput
@@ -21083,13 +21287,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionCreateNestedManyWithoutUserInput
     accounts?: AccountCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileCreateNestedOneWithoutUserInput
+    profile?: ProfileCreateNestedOneWithoutUserInput
     ordersCreated?: OrderCreateNestedManyWithoutClientInput
     offers?: OfferCreateNestedManyWithoutWorkerInput
     transactions?: TransactionCreateNestedManyWithoutUserInput
@@ -21104,13 +21308,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileUncheckedCreateNestedOneWithoutUserInput
+    profile?: ProfileUncheckedCreateNestedOneWithoutUserInput
     ordersCreated?: OrderUncheckedCreateNestedManyWithoutClientInput
     offers?: OfferUncheckedCreateNestedManyWithoutWorkerInput
     transactions?: TransactionUncheckedCreateNestedManyWithoutUserInput
@@ -21246,13 +21450,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUpdateManyWithoutUserNestedInput
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUpdateOneWithoutUserNestedInput
+    profile?: ProfileUpdateOneWithoutUserNestedInput
     ordersTaken?: OrderUpdateManyWithoutWorkerNestedInput
     offers?: OfferUpdateManyWithoutWorkerNestedInput
     transactions?: TransactionUpdateManyWithoutUserNestedInput
@@ -21267,13 +21471,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
+    profile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
     ordersTaken?: OrderUncheckedUpdateManyWithoutWorkerNestedInput
     offers?: OfferUncheckedUpdateManyWithoutWorkerNestedInput
     transactions?: TransactionUncheckedUpdateManyWithoutUserNestedInput
@@ -21299,13 +21503,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUpdateManyWithoutUserNestedInput
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUpdateOneWithoutUserNestedInput
+    profile?: ProfileUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUpdateManyWithoutClientNestedInput
     offers?: OfferUpdateManyWithoutWorkerNestedInput
     transactions?: TransactionUpdateManyWithoutUserNestedInput
@@ -21320,13 +21524,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
+    profile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUncheckedUpdateManyWithoutClientNestedInput
     offers?: OfferUncheckedUpdateManyWithoutWorkerNestedInput
     transactions?: TransactionUncheckedUpdateManyWithoutUserNestedInput
@@ -21461,13 +21665,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionCreateNestedManyWithoutUserInput
     accounts?: AccountCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileCreateNestedOneWithoutUserInput
+    profile?: ProfileCreateNestedOneWithoutUserInput
     ordersCreated?: OrderCreateNestedManyWithoutClientInput
     ordersTaken?: OrderCreateNestedManyWithoutWorkerInput
     transactions?: TransactionCreateNestedManyWithoutUserInput
@@ -21482,13 +21686,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileUncheckedCreateNestedOneWithoutUserInput
+    profile?: ProfileUncheckedCreateNestedOneWithoutUserInput
     ordersCreated?: OrderUncheckedCreateNestedManyWithoutClientInput
     ordersTaken?: OrderUncheckedCreateNestedManyWithoutWorkerInput
     transactions?: TransactionUncheckedCreateNestedManyWithoutUserInput
@@ -21570,13 +21774,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUpdateManyWithoutUserNestedInput
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUpdateOneWithoutUserNestedInput
+    profile?: ProfileUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUpdateManyWithoutWorkerNestedInput
     transactions?: TransactionUpdateManyWithoutUserNestedInput
@@ -21591,13 +21795,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
+    profile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUncheckedUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUncheckedUpdateManyWithoutWorkerNestedInput
     transactions?: TransactionUncheckedUpdateManyWithoutUserNestedInput
@@ -21612,13 +21816,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionCreateNestedManyWithoutUserInput
     accounts?: AccountCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileCreateNestedOneWithoutUserInput
+    profile?: ProfileCreateNestedOneWithoutUserInput
     ordersCreated?: OrderCreateNestedManyWithoutClientInput
     ordersTaken?: OrderCreateNestedManyWithoutWorkerInput
     offers?: OfferCreateNestedManyWithoutWorkerInput
@@ -21633,13 +21837,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileUncheckedCreateNestedOneWithoutUserInput
+    profile?: ProfileUncheckedCreateNestedOneWithoutUserInput
     ordersCreated?: OrderUncheckedCreateNestedManyWithoutClientInput
     ordersTaken?: OrderUncheckedCreateNestedManyWithoutWorkerInput
     offers?: OfferUncheckedCreateNestedManyWithoutWorkerInput
@@ -21715,13 +21919,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUpdateManyWithoutUserNestedInput
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUpdateOneWithoutUserNestedInput
+    profile?: ProfileUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUpdateManyWithoutWorkerNestedInput
     offers?: OfferUpdateManyWithoutWorkerNestedInput
@@ -21736,13 +21940,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
+    profile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUncheckedUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUncheckedUpdateManyWithoutWorkerNestedInput
     offers?: OfferUncheckedUpdateManyWithoutWorkerNestedInput
@@ -21849,24 +22053,36 @@ export namespace Prisma {
 
   export type ProfileCreateWithoutReviewsInput = {
     id?: string
-    skills?: ProfileCreateskillsInput | string[]
+    phone?: string | null
+    city?: string | null
+    avatarUrl?: string | null
     bio?: string | null
+    skills?: ProfileCreateskillsInput | string[]
     rating?: number
     isOnline?: boolean
+    completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
-    user: UserCreateNestedOneWithoutWorkerProfileInput
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutProfileInput
   }
 
   export type ProfileUncheckedCreateWithoutReviewsInput = {
     id?: string
     userId: string
-    skills?: ProfileCreateskillsInput | string[]
+    phone?: string | null
+    city?: string | null
+    avatarUrl?: string | null
     bio?: string | null
+    skills?: ProfileCreateskillsInput | string[]
     rating?: number
     isOnline?: boolean
+    completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
   }
 
   export type ProfileCreateOrConnectWithoutReviewsInput = {
@@ -21938,24 +22154,36 @@ export namespace Prisma {
 
   export type ProfileUpdateWithoutReviewsInput = {
     id?: StringFieldUpdateOperationsInput | string
-    skills?: ProfileUpdateskillsInput | string[]
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
     isOnline?: BoolFieldUpdateOperationsInput | boolean
+    completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
-    user?: UserUpdateOneRequiredWithoutWorkerProfileNestedInput
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutProfileNestedInput
   }
 
   export type ProfileUncheckedUpdateWithoutReviewsInput = {
     id?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
-    skills?: ProfileUpdateskillsInput | string[]
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
     bio?: NullableStringFieldUpdateOperationsInput | string | null
+    skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
     isOnline?: BoolFieldUpdateOperationsInput | boolean
+    completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type UserCreateWithoutSessionsInput = {
@@ -21964,12 +22192,12 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     accounts?: AccountCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileCreateNestedOneWithoutUserInput
+    profile?: ProfileCreateNestedOneWithoutUserInput
     ordersCreated?: OrderCreateNestedManyWithoutClientInput
     ordersTaken?: OrderCreateNestedManyWithoutWorkerInput
     offers?: OfferCreateNestedManyWithoutWorkerInput
@@ -21985,12 +22213,12 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileUncheckedCreateNestedOneWithoutUserInput
+    profile?: ProfileUncheckedCreateNestedOneWithoutUserInput
     ordersCreated?: OrderUncheckedCreateNestedManyWithoutClientInput
     ordersTaken?: OrderUncheckedCreateNestedManyWithoutWorkerInput
     offers?: OfferUncheckedCreateNestedManyWithoutWorkerInput
@@ -22022,12 +22250,12 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUpdateOneWithoutUserNestedInput
+    profile?: ProfileUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUpdateManyWithoutWorkerNestedInput
     offers?: OfferUpdateManyWithoutWorkerNestedInput
@@ -22043,12 +22271,12 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
+    profile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUncheckedUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUncheckedUpdateManyWithoutWorkerNestedInput
     offers?: OfferUncheckedUpdateManyWithoutWorkerNestedInput
@@ -22064,12 +22292,12 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileCreateNestedOneWithoutUserInput
+    profile?: ProfileCreateNestedOneWithoutUserInput
     ordersCreated?: OrderCreateNestedManyWithoutClientInput
     ordersTaken?: OrderCreateNestedManyWithoutWorkerInput
     offers?: OfferCreateNestedManyWithoutWorkerInput
@@ -22085,12 +22313,12 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileUncheckedCreateNestedOneWithoutUserInput
+    profile?: ProfileUncheckedCreateNestedOneWithoutUserInput
     ordersCreated?: OrderUncheckedCreateNestedManyWithoutClientInput
     ordersTaken?: OrderUncheckedCreateNestedManyWithoutWorkerInput
     offers?: OfferUncheckedCreateNestedManyWithoutWorkerInput
@@ -22122,12 +22350,12 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUpdateOneWithoutUserNestedInput
+    profile?: ProfileUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUpdateManyWithoutWorkerNestedInput
     offers?: OfferUpdateManyWithoutWorkerNestedInput
@@ -22143,12 +22371,12 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
+    profile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUncheckedUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUncheckedUpdateManyWithoutWorkerNestedInput
     offers?: OfferUncheckedUpdateManyWithoutWorkerNestedInput
@@ -22164,13 +22392,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionCreateNestedManyWithoutUserInput
     accounts?: AccountCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileCreateNestedOneWithoutUserInput
+    profile?: ProfileCreateNestedOneWithoutUserInput
     ordersCreated?: OrderCreateNestedManyWithoutClientInput
     ordersTaken?: OrderCreateNestedManyWithoutWorkerInput
     offers?: OfferCreateNestedManyWithoutWorkerInput
@@ -22185,13 +22413,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileUncheckedCreateNestedOneWithoutUserInput
+    profile?: ProfileUncheckedCreateNestedOneWithoutUserInput
     ordersCreated?: OrderUncheckedCreateNestedManyWithoutClientInput
     ordersTaken?: OrderUncheckedCreateNestedManyWithoutWorkerInput
     offers?: OfferUncheckedCreateNestedManyWithoutWorkerInput
@@ -22222,13 +22450,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUpdateManyWithoutUserNestedInput
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUpdateOneWithoutUserNestedInput
+    profile?: ProfileUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUpdateManyWithoutWorkerNestedInput
     offers?: OfferUpdateManyWithoutWorkerNestedInput
@@ -22243,13 +22471,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
+    profile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUncheckedUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUncheckedUpdateManyWithoutWorkerNestedInput
     offers?: OfferUncheckedUpdateManyWithoutWorkerNestedInput
@@ -22264,13 +22492,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionCreateNestedManyWithoutUserInput
     accounts?: AccountCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileCreateNestedOneWithoutUserInput
+    profile?: ProfileCreateNestedOneWithoutUserInput
     ordersCreated?: OrderCreateNestedManyWithoutClientInput
     ordersTaken?: OrderCreateNestedManyWithoutWorkerInput
     offers?: OfferCreateNestedManyWithoutWorkerInput
@@ -22285,13 +22513,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileUncheckedCreateNestedOneWithoutUserInput
+    profile?: ProfileUncheckedCreateNestedOneWithoutUserInput
     ordersCreated?: OrderUncheckedCreateNestedManyWithoutClientInput
     ordersTaken?: OrderUncheckedCreateNestedManyWithoutWorkerInput
     offers?: OfferUncheckedCreateNestedManyWithoutWorkerInput
@@ -22311,13 +22539,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionCreateNestedManyWithoutUserInput
     accounts?: AccountCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileCreateNestedOneWithoutUserInput
+    profile?: ProfileCreateNestedOneWithoutUserInput
     ordersCreated?: OrderCreateNestedManyWithoutClientInput
     ordersTaken?: OrderCreateNestedManyWithoutWorkerInput
     offers?: OfferCreateNestedManyWithoutWorkerInput
@@ -22332,13 +22560,13 @@ export namespace Prisma {
     email: string
     emailVerified?: boolean
     image?: string | null
-    role?: $Enums.Role
+    role?: $Enums.UserRole
     balance?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    workerProfile?: ProfileUncheckedCreateNestedOneWithoutUserInput
+    profile?: ProfileUncheckedCreateNestedOneWithoutUserInput
     ordersCreated?: OrderUncheckedCreateNestedManyWithoutClientInput
     ordersTaken?: OrderUncheckedCreateNestedManyWithoutWorkerInput
     offers?: OfferUncheckedCreateNestedManyWithoutWorkerInput
@@ -22414,13 +22642,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUpdateManyWithoutUserNestedInput
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUpdateOneWithoutUserNestedInput
+    profile?: ProfileUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUpdateManyWithoutWorkerNestedInput
     offers?: OfferUpdateManyWithoutWorkerNestedInput
@@ -22435,13 +22663,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
+    profile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUncheckedUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUncheckedUpdateManyWithoutWorkerNestedInput
     offers?: OfferUncheckedUpdateManyWithoutWorkerNestedInput
@@ -22467,13 +22695,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUpdateManyWithoutUserNestedInput
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUpdateOneWithoutUserNestedInput
+    profile?: ProfileUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUpdateManyWithoutWorkerNestedInput
     offers?: OfferUpdateManyWithoutWorkerNestedInput
@@ -22488,13 +22716,13 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     emailVerified?: BoolFieldUpdateOperationsInput | boolean
     image?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: EnumRoleFieldUpdateOperationsInput | $Enums.Role
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
     balance?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    workerProfile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
+    profile?: ProfileUncheckedUpdateOneWithoutUserNestedInput
     ordersCreated?: OrderUncheckedUpdateManyWithoutClientNestedInput
     ordersTaken?: OrderUncheckedUpdateManyWithoutWorkerNestedInput
     offers?: OfferUncheckedUpdateManyWithoutWorkerNestedInput

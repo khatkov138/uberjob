@@ -11,8 +11,9 @@ import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
-import { markAllAsRead, markAsRead } from "@/app/actions/notifications"
+
 import { Notification } from "../../prisma/generated"
+import { markAllAsRead, markAsRead } from "@/actions/notifications"
 
 export function NotificationsBell() {
   const queryClient = useQueryClient()

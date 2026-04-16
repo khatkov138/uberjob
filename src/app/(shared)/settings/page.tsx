@@ -25,7 +25,7 @@ export default async function SettingsPage() {
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     include: {
-      workerProfile: true // Убедись, что связь называется так в schema.prisma
+      profile:true
     }
   })
 

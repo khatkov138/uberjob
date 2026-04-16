@@ -2,8 +2,9 @@
 
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
-import { getLatestPublicOrders } from "@/app/actions/public-orders"
+
 import { Zap, MapPin, Clock } from "lucide-react"
+import { getLatestPublicOrders } from "@/actions/public-orders";
 
 function formatRelativeTime(date: Date) {
   const diffInSeconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);

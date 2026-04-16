@@ -8,14 +8,19 @@ datasource db {
 }
 
 // --- ПОЛЬЗОВАТЕЛИ И РОЛИ ---
+enum UserRole {
+  USER
+  ADMIN
+  SUPERADMIN
+}
 
 model User {
-  id            String  @id
+  id            String   @id
   name          String
-  email         String  @unique
-  emailVerified Boolean @default(false)
+  email         String   @unique
+  emailVerified Boolean  @default(false)
   image         String?
-  role          Role    @default(CLIENT)
+  role          UserRole @default(USER)
 
   // ФИНАНСЫ (в копейках)
   balance Int @default(0)
@@ -28,7 +33,7 @@ model User {
   accounts Account[]
 
   // Профиль исполнителя
-  workerProfile Profile? @relation("WorkerProfile")
+  profile Profile?
 
   // Заказы и отклики
   ordersCreated Order[] @relation("ClientOrders") // Заказы, где юзер — клиент
@@ -48,27 +53,33 @@ model User {
   @@map("user")
 }
 
-enum Role {
-  CLIENT
-  PRO
-  ADMIN
-}
-
 model Profile {
   id     String @id @default(cuid())
   userId String @unique
-  user   User   @relation("WorkerProfile", fields: [userId], references: [id], onDelete: Cascade)
+  // Связь теперь общая, без привязки только к "Worker"
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  skills   String[] // Массив навыков для мэтчинга
-  bio      String?
-  rating   Float    @default(5.0)
-  isOnline Boolean  @default(false)
+  // --- ОБЩИЕ ДАННЫЕ (Личность) ---
+  phone     String? // Телефон для связи по заказам
+  city      String? // Город проживания
+  avatarUrl String? // Ссылка на фото (если не из соцсетей)
+  bio       String? // Кратко о себе / Опыт работы
 
-  // Геопозиция для Uber-механики
+  // --- ПРОФЕССИОНАЛЬНЫЕ ДАННЫЕ (PRO) ---
+  skills         String[] @default([]) // Массив навыков (Электрика, Сантехника и т.д.)
+  rating         Float    @default(5.0)
+  isOnline       Boolean  @default(false)
+  completedCount Int      @default(0) // Сколько заказов реально завершено
+
+  // --- ГЕОПОЗИЦИЯ (Uber-механика) ---
   lastLat Float?
   lastLng Float?
 
   reviews Review[]
+
+  // --- СИСТЕМНЫЕ ПОЛЯ ---
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("profile")
 }

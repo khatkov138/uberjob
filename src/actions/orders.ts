@@ -3,8 +3,9 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { OrderStatus } from "../../../prisma/generated"
+
 import { getServerSession } from "@/lib/get-session"
+import { OrderStatus } from "../../prisma/generated"
 
 
 // Получить заказы, которые Я СОЗДАЛ (как клиент)

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
-import { getClientOrders } from "@/app/actions/orders" // Проверь путь к экшену
+
 import { authClient } from "@/lib/auth-client"
 import { 
   Plus, 
@@ -17,6 +17,7 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Container } from "@/components/shared/container"
+import { getClientOrders } from "@/actions/orders"
 
 export default function ClientDashboardPage() {
   const { data: session } = authClient.useSession()
