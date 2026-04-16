@@ -3,16 +3,16 @@ import prisma from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import { getServerSession } from "@/lib/get-session"
 import { OrderDetailsUI } from "./order-details-ui"
+import { Container } from "@/components/shared/container"
 
-// Описываем тип params как Promise
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
 export default async function OrderPage({ params }: PageProps) {
-  // 1. Ждем получения id
+  // 1. Ждем получения id (Next.js 15)
   const { id } = await params
-  
+
   const session = await getServerSession()
   const userId = session?.user?.id
 
@@ -36,7 +36,7 @@ export default async function OrderPage({ params }: PageProps) {
 
   if (!order) return notFound()
 
-  // 3. Проверяем, есть ли уже отклик от этого мастера
+  // 3. Проверяем, есть ли уже отклик от этого исполнителя
   let existingOffer = null
   if (userId) {
     existingOffer = await prisma.offer.findFirst({
@@ -48,12 +48,18 @@ export default async function OrderPage({ params }: PageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50/50 pb-20">
-      <OrderDetailsUI 
-        order={order} 
-        existingOffer={!!existingOffer} 
-        userId={userId} 
+    /**
+     * Container берет на себя:
+     * - Центрирование и max-w-5xl
+     * - bg-slate-50/50 (стандарт для информационных блоков)
+     * - Правильные отступы сверху и снизу
+     */
+    <Container className="max-w-7xl bg-transparent border-none  shadow-none bg-slate-50/50">
+      <OrderDetailsUI
+        order={order}
+        existingOffer={!!existingOffer}
+        userId={userId}
       />
-    </main>
+    </Container>
   )
 }

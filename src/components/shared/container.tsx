@@ -3,22 +3,17 @@ import { cn } from "@/lib/utils"
 interface ContainerProps {
   children: React.ReactNode
   className?: string
-  scrollable?: boolean
 }
 
-export function Container({ children, className, scrollable = true }: ContainerProps) {
+export function Container({ children, className }: ContainerProps) {
   return (
-    <div className={cn(
-      "w-full h-full bg-white flex flex-col items-center px-4",
-      // pt-4 md:pt-8 — этого достаточно, чтобы контент не лип к бегущей строке
-      scrollable && "overflow-y-auto no-scrollbar pt-4 md:pt-8" 
-    )}>
+    /** 
+     * Теперь используем max-w-5xl (1024px) как стандарт. 
+     * Это даст больше места для твоих карточек заказов и откликов.
+     */
+    <div className="w-full flex flex-col items-center px-4 py-6 md:py-10">
       <div className={cn(
-        /**
-         * Убрали mt-4 и гигантские pt-12/16.
-         * Оставили только базовый паддинг p-6 для мобилок и p-10 для десктопа.
-         */
-        "w-full max-w-4xl p-6 md:p-10 mb-20 shrink-0 min-h-fit",
+        "w-full max-w-5xl bg-slate-50/50 p-6 md:p-10 shrink-0 min-h-fit rounded-xl",
         className
       )}>
         {children}
