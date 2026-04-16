@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserDropdown } from "@/components/user-dropdown";
@@ -17,12 +18,20 @@ export default function Navbar() {
     const { mode } = useRoleModeStore();
     const pathname = usePathname();
 
+    // 🛡️ ЗАЩИТА ОТ ОШИБОК ГИДРАТАЦИИ
+    const [mounted, setMounted] = React.useState(false);
+
+    // useEffect срабатывает только на клиенте после первого рендера
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const logoHref = user ? (mode === 'PRO' ? '/pro/dashboard' : '/client/dashboard') : "/";
 
-    // ПЕРЕВОД И ПОДСВЕТКА ДЛЯ ДАШБОРДА
+    // ПЕРЕВОД И ПОДСВЕТКА
     const links = mode === 'PRO' 
         ? [
-            { name: "ХАБ", href: "/pro/dashboard" }, // Добавили ХАБ, теперь он будет светиться
+            { name: "ХАБ", href: "/pro/dashboard" },
             { name: "ЛЕНТА", href: "/pro/feed" },
             { name: "ОТКЛИКИ", href: "/pro/my-offers" },
             { name: "ЗАДАЧИ", href: "/pro/my-orders" },
@@ -45,7 +54,8 @@ export default function Navbar() {
                     </Link>
 
                     <nav className="hidden lg:flex items-center gap-6">
-                        {user && links.map((link) => (
+                        {/* Показываем ссылки только после монтирования, чтобы избежать мерцания ролей */}
+                        {mounted && user && links.map((link) => (
                             <Link 
                                 key={link.href} 
                                 href={link.href}
@@ -64,7 +74,10 @@ export default function Navbar() {
 
                 {/* ПРАВО: СВИТЧЕР + ИКОНКИ / КНОПКИ ВХОДА */}
                 <div className="flex items-center gap-4">
-                    {user ? (
+                    {/* Если неmounted — показываем пустую заглушку, чтобы контент не прыгал */}
+                    {!mounted ? (
+                        <div className="h-10 w-24 bg-slate-50 animate-pulse rounded-2xl" />
+                    ) : user ? (
                         <>
                             <RoleSwitcher />
                             
@@ -81,7 +94,6 @@ export default function Navbar() {
                             <UserDropdown user={user as any} />
                         </>
                     ) : (
-                        /* ВОЗВРАЩАЕМ КНОПКИ ВХОДА В СТИЛЕ ZWORK */
                         <div className="flex items-center gap-3">
                             <Link 
                                 href="/sign-in" 
