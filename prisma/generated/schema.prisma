@@ -72,10 +72,10 @@ model Profile {
   completedCount Int      @default(0) // Сколько заказов реально завершено
 
   // --- ГЕОПОЗИЦИЯ (Uber-механика) ---
-  lastLat Float?
-  lastLng Float?
-
-  reviews Review[]
+  lastLat  Float?
+  lastLng  Float?
+  lastSeen DateTime @default(now())
+  reviews  Review[]
 
   // --- СИСТЕМНЫЕ ПОЛЯ ---
   createdAt DateTime @default(now())

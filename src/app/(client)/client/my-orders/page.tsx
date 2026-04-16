@@ -1,11 +1,14 @@
 import * as React from "react"
-import { getClientOrders } from "./actions"
+
 import { ClientOrdersList } from "./client-orders-list"
 import { Container } from "@/components/shared/container"
+import { getClientOrders } from "@/actions/orders/orders"
 
 export default async function ClientOrdersPage() {
   const result = await getClientOrders()
   const orders = result.success ? result.data : []
+
+
 
   return (
     <Container className="bg-slate-50/50 space-y-10">

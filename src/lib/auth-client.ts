@@ -9,3 +9,12 @@ export const authClient = createAuthClient({
         nextCookies()
     ]
 }) 
+
+
+export const isAdmin = (role?: string | null) => {
+  return role === 'ADMIN' || role === 'SUPERADMIN'
+}
+
+export const isSuperAdmin = (role?: string | null) => {
+  return role === 'SUPERADMIN'
+}

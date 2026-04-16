@@ -17,7 +17,7 @@ export async function getProWorkOrders() {
 
   try {
     const orders = await prisma.order.findMany({
-      where: { 
+      where: {
         workerId: session.user.id,
         status: { in: [OrderStatus.ACCEPTED, OrderStatus.IN_PROGRESS, OrderStatus.COMPLETED] }
       },
@@ -80,7 +80,7 @@ export async function getClientOrders() {
               select: {
                 name: true,
                 image: true,
-                workerProfile: {
+                profile: {
                   select: { rating: true, skills: true }
                 }
               }
@@ -91,6 +91,7 @@ export async function getClientOrders() {
       },
       orderBy: { createdAt: 'desc' }
     })
+
     return { success: true, data: orders }
   } catch (error) {
     return { success: false, error: "Ошибка загрузки" }

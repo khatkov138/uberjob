@@ -145,6 +145,7 @@ exports.Prisma.ProfileScalarFieldEnum = {
   completedCount: 'completedCount',
   lastLat: 'lastLat',
   lastLng: 'lastLng',
+  lastSeen: 'lastSeen',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };

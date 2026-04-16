@@ -5,7 +5,8 @@ import { useMutation } from "@tanstack/react-query"
 
 import { toast } from "sonner"
 import { Loader2, ArrowRight } from "lucide-react"
-import { createOffer } from "./actions"
+import { createOffer } from "@/actions/pro"
+
 
 export function OfferForm({ orderId, defaultPrice }: { orderId: string, defaultPrice: number }) {
   const [price, setPrice] = React.useState(defaultPrice > 0 ? (defaultPrice / 100).toString() : "")

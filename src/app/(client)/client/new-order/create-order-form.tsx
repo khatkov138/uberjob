@@ -10,9 +10,10 @@ import { MapPin, Wallet, ArrowRight, Loader2, AlertCircle } from "lucide-react"
 
 import { AddressInput } from "@/components/geo/address-input"
 import { createOrderSchema, type CreateOrderValues } from "@/lib/validation"
-import { createOrder } from "@/app/(client)/client/new-order/actions"
+
 import { useClientLocationStore } from "@/store/use-client-location-store"
 import { cn } from "@/lib/utils"
+import { createOrder } from "@/actions/orders/create"
 
 export function CreateOrderForm() {
     const router = useRouter()

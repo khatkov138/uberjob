@@ -3578,6 +3578,7 @@ export namespace Prisma {
     completedCount: number | null
     lastLat: number | null
     lastLng: number | null
+    lastSeen: Date | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -3594,6 +3595,7 @@ export namespace Prisma {
     completedCount: number | null
     lastLat: number | null
     lastLng: number | null
+    lastSeen: Date | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -3611,6 +3613,7 @@ export namespace Prisma {
     completedCount: number
     lastLat: number
     lastLng: number
+    lastSeen: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -3643,6 +3646,7 @@ export namespace Prisma {
     completedCount?: true
     lastLat?: true
     lastLng?: true
+    lastSeen?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -3659,6 +3663,7 @@ export namespace Prisma {
     completedCount?: true
     lastLat?: true
     lastLng?: true
+    lastSeen?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -3676,6 +3681,7 @@ export namespace Prisma {
     completedCount?: true
     lastLat?: true
     lastLng?: true
+    lastSeen?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -3780,6 +3786,7 @@ export namespace Prisma {
     completedCount: number
     lastLat: number | null
     lastLng: number | null
+    lastSeen: Date
     createdAt: Date
     updatedAt: Date
     _count: ProfileCountAggregateOutputType | null
@@ -3816,6 +3823,7 @@ export namespace Prisma {
     completedCount?: boolean
     lastLat?: boolean
     lastLng?: boolean
+    lastSeen?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
@@ -3836,6 +3844,7 @@ export namespace Prisma {
     completedCount?: boolean
     lastLat?: boolean
     lastLng?: boolean
+    lastSeen?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
@@ -3854,6 +3863,7 @@ export namespace Prisma {
     completedCount?: boolean
     lastLat?: boolean
     lastLng?: boolean
+    lastSeen?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
@@ -3872,11 +3882,12 @@ export namespace Prisma {
     completedCount?: boolean
     lastLat?: boolean
     lastLng?: boolean
+    lastSeen?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type ProfileOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "phone" | "city" | "avatarUrl" | "bio" | "skills" | "rating" | "isOnline" | "completedCount" | "lastLat" | "lastLng" | "createdAt" | "updatedAt", ExtArgs["result"]["profile"]>
+  export type ProfileOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "phone" | "city" | "avatarUrl" | "bio" | "skills" | "rating" | "isOnline" | "completedCount" | "lastLat" | "lastLng" | "lastSeen" | "createdAt" | "updatedAt", ExtArgs["result"]["profile"]>
   export type ProfileInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     reviews?: boolean | Profile$reviewsArgs<ExtArgs>
@@ -3908,6 +3919,7 @@ export namespace Prisma {
       completedCount: number
       lastLat: number | null
       lastLng: number | null
+      lastSeen: Date
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["profile"]>
@@ -4347,6 +4359,7 @@ export namespace Prisma {
     readonly completedCount: FieldRef<"Profile", 'Int'>
     readonly lastLat: FieldRef<"Profile", 'Float'>
     readonly lastLng: FieldRef<"Profile", 'Float'>
+    readonly lastSeen: FieldRef<"Profile", 'DateTime'>
     readonly createdAt: FieldRef<"Profile", 'DateTime'>
     readonly updatedAt: FieldRef<"Profile", 'DateTime'>
   }
@@ -16004,6 +16017,7 @@ export namespace Prisma {
     completedCount: 'completedCount',
     lastLat: 'lastLat',
     lastLng: 'lastLng',
+    lastSeen: 'lastSeen',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -16450,6 +16464,7 @@ export namespace Prisma {
     completedCount?: IntFilter<"Profile"> | number
     lastLat?: FloatNullableFilter<"Profile"> | number | null
     lastLng?: FloatNullableFilter<"Profile"> | number | null
+    lastSeen?: DateTimeFilter<"Profile"> | Date | string
     createdAt?: DateTimeFilter<"Profile"> | Date | string
     updatedAt?: DateTimeFilter<"Profile"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
@@ -16469,6 +16484,7 @@ export namespace Prisma {
     completedCount?: SortOrder
     lastLat?: SortOrderInput | SortOrder
     lastLng?: SortOrderInput | SortOrder
+    lastSeen?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     user?: UserOrderByWithRelationInput
@@ -16491,6 +16507,7 @@ export namespace Prisma {
     completedCount?: IntFilter<"Profile"> | number
     lastLat?: FloatNullableFilter<"Profile"> | number | null
     lastLng?: FloatNullableFilter<"Profile"> | number | null
+    lastSeen?: DateTimeFilter<"Profile"> | Date | string
     createdAt?: DateTimeFilter<"Profile"> | Date | string
     updatedAt?: DateTimeFilter<"Profile"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
@@ -16510,6 +16527,7 @@ export namespace Prisma {
     completedCount?: SortOrder
     lastLat?: SortOrderInput | SortOrder
     lastLng?: SortOrderInput | SortOrder
+    lastSeen?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: ProfileCountOrderByAggregateInput
@@ -16535,6 +16553,7 @@ export namespace Prisma {
     completedCount?: IntWithAggregatesFilter<"Profile"> | number
     lastLat?: FloatNullableWithAggregatesFilter<"Profile"> | number | null
     lastLng?: FloatNullableWithAggregatesFilter<"Profile"> | number | null
+    lastSeen?: DateTimeWithAggregatesFilter<"Profile"> | Date | string
     createdAt?: DateTimeWithAggregatesFilter<"Profile"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Profile"> | Date | string
   }
@@ -17407,6 +17426,7 @@ export namespace Prisma {
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
+    lastSeen?: Date | string
     createdAt?: Date | string
     updatedAt?: Date | string
     user: UserCreateNestedOneWithoutProfileInput
@@ -17426,6 +17446,7 @@ export namespace Prisma {
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
+    lastSeen?: Date | string
     createdAt?: Date | string
     updatedAt?: Date | string
     reviews?: ReviewUncheckedCreateNestedManyWithoutProfileInput
@@ -17443,6 +17464,7 @@ export namespace Prisma {
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    lastSeen?: DateTimeFieldUpdateOperationsInput | Date | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutProfileNestedInput
@@ -17462,6 +17484,7 @@ export namespace Prisma {
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    lastSeen?: DateTimeFieldUpdateOperationsInput | Date | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reviews?: ReviewUncheckedUpdateManyWithoutProfileNestedInput
@@ -17480,6 +17503,7 @@ export namespace Prisma {
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
+    lastSeen?: Date | string
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -17496,6 +17520,7 @@ export namespace Prisma {
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    lastSeen?: DateTimeFieldUpdateOperationsInput | Date | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -17513,6 +17538,7 @@ export namespace Prisma {
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    lastSeen?: DateTimeFieldUpdateOperationsInput | Date | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -18619,6 +18645,7 @@ export namespace Prisma {
     completedCount?: SortOrder
     lastLat?: SortOrder
     lastLng?: SortOrder
+    lastSeen?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -18642,6 +18669,7 @@ export namespace Prisma {
     completedCount?: SortOrder
     lastLat?: SortOrder
     lastLng?: SortOrder
+    lastSeen?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -18658,6 +18686,7 @@ export namespace Prisma {
     completedCount?: SortOrder
     lastLat?: SortOrder
     lastLng?: SortOrder
+    lastSeen?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -20518,6 +20547,7 @@ export namespace Prisma {
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
+    lastSeen?: Date | string
     createdAt?: Date | string
     updatedAt?: Date | string
     reviews?: ReviewCreateNestedManyWithoutProfileInput
@@ -20535,6 +20565,7 @@ export namespace Prisma {
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
+    lastSeen?: Date | string
     createdAt?: Date | string
     updatedAt?: Date | string
     reviews?: ReviewUncheckedCreateNestedManyWithoutProfileInput
@@ -20873,6 +20904,7 @@ export namespace Prisma {
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    lastSeen?: DateTimeFieldUpdateOperationsInput | Date | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reviews?: ReviewUpdateManyWithoutProfileNestedInput
@@ -20890,6 +20922,7 @@ export namespace Prisma {
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    lastSeen?: DateTimeFieldUpdateOperationsInput | Date | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     reviews?: ReviewUncheckedUpdateManyWithoutProfileNestedInput
@@ -22063,6 +22096,7 @@ export namespace Prisma {
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
+    lastSeen?: Date | string
     createdAt?: Date | string
     updatedAt?: Date | string
     user: UserCreateNestedOneWithoutProfileInput
@@ -22081,6 +22115,7 @@ export namespace Prisma {
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
+    lastSeen?: Date | string
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -22164,6 +22199,7 @@ export namespace Prisma {
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    lastSeen?: DateTimeFieldUpdateOperationsInput | Date | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutProfileNestedInput
@@ -22182,6 +22218,7 @@ export namespace Prisma {
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
+    lastSeen?: DateTimeFieldUpdateOperationsInput | Date | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

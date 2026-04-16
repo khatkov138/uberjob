@@ -1,3 +1,4 @@
+"use"
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -8,6 +9,7 @@ import { Footer } from "@/components/footer";
 import Script from "next/script";
 import { LivePulseMarquee } from "@/components/shared/live-pulse-marquee";
 import { RoleAutoswitcher } from "@/components/shared/role-autoswitcher";
+import { Heartbeat } from "@/components/shared/heartbeat";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,9 +55,11 @@ export default function RootLayout({
             <Footer />
           </main>
           <RoleAutoswitcher />
-          
+
           <Toaster richColors closeButton />
+          <Heartbeat />
         </TanstackProvider>
+
       </body>
     </html>
   );

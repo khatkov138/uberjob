@@ -7,7 +7,8 @@ import { useMutation } from "@tanstack/react-query"
 
 import { toast } from "sonner"
 import Link from "next/link"
-import { acceptOffer } from "./actions"
+import { acceptOffer } from "@/actions/orders/orders"
+
 
 export function ClientOrdersList({ initialOrders }: any) {
   // Состояние для модалки подтверждения

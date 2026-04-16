@@ -1,10 +1,11 @@
 "use client"
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { completeOrder } from "@/app/actions/orders"
+
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { CheckCircle } from "lucide-react"
+import { completeOrder } from "@/actions/orders/orders"
 
 export function CompleteOrderButton({ orderId }: { orderId: string }) {
   const queryClient = useQueryClient()

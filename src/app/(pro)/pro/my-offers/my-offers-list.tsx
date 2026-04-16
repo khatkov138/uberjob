@@ -108,7 +108,7 @@ export function MyOffersList({ initialOffers }: any) {
 
             {/* ПЕРЕХОД */}
             <Link 
-              href={`/pro/orders/${offer.order.id}`}
+              href={`/pro/feed/orders/${offer.order.id}`}
               className="absolute top-1/2 -right-4 -translate-y-1/2 w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:right-6 transition-all duration-500 shadow-xl z-10"
             >
               <ChevronRight className="w-6 h-6" />

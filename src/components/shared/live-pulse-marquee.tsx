@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 
 import { Zap, MapPin, Clock } from "lucide-react"
 import { getLatestPublicOrders } from "@/actions/orders/public-orders";
+import { usePathname } from "next/navigation";
 
 function formatRelativeTime(date: Date) {
   const diffInSeconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
@@ -22,6 +23,10 @@ export function LivePulseMarquee() {
     queryFn: () => getLatestPublicOrders(),
     refetchInterval: 30000,
   })
+
+  const pathname = usePathname();
+  const isAdminPage = pathname.startsWith('/admin')
+  if (isAdminPage) return null
 
   if (!orders || orders.length === 0) return null
 
@@ -50,10 +55,10 @@ export function LivePulseMarquee() {
           <div className="flex animate-marquee whitespace-nowrap items-center">
             {displayOrders.map((order, idx) => (
               <div key={`${order.id}-${idx}`} className="flex items-center">
-                
+
                 {/* КОНТЕНТ ЗАКАЗА */}
                 <div className="flex items-center gap-6 px-8">
-                  
+
                   {/* ВРЕМЯ */}
                   <div className="flex items-center gap-1.5 shrink-0">
                     <Clock className="w-3 h-3 text-slate-300" />
@@ -88,7 +93,7 @@ export function LivePulseMarquee() {
 
                 {/* ВЕРТИКАЛЬНЫЙ РАЗДЕЛИТЕЛЬ */}
                 <div className="h-4 w-px bg-slate-200" />
-                
+
               </div>
             ))}
           </div>

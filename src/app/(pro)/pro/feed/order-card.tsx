@@ -36,7 +36,7 @@ export function OrderCard({ order, userCategories = [], isMatched, toggleCategor
           {/* 2. ВЕРХ: ТИТУЛ И ЦЕНА */}
           <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-1">
             <div className="space-y-3 flex-1 w-full">
-              <Link href={`/pro/orders/${order.id}`} className="block">
+              <Link href={`/pro/feed/orders/${order.id}`} className="block">
                 <h3 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase text-slate-900 leading-[0.95]">
                   {order.title}
                 </h3>
@@ -149,7 +149,7 @@ export function OrderCard({ order, userCategories = [], isMatched, toggleCategor
               </div>
 
               <Link 
-                href={`/pro/orders/${order.id}`}
+                href={`/pro/feed/orders/${order.id}`}
                 className={cn(
                   "flex items-center justify-center gap-3 px-8 py-3.5 rounded-xl md:rounded-2xl text-[11px] font-black uppercase italic tracking-widest transition-all duration-500 w-full lg:w-auto shrink-0 whitespace-nowrap",
                   "bg-slate-100 text-slate-400 border border-slate-200", 
