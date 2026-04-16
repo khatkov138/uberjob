@@ -1,46 +1,95 @@
-import { Button } from "@/components/ui/button";
-import { UserDropdown } from "@/components/user-dropdown";
-import { getServerSession } from "@/lib/get-session";
-import Link from "next/link";
-import { RoleSwitcher } from "./role-switcher";
-import { NotificationsBell } from "./notifications-bell"; // Импортируем колокольчик
+"use client"
 
-export default async function Navbar() {
-    const session = await getServerSession();
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { UserDropdown } from "@/components/user-dropdown";
+import { NotificationsBell } from "./notifications-bell";
+import { useRoleModeStore } from "@/store/use-role-store";
+import { authClient } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
+import { MessageSquare } from "lucide-react";
+import { RoleSwitcher } from "./shared/role-switcher";
+import { Button } from "@/components/ui/button";
+
+export default function Navbar() {
+    const { data: session } = authClient.useSession();
     const user = session?.user;
+    const { mode } = useRoleModeStore();
+    const pathname = usePathname();
+
+    const logoHref = user ? (mode === 'PRO' ? '/pro/dashboard' : '/client/dashboard') : "/";
+
+    // ПЕРЕВОД И ПОДСВЕТКА ДЛЯ ДАШБОРДА
+    const links = mode === 'PRO' 
+        ? [
+            { name: "ХАБ", href: "/pro/dashboard" }, // Добавили ХАБ, теперь он будет светиться
+            { name: "ЛЕНТА", href: "/pro/feed" },
+            { name: "ОТКЛИКИ", href: "/pro/my-offers" },
+            { name: "ЗАДАЧИ", href: "/pro/my-orders" },
+          ]
+        : [
+            { name: "ХАБ", href: "/client/dashboard" },
+            { name: "МОИ ЗАКАЗЫ", href: "/client/my-orders" },
+          ];
 
     return (
-        <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <header className="sticky top-0 z-50 w-full h-20 bg-white border-b border-slate-100">
+            <div className="max-w-5xl mx-auto h-full px-4 md:px-6 flex items-center justify-between">
                 
-                {/* Логотип */}
-                <div className="flex items-center gap-8">
-                    <Link href="/" className="transition-transform hover:scale-105 active:scale-95">
-                        <span className="font-black text-2xl tracking-tighter text-blue-600">
-                            Z<span className="text-foreground">WORK</span>
+                {/* ЛЕВО: ЛОГО + НАВИГАЦИЯ */}
+                <div className="flex items-center gap-10">
+                    <Link href={logoHref} className="hover:opacity-80 transition-opacity shrink-0">
+                        <span className="font-black text-2xl tracking-tighter italic text-slate-900 leading-none">
+                            <span className="text-blue-600">Z</span>WORK
                         </span>
                     </Link>
+
+                    <nav className="hidden lg:flex items-center gap-6">
+                        {user && links.map((link) => (
+                            <Link 
+                                key={link.href} 
+                                href={link.href}
+                                className={cn(
+                                    "text-[11px] font-black uppercase tracking-[0.2em] transition-all relative py-1",
+                                    pathname === link.href 
+                                        ? "text-blue-600 after:absolute after:bottom-[-4px] after:left-0 after:w-full after:h-[3px] after:bg-blue-600 after:rounded-full" 
+                                        : "text-slate-400 hover:text-slate-900"
+                                )}
+                            >
+                                {link.name}
+                            </Link>
+                        ))}
+                    </nav>
                 </div>
 
-                {/* Правая часть */}
-                <div className="flex items-center gap-3">
+                {/* ПРАВО: СВИТЧЕР + ИКОНКИ / КНОПКИ ВХОДА */}
+                <div className="flex items-center gap-4">
                     {user ? (
                         <>
-                            <div className="hidden md:block">
-                                <RoleSwitcher currentRole={user.role} />
+                            <RoleSwitcher />
+                            
+                            <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+                                <Link 
+                                    href="/messages" 
+                                    className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-400 hover:bg-white hover:text-blue-600 transition-all relative group bg-white/50 border border-transparent hover:border-slate-200 shadow-sm"
+                                >
+                                    <MessageSquare className="w-5 h-5" />
+                                    <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-blue-600 rounded-full border-2 border-white shadow-sm" />
+                                </Link>
+                                <NotificationsBell />
                             </div>
-                            
-                            {/* 🔔 Колокольчик уведомлений */}
-                            <NotificationsBell />
-                            
-                            <UserDropdown user={user} />
+                            <UserDropdown user={user as any} />
                         </>
                     ) : (
-                        <div className="flex items-center gap-2">
-                            <Button asChild variant="ghost" className="hidden sm:inline-flex">
-                                <Link href="/sign-in">Вход</Link>
-                            </Button>
-                            <Button asChild className="rounded-xl font-bold">
+                        /* ВОЗВРАЩАЕМ КНОПКИ ВХОДА В СТИЛЕ ZWORK */
+                        <div className="flex items-center gap-3">
+                            <Link 
+                                href="/sign-in" 
+                                className="text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors px-4"
+                            >
+                                Вход
+                            </Link>
+                            <Button asChild className="rounded-2xl h-12 px-8 bg-slate-900 hover:bg-blue-600 text-white font-black uppercase italic text-[11px] tracking-widest transition-all shadow-xl shadow-slate-200 active:scale-95">
                                 <Link href="/sign-up">Начать работу</Link>
                             </Button>
                         </div>

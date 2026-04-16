@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Footer } from "@/components/footer";
 import Script from "next/script";
 import { LivePulseMarquee } from "@/components/shared/live-pulse-marquee";
+import { RoleAutoswitcher } from "@/components/shared/role-autoswitcher";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,7 +52,8 @@ export default function RootLayout({
             {/* FOOTER: В самом низу контента */}
             <Footer />
           </main>
-
+          <RoleAutoswitcher />
+          
           <Toaster richColors closeButton />
         </TanstackProvider>
       </body>

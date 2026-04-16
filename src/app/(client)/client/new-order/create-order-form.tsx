@@ -6,103 +6,107 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Sparkles, MapPin, Wallet, Clock, Rocket, Loader2, X } from "lucide-react"
+import { MapPin, Wallet, ArrowRight, Loader2, AlertCircle } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
 import { AddressInput } from "@/components/geo/address-input"
-
 import { createOrderSchema, type CreateOrderValues } from "@/lib/validation"
 import { createOrder } from "@/app/(client)/client/new-order/actions"
 import { useClientLocationStore } from "@/store/use-client-location-store"
+import { cn } from "@/lib/utils"
 
 export function CreateOrderForm() {
     const router = useRouter()
-    const [showPrice, setShowPrice] = React.useState(false)
     const { lastCity, lastLat, lastLng, setClientLocation } = useClientLocationStore()
 
     const form = useForm<CreateOrderValues>({
         resolver: zodResolver(createOrderSchema),
+        mode: "onChange",
         defaultValues: {
             description: "",
             address: lastCity || "",
             lat: lastLat || 0,
             lng: lastLng || 0,
             price: 0,
-            dateType: "ASAP" as const,
+            dateType: "ASAP",
         }
     });
 
-    // Синхронизация с Zustand после загрузки страницы
-    React.useEffect(() => {
-        if (lastCity && !form.getValues("address")) {
-            form.setValue("address", lastCity)
-            form.setValue("lat", lastLat)
-            form.setValue("lng", lastLng)
-        }
-    }, [lastCity, lastLat, lastLng, form])
+    const description = form.watch("description")
 
     const mutation = useMutation({
         mutationFn: (data: CreateOrderValues) => createOrder(data),
         onSuccess: (res) => {
             if (res.success) {
-                toast.success(`Заказ создан! `)
-                router.push(`/client/orders/${res.orderId}`)
+                toast.success("ЗАДАЧА ЗАПУЩЕНА")
+                router.push(`/client/my-orders`)
             } else {
                 toast.error(res.error || "Ошибка публикации")
             }
         }
     })
 
-    const onSubmit = (data: CreateOrderValues) => {
-        mutation.mutate(data);
-    };
+    const onSubmit = (data: CreateOrderValues) => mutation.mutate(data)
 
     return (
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Card className="p-8 border-2 shadow-none rounded-[3rem] bg-white">
-                <CardContent className="space-y-8 p-0">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-12">
+            
+            {/* 1. ВЕРНУЛИ ВЫСОТУ: min-h-[220px] */}
+            <div className="relative group cursor-text">
+                <Controller
+                    control={form.control}
+                    name="description"
+                    render={({ field, fieldState }) => (
+                        <>
+                            <div className={cn(
+                                "absolute -left-6 top-0 bottom-0 w-1.5 rounded-full transition-all duration-500",
+                                fieldState.invalid ? "bg-red-500" : (description.length > 0 ? "bg-blue-600" : "bg-slate-100")
+                            )} />
 
-                    {/* ОПИСАНИЕ */}
+                            <textarea
+                                {...field}
+                                autoFocus
+                                placeholder="ОПИШИТЕ ЗАДАЧУ ЗДЕСЬ..."
+                                className={cn(
+                                    "w-full bg-transparent text-4xl md:text-7xl font-black uppercase italic tracking-tighter outline-none resize-none min-h-[220px] transition-all leading-[0.9] overflow-y-auto no-scrollbar",
+                                    fieldState.invalid ? "text-red-500 placeholder:text-red-200" : "text-slate-900 placeholder:text-slate-100"
+                                )}
+                            />
+                            
+                            {fieldState.error && (
+                                <p className="text-[10px] font-black uppercase text-red-500 mt-4 flex items-center gap-2 italic tracking-widest">
+                                    <AlertCircle size={14} /> {fieldState.error.message}
+                                </p>
+                            )}
+                        </>
+                    )}
+                />
+                
+                {description.length === 0 && !form.formState.errors.description && (
+                    <div className="flex items-center gap-2 text-slate-300 mt-4">
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-100 border-t-blue-600 animate-spin" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">Ждем вашего ввода...</span>
+                    </div>
+                )}
+            </div>
+
+            {/* 2. ПАРАМЕТРЫ (КОМПАКТНЫЕ) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 ml-2">
+                        <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Локация</span>
+                    </div>
                     <Controller
                         control={form.control}
-                        name="description"
+                        name="address"
                         render={({ field, fieldState }) => (
-                            <Field>
-                                <div className="flex items-center justify-between mb-3">
-                                    <FieldLabel className="font-bold text-lg mb-0 italic">Что нужно сделать?</FieldLabel>
-                                    <Badge className="bg-blue-600 gap-1 px-3 py-1">
-                                        <Sparkles className="w-3 h-3 fill-current" /> AI Смарт
-                                    </Badge>
-                                </div>
-                                <Textarea
-                                    placeholder="Например: Нужно починить кран на кухне..."
-                                    className="min-h-[140px] rounded-[2rem] p-6 text-lg bg-slate-50 border-none focus-visible:ring-blue-600 transition-all resize-none shadow-inner"
-                                    {...field}
-                                />
-                                <p className="text-[10px] text-slate-400 mt-2 ml-2 italic">
-                                    Опишите только суть работы — так AI точнее подберет специалиста
-                                </p>
-                                {fieldState.invalid && <p className="text-red-500 text-[10px] mt-1 font-bold">{fieldState.error?.message}</p>}
-                            </Field>
-                        )}
-                    />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* АДРЕС */}
-                        <Controller
-                            control={form.control}
-                            name="address"
-                            render={({ field, fieldState }) => (
-                                <Field>
-                                    <FieldLabel className="font-bold italic">Населенный пункт</FieldLabel>
+                            <>
+                                <div className={cn(
+                                    "bg-slate-50 rounded-2xl p-1 border-2 transition-all shadow-inner",
+                                    fieldState.invalid ? "border-red-500 bg-red-50/20" : "border-transparent focus-within:border-blue-100 focus-within:bg-white"
+                                )}>
                                     <AddressInput
-                                        placeholder="Город или поселок..."
+                                        placeholder="Город или адрес..."
                                         defaultValue={field.value}
                                         onSelect={(data) => {
                                             form.setValue("address", data.address, { shouldValidate: true })
@@ -110,102 +114,68 @@ export function CreateOrderForm() {
                                             form.setValue("lng", data.lng, { shouldValidate: true })
                                             setClientLocation(data.address, data.lat, data.lng)
                                         }}
-                                        onChange={(val) => {
-                                            form.setValue("address", val)
-                                            form.setValue("lat", 0)
-                                            form.setValue("lng", 0)
-                                        }}
                                     />
-                                    {(fieldState.error || form.formState.errors.lat) && (
-                                        <p className="text-[11px] text-red-500 mt-1 font-bold">
-                                            Выберите город из списка
-                                        </p>
-                                    )}
-                                </Field>
-                            )}
-                        />
-
-                        {/* БЮДЖЕТ */}
-                        <div className="space-y-2">
-                            <FieldLabel className="font-bold italic">Бюджет</FieldLabel>
-                            {!showPrice ? (
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPrice(true)}
-                                    className="h-14 w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-all font-bold text-sm"
-                                >
-                                    <Wallet className="w-4 h-4" /> + Указать цену (опционально)
-                                </button>
-                            ) : (
-                                <Controller
-                                    control={form.control}
-                                    name="price"
-                                    render={({ field: { onChange, value, ...field } }) => (
-                                        <div className="relative animate-in zoom-in-95 duration-200">
-                                            <Input
-                                                type="number"
-                                                {...field}
-                                                value={value || ""}
-                                                onChange={(e) => onChange(e.target.valueAsNumber || 0)}
-                                                className="h-14 rounded-2xl text-lg font-bold bg-slate-50 border-none shadow-inner pr-12"
-                                                placeholder="Сумма в ₽"
-                                                autoFocus
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => { setShowPrice(false); form.setValue("price", 0); }}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-200 rounded-full"
-                                            >
-                                                <X className="w-4 h-4 text-slate-400" />
-                                            </button>
-                                        </div>
-                                    )}
-                                />
-                            )}
-                            <p className="text-[10px] text-slate-400 italic">Мастера предложат свои цены, если бюджет не указан</p>
-                        </div>
-                    </div>
-
-                    {/* СРОЧНОСТЬ */}
-                    <Controller
-                        control={form.control}
-                        name="dateType"
-                        render={({ field }) => (
-                            <Field>
-                                <FieldLabel className="font-bold flex items-center gap-2 italic mb-3">
-                                    <Clock className="w-4 h-4 text-slate-500" /> Когда приступить?
-                                </FieldLabel>
-                                <Tabs onValueChange={field.onChange} defaultValue={field.value} className="w-full">
-                                    <TabsList className="grid w-full grid-cols-2 h-14 rounded-2xl bg-slate-100 p-1">
-                                        <TabsTrigger value="ASAP" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm font-black italic uppercase transition-all">
-                                            Срочно
-                                        </TabsTrigger>
-                                        <TabsTrigger value="SCHEDULED" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm font-black italic uppercase transition-all">
-                                            В срок
-                                        </TabsTrigger>
-                                    </TabsList>
-                                </Tabs>
-                            </Field>
+                                </div>
+                                {fieldState.error && (
+                                    <p className="text-[9px] font-black uppercase text-red-500 ml-2 mt-1 italic">Выберите город из списка</p>
+                                )}
+                            </>
                         )}
                     />
-                </CardContent>
-            </Card>
+                </div>
 
-            <Button 
-                type="submit" 
-                disabled={mutation.isPending}
-                className="w-full h-16 text-xl font-black rounded-[2rem] bg-slate-900 hover:bg-blue-600 text-white shadow-2xl transition-all active:scale-95 uppercase italic"
-            >
-                {mutation.isPending ? (
-                    <div className="flex items-center gap-3">
-                        <Loader2 className="w-6 h-6 animate-spin" /> Анализируем...
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 ml-2">
+                        <Wallet className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Бюджет (₽)</span>
                     </div>
-                ) : (
-                    <span className="flex items-center gap-3">
-                        Опубликовать <Rocket className="w-6 h-6" />
-                    </span>
-                )}
-            </Button>
+                    <Controller
+                        control={form.control}
+                        name="price"
+                        render={({ field: { onChange, value, ...field } }) => (
+                            <input
+                                type="number"
+                                {...field}
+                                value={value || ""}
+                                onChange={(e) => onChange(e.target.valueAsNumber || 0)}
+                                placeholder="0"
+                                className="w-full h-16 md:h-18 px-6 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-blue-100 focus:bg-white outline-none font-black italic text-3xl tracking-tighter text-slate-900 placeholder:text-slate-200 transition-all shadow-inner"
+                            />
+                        )}
+                    />
+                </div>
+            </div>
+
+            {/* 3. ВЕРНУЛИ ГИГАНТСКУЮ КНОПКУ: h-24 md:h-32 */}
+            <div className="pt-6">
+                <button
+                    type="submit"
+                    disabled={mutation.isPending}
+                    className={cn(
+                        "w-full h-24 md:h-32 rounded-[2.5rem] md:rounded-[3.5rem] flex items-center justify-between px-10 md:px-16 transition-all duration-700 active:scale-[0.97] group overflow-hidden cursor-pointer",
+                        mutation.isPending ? "bg-slate-800" : "bg-slate-900 text-white shadow-2xl shadow-slate-200 hover:bg-blue-600"
+                    )}
+                >
+                    {mutation.isPending ? (
+                        <div className="flex items-center gap-6 mx-auto">
+                            <Loader2 className="w-12 h-12 animate-spin text-white" />
+                            <span className="text-3xl font-black uppercase italic tracking-tighter">Запуск...</span>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex flex-col items-start leading-none text-left">
+                                <span className="text-3xl md:text-5xl font-black uppercase italic tracking-tighter">Опубликовать</span>
+                                <span className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-40 mt-3">Мгновенный поиск мастеров</span>
+                            </div>
+                            <div className={cn(
+                                "w-14 h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center transition-all duration-500 bg-white/10 group-hover:bg-white group-hover:scale-110"
+                            )}>
+                                <ArrowRight className="w-8 h-8 md:w-10 md:h-10 text-white group-hover:text-blue-600 transition-colors" />
+                            </div>
+                        </>
+                    )}
+                </button>
+            </div>
         </form>
     )
 }

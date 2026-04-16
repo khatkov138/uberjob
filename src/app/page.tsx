@@ -5,16 +5,22 @@ import { Search, ShieldCheck, Zap } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Role } from "../../prisma/generated";
+import { cookies } from "next/headers";
 
 export default async function HomePage() {
-    const session = await getServerSession();
-    const user = session?.user;
+   const session = await getServerSession()
+  
+  // Если пользователь залогинен, проверяем, какой режим был последним
+  if (session?.user) {
+    const cookieStore = await cookies()
+    const lastMode = cookieStore.get('zwork-mode')?.value
 
-    // UX-РЕДИРЕКТ: Если юзер залогинен, сразу кидаем в нужный ЛК
-    if (user) {
-        if (user.role === Role.PRO) redirect("/pro/dashboard");
-        redirect("/client/dashboard");
+    if (lastMode === 'PRO') {
+      redirect('/pro/dashboard')
+    } else {
+      redirect('/client/dashboard')
     }
+  }
 
     return (
         <div className="flex flex-col min-h-screen">

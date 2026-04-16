@@ -4,12 +4,6 @@ import { Role } from "../../../prisma/generated";
 import { redirect } from "next/navigation";
 
 export default async function ProLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession();
-  
-  // Если не мастер — выкидываем в клиентскую часть
-  if (session?.user.role !== Role.PRO) {
-   // redirect("/client/dashboard");
-  }
 
   return (
     <div className="flex min-h-screen">

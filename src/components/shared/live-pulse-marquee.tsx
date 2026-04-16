@@ -28,7 +28,7 @@ export function LivePulseMarquee() {
 
   return (
     <div className="sticky top-[64px] z-40 w-full h-[48px] border-b bg-white/95 backdrop-blur-md overflow-hidden flex items-center shadow-sm">
-      <div className="max-w-7xl mx-auto w-full px-4 flex items-center">
+      <div className="max-w-5xl mx-auto w-full px-4 flex items-center">
 
         {/* СТАТИЧНЫЙ ЗАГОЛОВОК */}
         <div className="flex items-center gap-3 pr-6 border-r border-slate-100 shrink-0 bg-white z-10 py-1">

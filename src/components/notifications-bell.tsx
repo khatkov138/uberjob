@@ -1,7 +1,6 @@
 "use client"
 
 import { Bell, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import {
   Popover,
   PopoverContent,
@@ -14,12 +13,10 @@ import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
 import { markAllAsRead, markAsRead } from "@/app/actions/notifications"
 import { Notification } from "../../prisma/generated"
-// 1. Импортируем тип из Prisma
 
 export function NotificationsBell() {
   const queryClient = useQueryClient()
 
-  // 2. Типизируем useQuery
   const { data: notifications, isLoading } = useQuery<Notification[]>({
     queryKey: ["notifications"],
     queryFn: async () => {
@@ -42,7 +39,6 @@ export function NotificationsBell() {
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: ["notifications"] })
       const previousNotifications = queryClient.getQueryData<Notification[]>(["notifications"])
-
       if (previousNotifications) {
         queryClient.setQueryData<Notification[]>(["notifications"],
           previousNotifications.map(n => n.id === id ? { ...n, isRead: true } : n)
@@ -55,40 +51,38 @@ export function NotificationsBell() {
         queryClient.setQueryData(["notifications"], context.previousNotifications)
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] })
-    }
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["notifications"] })
   })
-
-
 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative hover:bg-blue-50 transition-colors">
-          <Bell className="h-5 w-5" />
+        {/* КНОПКА: Теперь 1 в 1 как чат */}
+        <button className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-400 hover:bg-white hover:text-blue-600 transition-all relative group bg-white/50 border border-transparent hover:border-slate-200 shadow-sm outline-none cursor-pointer">
+          <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
+          
           {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 border-2 border-background text-[9px] font-bold text-white rounded-full flex items-center justify-center animate-in zoom-in">
-              {unreadCount}
-            </span>
+            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-600 rounded-full border-2 border-white shadow-sm animate-in zoom-in" />
           )}
-        </Button>
+        </button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-80 p-0 rounded-2xl shadow-xl border-blue-100" align="end">
-        <div className="p-4 flex items-center justify-between border-b">
-          <h4 className="font-bold text-sm">Уведомления</h4>
+      <PopoverContent className="w-80 p-0 rounded-[1.5rem] border-2 border-slate-100 shadow-2xl mt-4" align="end">
+        {/* ХЕДЕР */}
+        <div className="p-4 flex items-center justify-between border-b border-slate-50">
+          <h4 className="font-black text-[10px] uppercase tracking-widest text-slate-900">Уведомления</h4>
           {unreadCount > 0 && (
-            <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold">
-              {unreadCount} новых
+            <span className="text-[9px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-lg font-black uppercase italic">
+              {unreadCount} NEW
             </span>
           )}
         </div>
 
-        <div className="max-h-[350px] overflow-y-auto">
+        {/* СПИСОК */}
+        <div className="max-h-[350px] overflow-y-auto no-scrollbar">
           {isLoading ? (
-            <div className="p-8 text-center">
-              <Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" />
+            <div className="p-10 text-center">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto text-blue-600" />
             </div>
           ) : notifications && notifications.length > 0 ? (
             notifications.map((n) => (
@@ -97,39 +91,44 @@ export function NotificationsBell() {
                 href={n.link || "#"}
                 onClick={() => !n.isRead && markOneMutation.mutate(n.id)}
                 className={cn(
-                  "block p-4 border-b last:border-0 hover:bg-muted/50 transition-colors relative",
-                  !n.isRead && "bg-blue-50/30"
+                  "block p-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors relative group/item",
+                  !n.isRead && "bg-blue-50/20"
                 )}
               >
                 {!n.isRead && (
-                  <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-500 rounded-full" />
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600" />
                 )}
-                <p className="font-bold text-xs pr-4">{n.title}</p>
-                <p className="text-muted-foreground text-[11px] mt-1 line-clamp-2">{n.message}</p>
-                <p className="text-[9px] text-slate-400 mt-2">
+                <p className="font-black uppercase italic text-[11px] text-slate-900 leading-tight">
+                  {n.title}
+                </p>
+                <p className="text-slate-500 text-[11px] mt-1 line-clamp-2 font-medium italic">
+                  {n.message}
+                </p>
+                <p className="text-[8px] font-black text-slate-300 uppercase tracking-tighter mt-2 group-hover/item:text-slate-400 transition-colors">
                   {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true, locale: ru })}
                 </p>
               </Link>
             ))
           ) : (
-            <div className="p-10 text-center space-y-2">
-              <Bell className="w-8 h-8 text-muted-foreground/20 mx-auto" />
-              <p className="text-xs text-muted-foreground">У вас пока нет уведомлений</p>
+            <div className="p-12 text-center">
+              <Bell className="w-8 h-8 text-slate-100 mx-auto mb-2" />
+              <p className="text-[10px] font-black text-slate-300 uppercase italic">Пусто</p>
             </div>
           )}
         </div>
 
-        <div className="p-2 border-t bg-muted/20 text-center">
-          <Button
-            onClick={() => markAllMutation.mutate()}
-            disabled={markAllMutation.isPending || unreadCount === 0}
-            variant="ghost"
-            size="sm"
-            className="text-[10px] font-bold uppercase w-full"
-          >
-            {markAllMutation.isPending ? "Обработка..." : "Очистить всё"}
-          </Button>
-        </div>
+        {/* ФУТЕР */}
+        {unreadCount > 0 && (
+          <div className="p-2 border-t border-slate-50 bg-slate-50/50">
+            <button
+              onClick={() => markAllMutation.mutate()}
+              disabled={markAllMutation.isPending}
+              className="w-full py-2 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-red-600 transition-all active:scale-95"
+            >
+              {markAllMutation.isPending ? "СИНХРОНИЗАЦИЯ..." : "ОЧИСТИТЬ ВСЁ"}
+            </button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   )

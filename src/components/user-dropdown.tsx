@@ -1,110 +1,97 @@
-"use client";
+// components/user-dropdown.tsx
+"use client"
 
-import { LogOutIcon, SettingsIcon, ShieldIcon, UserIcon, BriefcaseIcon } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { 
-  Avatar, 
-  AvatarFallback, 
-  AvatarImage 
-} from "./ui/avatar"; // Убедись, что компонент установлен
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
   DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
-import { authClient } from "@/lib/auth-client";
-import { toast } from "sonner";
-import { User } from "@/lib/auth";
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu"
+import { useRoleModeStore } from "@/store/use-role-store"
+import { authClient } from "@/lib/auth-client"
+import { Settings, LogOut, User, Zap, Shield } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 
-interface UserDropdownProps {
-  user: User
-}
+export function UserDropdown({ user }: { user: any }) {
+  const { mode } = useRoleModeStore()
+  const router = useRouter()
 
-export function UserDropdown({ user }: UserDropdownProps) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        {/* Делаем триггер более чистым: только аватар и имя */}
-        <button className="flex items-center gap-3 p-1 pr-3 rounded-full hover:bg-muted/50 transition-all outline-none group">
-          <Avatar className="h-9 w-9 border-2 border-background shadow-sm transition-transform group-active:scale-95">
-            <AvatarImage src={user.image || ""} alt={user.name} />
-            <AvatarFallback className="bg-blue-600 text-white font-bold">
-              {user.name?.slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <span className="hidden sm:block text-sm font-bold max-w-[8rem] truncate">
-            {user.name}
-          </span>
-        </button>
-      </DropdownMenuTrigger>
-      
-      <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl shadow-xl border-blue-50/50">
-        <DropdownMenuLabel className="font-normal p-3">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-black leading-none">{user.name}</p>
-            <p className="text-xs leading-none text-muted-foreground mt-1 italic">{user.email}</p>
+      <DropdownMenuTrigger className="outline-none">
+        <div className="flex items-center gap-3 p-1 pr-4 bg-slate-900 rounded-full hover:bg-blue-600 transition-all cursor-pointer group shadow-xl">
+          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-slate-900 font-black italic text-lg shadow-inner">
+            {user.name?.charAt(0).toUpperCase()}
           </div>
-        </DropdownMenuLabel>
-        
-        <DropdownMenuSeparator className="my-2" />
-        
-        {/* Ссылки на кабинеты в зависимости от роли */}
-        <DropdownMenuItem asChild className="rounded-xl h-10 cursor-pointer">
-          <Link href={user.role === "PRO" ? "/pro/dashboard" : "/client/dashboard"}>
-            <BriefcaseIcon className="mr-2 size-4 text-blue-600" />
-            <span className="font-medium">Рабочий стол</span>
-          </Link>
-        </DropdownMenuItem>
+          <div className="hidden md:block text-left leading-none">
+            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">Аккаунт</p>
+            <p className="text-[11px] font-black text-white uppercase italic tracking-tighter">
+              {user.name?.split(' ')[0]}
+            </p>
+          </div>
+        </div>
+      </DropdownMenuTrigger>
 
-        <DropdownMenuItem asChild className="rounded-xl h-10 cursor-pointer">
-          <Link href="/settings">
-            <SettingsIcon className="mr-2 size-4 text-slate-500" />
-            <span className="font-medium">Настройки</span>
+      <DropdownMenuContent align="end" className="w-72 p-4 bg-white rounded-[2rem] border-2 border-slate-100 shadow-2xl mt-4">
+        {/* ХЕДЕР ДРОПДАУНА */}
+        <div className="p-4 bg-slate-50 rounded-[1.5rem] mb-4">
+          <div className="flex items-center gap-3 mb-3">
+             <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black italic text-xl">
+                {user.name?.charAt(0).toUpperCase()}
+             </div>
+             <div>
+                <p className="text-sm font-black uppercase italic text-slate-900 leading-none mb-1">{user.name}</p>
+                <div className="flex items-center gap-1.5">
+                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{mode} MODE</p>
+                </div>
+             </div>
+          </div>
+          <Link href="/settings" className="flex items-center justify-center w-full bg-white border-2 border-slate-100 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-blue-600 transition-all">
+             Редактировать профиль
           </Link>
-        </DropdownMenuItem>
+        </div>
 
-        {user.role === "admin" && (
-          <DropdownMenuItem asChild className="rounded-xl h-10 cursor-pointer text-red-600 focus:text-red-600">
-            <Link href="/admin">
-              <ShieldIcon className="mr-2 size-4" />
-              <span className="font-medium">Админ-панель</span>
+        {/* ПУНКТЫ МЕНЮ */}
+        <div className="space-y-1">
+          <DropdownMenuItem asChild className="focus:bg-slate-50 rounded-xl p-3 cursor-pointer group">
+            <Link href="/settings" className="flex items-center gap-3">
+               <div className="p-2 bg-slate-100 rounded-lg group-focus:bg-white transition-colors">
+                  <Settings className="w-4 h-4 text-slate-600" />
+               </div>
+               <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Настройки</span>
             </Link>
           </DropdownMenuItem>
-        )}
 
-        <DropdownMenuSeparator className="my-2" />
-        
-        <SignOutItem />
+          <DropdownMenuItem asChild className="focus:bg-slate-50 rounded-xl p-3 cursor-pointer group">
+            <Link href="/help" className="flex items-center gap-3">
+               <div className="p-2 bg-slate-100 rounded-lg group-focus:bg-white transition-colors">
+                  <Shield className="w-4 h-4 text-slate-600" />
+               </div>
+               <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Поддержка</span>
+            </Link>
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator className="bg-slate-50 my-2" />
+
+          <DropdownMenuItem 
+            onClick={async () => {
+                await authClient.signOut();
+                router.push("/");
+            }}
+            className="focus:bg-red-50 rounded-xl p-3 cursor-pointer group"
+          >
+            <div className="flex items-center gap-3">
+               <div className="p-2 bg-red-100/50 rounded-lg group-focus:bg-white transition-colors">
+                  <LogOut className="w-4 h-4 text-red-600" />
+               </div>
+               <span className="text-[10px] font-black uppercase tracking-widest text-red-600">Выйти из системы</span>
+            </div>
+          </DropdownMenuItem>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-function SignOutItem() {
-  const router = useRouter();
-
-  async function handleSignOut() {
-    const { error } = await authClient.signOut()
-    if (error) {
-      toast.error(error.message || "Ошибка выхода")
-    } else {
-      toast.success("Вы вышли из системы")
-      router.push('/')
-      router.refresh()
-    }
-  }
-
-  return (
-    <DropdownMenuItem 
-      onClick={handleSignOut} 
-      className="rounded-xl h-10 cursor-pointer text-slate-500 focus:bg-red-50 focus:text-red-600 transition-colors"
-    >
-      <LogOutIcon className="mr-2 size-4" />
-      <span className="font-bold">Выйти</span>
-    </DropdownMenuItem>
-  );
+  )
 }
