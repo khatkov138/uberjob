@@ -141,7 +141,6 @@ exports.Prisma.ProfileScalarFieldEnum = {
   bio: 'bio',
   skills: 'skills',
   rating: 'rating',
-  isOnline: 'isOnline',
   completedCount: 'completedCount',
   lastLat: 'lastLat',
   lastLng: 'lastLng',
@@ -255,6 +254,7 @@ exports.Prisma.MessageScalarFieldEnum = {
   id: 'id',
   text: 'text',
   createdAt: 'createdAt',
+  isRead: 'isRead',
   senderId: 'senderId',
   recipientId: 'recipientId',
   orderId: 'orderId'

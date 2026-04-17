@@ -93,7 +93,7 @@ export default function ClientDashboardPage() {
         </Link>
 
         {/* ЧАТ (Черная плитка) */}
-        <Link href="/client/messages" className="group">
+        <Link href="/messages" className="group">
           <div className="h-full min-h-[220px] rounded-[2.5rem] p-8 bg-slate-900 text-white transition-all duration-500 flex flex-col justify-between hover:shadow-xl">
             <div className="flex justify-between items-start">
               <div className="p-4 rounded-2xl bg-white/10 transition-transform duration-500 group-hover:scale-110">

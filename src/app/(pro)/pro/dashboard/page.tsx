@@ -78,7 +78,7 @@ export default async function ProDashboardPage() {
             </Link>
 
             {/* СООБЩЕНИЯ */}
-            <Link href="/pro/messages" className="group">
+            <Link href="/messages" className="group">
               <div className="h-full bg-slate-50 border border-slate-100 rounded-[2rem] p-8 text-slate-900 flex flex-col justify-between min-h-[200px] transition-all hover:-translate-y-1 hover:bg-white hover:shadow-xl">
                 <div className="flex justify-between items-start">
                   <div className="p-3 bg-white border border-slate-100 rounded-2xl shadow-sm text-blue-600">

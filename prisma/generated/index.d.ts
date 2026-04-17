@@ -3574,7 +3574,6 @@ export namespace Prisma {
     avatarUrl: string | null
     bio: string | null
     rating: number | null
-    isOnline: boolean | null
     completedCount: number | null
     lastLat: number | null
     lastLng: number | null
@@ -3591,7 +3590,6 @@ export namespace Prisma {
     avatarUrl: string | null
     bio: string | null
     rating: number | null
-    isOnline: boolean | null
     completedCount: number | null
     lastLat: number | null
     lastLng: number | null
@@ -3609,7 +3607,6 @@ export namespace Prisma {
     bio: number
     skills: number
     rating: number
-    isOnline: number
     completedCount: number
     lastLat: number
     lastLng: number
@@ -3642,7 +3639,6 @@ export namespace Prisma {
     avatarUrl?: true
     bio?: true
     rating?: true
-    isOnline?: true
     completedCount?: true
     lastLat?: true
     lastLng?: true
@@ -3659,7 +3655,6 @@ export namespace Prisma {
     avatarUrl?: true
     bio?: true
     rating?: true
-    isOnline?: true
     completedCount?: true
     lastLat?: true
     lastLng?: true
@@ -3677,7 +3672,6 @@ export namespace Prisma {
     bio?: true
     skills?: true
     rating?: true
-    isOnline?: true
     completedCount?: true
     lastLat?: true
     lastLng?: true
@@ -3782,7 +3776,6 @@ export namespace Prisma {
     bio: string | null
     skills: string[]
     rating: number
-    isOnline: boolean
     completedCount: number
     lastLat: number | null
     lastLng: number | null
@@ -3819,7 +3812,6 @@ export namespace Prisma {
     bio?: boolean
     skills?: boolean
     rating?: boolean
-    isOnline?: boolean
     completedCount?: boolean
     lastLat?: boolean
     lastLng?: boolean
@@ -3840,7 +3832,6 @@ export namespace Prisma {
     bio?: boolean
     skills?: boolean
     rating?: boolean
-    isOnline?: boolean
     completedCount?: boolean
     lastLat?: boolean
     lastLng?: boolean
@@ -3859,7 +3850,6 @@ export namespace Prisma {
     bio?: boolean
     skills?: boolean
     rating?: boolean
-    isOnline?: boolean
     completedCount?: boolean
     lastLat?: boolean
     lastLng?: boolean
@@ -3878,7 +3868,6 @@ export namespace Prisma {
     bio?: boolean
     skills?: boolean
     rating?: boolean
-    isOnline?: boolean
     completedCount?: boolean
     lastLat?: boolean
     lastLng?: boolean
@@ -3887,7 +3876,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type ProfileOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "phone" | "city" | "avatarUrl" | "bio" | "skills" | "rating" | "isOnline" | "completedCount" | "lastLat" | "lastLng" | "lastSeen" | "createdAt" | "updatedAt", ExtArgs["result"]["profile"]>
+  export type ProfileOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "phone" | "city" | "avatarUrl" | "bio" | "skills" | "rating" | "completedCount" | "lastLat" | "lastLng" | "lastSeen" | "createdAt" | "updatedAt", ExtArgs["result"]["profile"]>
   export type ProfileInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     reviews?: boolean | Profile$reviewsArgs<ExtArgs>
@@ -3915,7 +3904,6 @@ export namespace Prisma {
       bio: string | null
       skills: string[]
       rating: number
-      isOnline: boolean
       completedCount: number
       lastLat: number | null
       lastLng: number | null
@@ -4355,7 +4343,6 @@ export namespace Prisma {
     readonly bio: FieldRef<"Profile", 'String'>
     readonly skills: FieldRef<"Profile", 'String[]'>
     readonly rating: FieldRef<"Profile", 'Float'>
-    readonly isOnline: FieldRef<"Profile", 'Boolean'>
     readonly completedCount: FieldRef<"Profile", 'Int'>
     readonly lastLat: FieldRef<"Profile", 'Float'>
     readonly lastLng: FieldRef<"Profile", 'Float'>
@@ -14902,6 +14889,7 @@ export namespace Prisma {
     id: string | null
     text: string | null
     createdAt: Date | null
+    isRead: boolean | null
     senderId: string | null
     recipientId: string | null
     orderId: string | null
@@ -14911,6 +14899,7 @@ export namespace Prisma {
     id: string | null
     text: string | null
     createdAt: Date | null
+    isRead: boolean | null
     senderId: string | null
     recipientId: string | null
     orderId: string | null
@@ -14920,6 +14909,7 @@ export namespace Prisma {
     id: number
     text: number
     createdAt: number
+    isRead: number
     senderId: number
     recipientId: number
     orderId: number
@@ -14931,6 +14921,7 @@ export namespace Prisma {
     id?: true
     text?: true
     createdAt?: true
+    isRead?: true
     senderId?: true
     recipientId?: true
     orderId?: true
@@ -14940,6 +14931,7 @@ export namespace Prisma {
     id?: true
     text?: true
     createdAt?: true
+    isRead?: true
     senderId?: true
     recipientId?: true
     orderId?: true
@@ -14949,6 +14941,7 @@ export namespace Prisma {
     id?: true
     text?: true
     createdAt?: true
+    isRead?: true
     senderId?: true
     recipientId?: true
     orderId?: true
@@ -15031,9 +15024,10 @@ export namespace Prisma {
     id: string
     text: string
     createdAt: Date
+    isRead: boolean
     senderId: string
     recipientId: string
-    orderId: string
+    orderId: string | null
     _count: MessageCountAggregateOutputType | null
     _min: MessageMinAggregateOutputType | null
     _max: MessageMaxAggregateOutputType | null
@@ -15057,62 +15051,66 @@ export namespace Prisma {
     id?: boolean
     text?: boolean
     createdAt?: boolean
+    isRead?: boolean
     senderId?: boolean
     recipientId?: boolean
     orderId?: boolean
     sender?: boolean | UserDefaultArgs<ExtArgs>
     recipient?: boolean | UserDefaultArgs<ExtArgs>
-    order?: boolean | OrderDefaultArgs<ExtArgs>
+    order?: boolean | Message$orderArgs<ExtArgs>
   }, ExtArgs["result"]["message"]>
 
   export type MessageSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     text?: boolean
     createdAt?: boolean
+    isRead?: boolean
     senderId?: boolean
     recipientId?: boolean
     orderId?: boolean
     sender?: boolean | UserDefaultArgs<ExtArgs>
     recipient?: boolean | UserDefaultArgs<ExtArgs>
-    order?: boolean | OrderDefaultArgs<ExtArgs>
+    order?: boolean | Message$orderArgs<ExtArgs>
   }, ExtArgs["result"]["message"]>
 
   export type MessageSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     text?: boolean
     createdAt?: boolean
+    isRead?: boolean
     senderId?: boolean
     recipientId?: boolean
     orderId?: boolean
     sender?: boolean | UserDefaultArgs<ExtArgs>
     recipient?: boolean | UserDefaultArgs<ExtArgs>
-    order?: boolean | OrderDefaultArgs<ExtArgs>
+    order?: boolean | Message$orderArgs<ExtArgs>
   }, ExtArgs["result"]["message"]>
 
   export type MessageSelectScalar = {
     id?: boolean
     text?: boolean
     createdAt?: boolean
+    isRead?: boolean
     senderId?: boolean
     recipientId?: boolean
     orderId?: boolean
   }
 
-  export type MessageOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "text" | "createdAt" | "senderId" | "recipientId" | "orderId", ExtArgs["result"]["message"]>
+  export type MessageOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "text" | "createdAt" | "isRead" | "senderId" | "recipientId" | "orderId", ExtArgs["result"]["message"]>
   export type MessageInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     sender?: boolean | UserDefaultArgs<ExtArgs>
     recipient?: boolean | UserDefaultArgs<ExtArgs>
-    order?: boolean | OrderDefaultArgs<ExtArgs>
+    order?: boolean | Message$orderArgs<ExtArgs>
   }
   export type MessageIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     sender?: boolean | UserDefaultArgs<ExtArgs>
     recipient?: boolean | UserDefaultArgs<ExtArgs>
-    order?: boolean | OrderDefaultArgs<ExtArgs>
+    order?: boolean | Message$orderArgs<ExtArgs>
   }
   export type MessageIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     sender?: boolean | UserDefaultArgs<ExtArgs>
     recipient?: boolean | UserDefaultArgs<ExtArgs>
-    order?: boolean | OrderDefaultArgs<ExtArgs>
+    order?: boolean | Message$orderArgs<ExtArgs>
   }
 
   export type $MessagePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -15120,15 +15118,16 @@ export namespace Prisma {
     objects: {
       sender: Prisma.$UserPayload<ExtArgs>
       recipient: Prisma.$UserPayload<ExtArgs>
-      order: Prisma.$OrderPayload<ExtArgs>
+      order: Prisma.$OrderPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
       text: string
       createdAt: Date
+      isRead: boolean
       senderId: string
       recipientId: string
-      orderId: string
+      orderId: string | null
     }, ExtArgs["result"]["message"]>
     composites: {}
   }
@@ -15525,7 +15524,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     sender<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     recipient<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-    order<T extends OrderDefaultArgs<ExtArgs> = {}>(args?: Subset<T, OrderDefaultArgs<ExtArgs>>): Prisma__OrderClient<$Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    order<T extends Message$orderArgs<ExtArgs> = {}>(args?: Subset<T, Message$orderArgs<ExtArgs>>): Prisma__OrderClient<$Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -15558,6 +15557,7 @@ export namespace Prisma {
     readonly id: FieldRef<"Message", 'String'>
     readonly text: FieldRef<"Message", 'String'>
     readonly createdAt: FieldRef<"Message", 'DateTime'>
+    readonly isRead: FieldRef<"Message", 'Boolean'>
     readonly senderId: FieldRef<"Message", 'String'>
     readonly recipientId: FieldRef<"Message", 'String'>
     readonly orderId: FieldRef<"Message", 'String'>
@@ -15957,6 +15957,25 @@ export namespace Prisma {
   }
 
   /**
+   * Message.order
+   */
+  export type Message$orderArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Order
+     */
+    select?: OrderSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Order
+     */
+    omit?: OrderOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: OrderInclude<ExtArgs> | null
+    where?: OrderWhereInput
+  }
+
+  /**
    * Message without action
    */
   export type MessageDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -16013,7 +16032,6 @@ export namespace Prisma {
     bio: 'bio',
     skills: 'skills',
     rating: 'rating',
-    isOnline: 'isOnline',
     completedCount: 'completedCount',
     lastLat: 'lastLat',
     lastLng: 'lastLng',
@@ -16157,6 +16175,7 @@ export namespace Prisma {
     id: 'id',
     text: 'text',
     createdAt: 'createdAt',
+    isRead: 'isRead',
     senderId: 'senderId',
     recipientId: 'recipientId',
     orderId: 'orderId'
@@ -16460,7 +16479,6 @@ export namespace Prisma {
     bio?: StringNullableFilter<"Profile"> | string | null
     skills?: StringNullableListFilter<"Profile">
     rating?: FloatFilter<"Profile"> | number
-    isOnline?: BoolFilter<"Profile"> | boolean
     completedCount?: IntFilter<"Profile"> | number
     lastLat?: FloatNullableFilter<"Profile"> | number | null
     lastLng?: FloatNullableFilter<"Profile"> | number | null
@@ -16480,7 +16498,6 @@ export namespace Prisma {
     bio?: SortOrderInput | SortOrder
     skills?: SortOrder
     rating?: SortOrder
-    isOnline?: SortOrder
     completedCount?: SortOrder
     lastLat?: SortOrderInput | SortOrder
     lastLng?: SortOrderInput | SortOrder
@@ -16503,7 +16520,6 @@ export namespace Prisma {
     bio?: StringNullableFilter<"Profile"> | string | null
     skills?: StringNullableListFilter<"Profile">
     rating?: FloatFilter<"Profile"> | number
-    isOnline?: BoolFilter<"Profile"> | boolean
     completedCount?: IntFilter<"Profile"> | number
     lastLat?: FloatNullableFilter<"Profile"> | number | null
     lastLng?: FloatNullableFilter<"Profile"> | number | null
@@ -16523,7 +16539,6 @@ export namespace Prisma {
     bio?: SortOrderInput | SortOrder
     skills?: SortOrder
     rating?: SortOrder
-    isOnline?: SortOrder
     completedCount?: SortOrder
     lastLat?: SortOrderInput | SortOrder
     lastLng?: SortOrderInput | SortOrder
@@ -16549,7 +16564,6 @@ export namespace Prisma {
     bio?: StringNullableWithAggregatesFilter<"Profile"> | string | null
     skills?: StringNullableListFilter<"Profile">
     rating?: FloatWithAggregatesFilter<"Profile"> | number
-    isOnline?: BoolWithAggregatesFilter<"Profile"> | boolean
     completedCount?: IntWithAggregatesFilter<"Profile"> | number
     lastLat?: FloatNullableWithAggregatesFilter<"Profile"> | number | null
     lastLng?: FloatNullableWithAggregatesFilter<"Profile"> | number | null
@@ -17231,21 +17245,23 @@ export namespace Prisma {
     id?: StringFilter<"Message"> | string
     text?: StringFilter<"Message"> | string
     createdAt?: DateTimeFilter<"Message"> | Date | string
+    isRead?: BoolFilter<"Message"> | boolean
     senderId?: StringFilter<"Message"> | string
     recipientId?: StringFilter<"Message"> | string
-    orderId?: StringFilter<"Message"> | string
+    orderId?: StringNullableFilter<"Message"> | string | null
     sender?: XOR<UserScalarRelationFilter, UserWhereInput>
     recipient?: XOR<UserScalarRelationFilter, UserWhereInput>
-    order?: XOR<OrderScalarRelationFilter, OrderWhereInput>
+    order?: XOR<OrderNullableScalarRelationFilter, OrderWhereInput> | null
   }
 
   export type MessageOrderByWithRelationInput = {
     id?: SortOrder
     text?: SortOrder
     createdAt?: SortOrder
+    isRead?: SortOrder
     senderId?: SortOrder
     recipientId?: SortOrder
-    orderId?: SortOrder
+    orderId?: SortOrderInput | SortOrder
     sender?: UserOrderByWithRelationInput
     recipient?: UserOrderByWithRelationInput
     order?: OrderOrderByWithRelationInput
@@ -17258,21 +17274,23 @@ export namespace Prisma {
     NOT?: MessageWhereInput | MessageWhereInput[]
     text?: StringFilter<"Message"> | string
     createdAt?: DateTimeFilter<"Message"> | Date | string
+    isRead?: BoolFilter<"Message"> | boolean
     senderId?: StringFilter<"Message"> | string
     recipientId?: StringFilter<"Message"> | string
-    orderId?: StringFilter<"Message"> | string
+    orderId?: StringNullableFilter<"Message"> | string | null
     sender?: XOR<UserScalarRelationFilter, UserWhereInput>
     recipient?: XOR<UserScalarRelationFilter, UserWhereInput>
-    order?: XOR<OrderScalarRelationFilter, OrderWhereInput>
+    order?: XOR<OrderNullableScalarRelationFilter, OrderWhereInput> | null
   }, "id">
 
   export type MessageOrderByWithAggregationInput = {
     id?: SortOrder
     text?: SortOrder
     createdAt?: SortOrder
+    isRead?: SortOrder
     senderId?: SortOrder
     recipientId?: SortOrder
-    orderId?: SortOrder
+    orderId?: SortOrderInput | SortOrder
     _count?: MessageCountOrderByAggregateInput
     _max?: MessageMaxOrderByAggregateInput
     _min?: MessageMinOrderByAggregateInput
@@ -17285,9 +17303,10 @@ export namespace Prisma {
     id?: StringWithAggregatesFilter<"Message"> | string
     text?: StringWithAggregatesFilter<"Message"> | string
     createdAt?: DateTimeWithAggregatesFilter<"Message"> | Date | string
+    isRead?: BoolWithAggregatesFilter<"Message"> | boolean
     senderId?: StringWithAggregatesFilter<"Message"> | string
     recipientId?: StringWithAggregatesFilter<"Message"> | string
-    orderId?: StringWithAggregatesFilter<"Message"> | string
+    orderId?: StringNullableWithAggregatesFilter<"Message"> | string | null
   }
 
   export type UserCreateInput = {
@@ -17422,7 +17441,6 @@ export namespace Prisma {
     bio?: string | null
     skills?: ProfileCreateskillsInput | string[]
     rating?: number
-    isOnline?: boolean
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
@@ -17442,7 +17460,6 @@ export namespace Prisma {
     bio?: string | null
     skills?: ProfileCreateskillsInput | string[]
     rating?: number
-    isOnline?: boolean
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
@@ -17460,7 +17477,6 @@ export namespace Prisma {
     bio?: NullableStringFieldUpdateOperationsInput | string | null
     skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
-    isOnline?: BoolFieldUpdateOperationsInput | boolean
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -17480,7 +17496,6 @@ export namespace Prisma {
     bio?: NullableStringFieldUpdateOperationsInput | string | null
     skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
-    isOnline?: BoolFieldUpdateOperationsInput | boolean
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -17499,7 +17514,6 @@ export namespace Prisma {
     bio?: string | null
     skills?: ProfileCreateskillsInput | string[]
     rating?: number
-    isOnline?: boolean
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
@@ -17516,7 +17530,6 @@ export namespace Prisma {
     bio?: NullableStringFieldUpdateOperationsInput | string | null
     skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
-    isOnline?: BoolFieldUpdateOperationsInput | boolean
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -17534,7 +17547,6 @@ export namespace Prisma {
     bio?: NullableStringFieldUpdateOperationsInput | string | null
     skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
-    isOnline?: BoolFieldUpdateOperationsInput | boolean
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -18259,60 +18271,67 @@ export namespace Prisma {
     id?: string
     text: string
     createdAt?: Date | string
+    isRead?: boolean
     sender: UserCreateNestedOneWithoutSentMessagesInput
     recipient: UserCreateNestedOneWithoutReceivedMessagesInput
-    order: OrderCreateNestedOneWithoutMessagesInput
+    order?: OrderCreateNestedOneWithoutMessagesInput
   }
 
   export type MessageUncheckedCreateInput = {
     id?: string
     text: string
     createdAt?: Date | string
+    isRead?: boolean
     senderId: string
     recipientId: string
-    orderId: string
+    orderId?: string | null
   }
 
   export type MessageUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
     sender?: UserUpdateOneRequiredWithoutSentMessagesNestedInput
     recipient?: UserUpdateOneRequiredWithoutReceivedMessagesNestedInput
-    order?: OrderUpdateOneRequiredWithoutMessagesNestedInput
+    order?: OrderUpdateOneWithoutMessagesNestedInput
   }
 
   export type MessageUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
     senderId?: StringFieldUpdateOperationsInput | string
     recipientId?: StringFieldUpdateOperationsInput | string
-    orderId?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type MessageCreateManyInput = {
     id?: string
     text: string
     createdAt?: Date | string
+    isRead?: boolean
     senderId: string
     recipientId: string
-    orderId: string
+    orderId?: string | null
   }
 
   export type MessageUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
   }
 
   export type MessageUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
     senderId?: StringFieldUpdateOperationsInput | string
     recipientId?: StringFieldUpdateOperationsInput | string
-    orderId?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type StringFilter<$PrismaModel = never> = {
@@ -18641,7 +18660,6 @@ export namespace Prisma {
     bio?: SortOrder
     skills?: SortOrder
     rating?: SortOrder
-    isOnline?: SortOrder
     completedCount?: SortOrder
     lastLat?: SortOrder
     lastLng?: SortOrder
@@ -18665,7 +18683,6 @@ export namespace Prisma {
     avatarUrl?: SortOrder
     bio?: SortOrder
     rating?: SortOrder
-    isOnline?: SortOrder
     completedCount?: SortOrder
     lastLat?: SortOrder
     lastLng?: SortOrder
@@ -18682,7 +18699,6 @@ export namespace Prisma {
     avatarUrl?: SortOrder
     bio?: SortOrder
     rating?: SortOrder
-    isOnline?: SortOrder
     completedCount?: SortOrder
     lastLat?: SortOrder
     lastLng?: SortOrder
@@ -19204,6 +19220,7 @@ export namespace Prisma {
     id?: SortOrder
     text?: SortOrder
     createdAt?: SortOrder
+    isRead?: SortOrder
     senderId?: SortOrder
     recipientId?: SortOrder
     orderId?: SortOrder
@@ -19213,6 +19230,7 @@ export namespace Prisma {
     id?: SortOrder
     text?: SortOrder
     createdAt?: SortOrder
+    isRead?: SortOrder
     senderId?: SortOrder
     recipientId?: SortOrder
     orderId?: SortOrder
@@ -19222,6 +19240,7 @@ export namespace Prisma {
     id?: SortOrder
     text?: SortOrder
     createdAt?: SortOrder
+    isRead?: SortOrder
     senderId?: SortOrder
     recipientId?: SortOrder
     orderId?: SortOrder
@@ -20138,10 +20157,12 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutReceivedMessagesInput, UserUpdateWithoutReceivedMessagesInput>, UserUncheckedUpdateWithoutReceivedMessagesInput>
   }
 
-  export type OrderUpdateOneRequiredWithoutMessagesNestedInput = {
+  export type OrderUpdateOneWithoutMessagesNestedInput = {
     create?: XOR<OrderCreateWithoutMessagesInput, OrderUncheckedCreateWithoutMessagesInput>
     connectOrCreate?: OrderCreateOrConnectWithoutMessagesInput
     upsert?: OrderUpsertWithoutMessagesInput
+    disconnect?: OrderWhereInput | boolean
+    delete?: OrderWhereInput | boolean
     connect?: OrderWhereUniqueInput
     update?: XOR<XOR<OrderUpdateToOneWithWhereWithoutMessagesInput, OrderUpdateWithoutMessagesInput>, OrderUncheckedUpdateWithoutMessagesInput>
   }
@@ -20543,7 +20564,6 @@ export namespace Prisma {
     bio?: string | null
     skills?: ProfileCreateskillsInput | string[]
     rating?: number
-    isOnline?: boolean
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
@@ -20561,7 +20581,6 @@ export namespace Prisma {
     bio?: string | null
     skills?: ProfileCreateskillsInput | string[]
     rating?: number
-    isOnline?: boolean
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
@@ -20768,16 +20787,18 @@ export namespace Prisma {
     id?: string
     text: string
     createdAt?: Date | string
+    isRead?: boolean
     recipient: UserCreateNestedOneWithoutReceivedMessagesInput
-    order: OrderCreateNestedOneWithoutMessagesInput
+    order?: OrderCreateNestedOneWithoutMessagesInput
   }
 
   export type MessageUncheckedCreateWithoutSenderInput = {
     id?: string
     text: string
     createdAt?: Date | string
+    isRead?: boolean
     recipientId: string
-    orderId: string
+    orderId?: string | null
   }
 
   export type MessageCreateOrConnectWithoutSenderInput = {
@@ -20794,16 +20815,18 @@ export namespace Prisma {
     id?: string
     text: string
     createdAt?: Date | string
+    isRead?: boolean
     sender: UserCreateNestedOneWithoutSentMessagesInput
-    order: OrderCreateNestedOneWithoutMessagesInput
+    order?: OrderCreateNestedOneWithoutMessagesInput
   }
 
   export type MessageUncheckedCreateWithoutRecipientInput = {
     id?: string
     text: string
     createdAt?: Date | string
+    isRead?: boolean
     senderId: string
-    orderId: string
+    orderId?: string | null
   }
 
   export type MessageCreateOrConnectWithoutRecipientInput = {
@@ -20900,7 +20923,6 @@ export namespace Prisma {
     bio?: NullableStringFieldUpdateOperationsInput | string | null
     skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
-    isOnline?: BoolFieldUpdateOperationsInput | boolean
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -20918,7 +20940,6 @@ export namespace Prisma {
     bio?: NullableStringFieldUpdateOperationsInput | string | null
     skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
-    isOnline?: BoolFieldUpdateOperationsInput | boolean
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -21092,9 +21113,10 @@ export namespace Prisma {
     id?: StringFilter<"Message"> | string
     text?: StringFilter<"Message"> | string
     createdAt?: DateTimeFilter<"Message"> | Date | string
+    isRead?: BoolFilter<"Message"> | boolean
     senderId?: StringFilter<"Message"> | string
     recipientId?: StringFilter<"Message"> | string
-    orderId?: StringFilter<"Message"> | string
+    orderId?: StringNullableFilter<"Message"> | string | null
   }
 
   export type MessageUpsertWithWhereUniqueWithoutRecipientInput = {
@@ -21414,6 +21436,7 @@ export namespace Prisma {
     id?: string
     text: string
     createdAt?: Date | string
+    isRead?: boolean
     sender: UserCreateNestedOneWithoutSentMessagesInput
     recipient: UserCreateNestedOneWithoutReceivedMessagesInput
   }
@@ -21422,6 +21445,7 @@ export namespace Prisma {
     id?: string
     text: string
     createdAt?: Date | string
+    isRead?: boolean
     senderId: string
     recipientId: string
   }
@@ -22092,7 +22116,6 @@ export namespace Prisma {
     bio?: string | null
     skills?: ProfileCreateskillsInput | string[]
     rating?: number
-    isOnline?: boolean
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
@@ -22111,7 +22134,6 @@ export namespace Prisma {
     bio?: string | null
     skills?: ProfileCreateskillsInput | string[]
     rating?: number
-    isOnline?: boolean
     completedCount?: number
     lastLat?: number | null
     lastLng?: number | null
@@ -22195,7 +22217,6 @@ export namespace Prisma {
     bio?: NullableStringFieldUpdateOperationsInput | string | null
     skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
-    isOnline?: BoolFieldUpdateOperationsInput | boolean
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -22214,7 +22235,6 @@ export namespace Prisma {
     bio?: NullableStringFieldUpdateOperationsInput | string | null
     skills?: ProfileUpdateskillsInput | string[]
     rating?: FloatFieldUpdateOperationsInput | number
-    isOnline?: BoolFieldUpdateOperationsInput | boolean
     completedCount?: IntFieldUpdateOperationsInput | number
     lastLat?: NullableFloatFieldUpdateOperationsInput | number | null
     lastLng?: NullableFloatFieldUpdateOperationsInput | number | null
@@ -22909,16 +22929,18 @@ export namespace Prisma {
     id?: string
     text: string
     createdAt?: Date | string
+    isRead?: boolean
     recipientId: string
-    orderId: string
+    orderId?: string | null
   }
 
   export type MessageCreateManyRecipientInput = {
     id?: string
     text: string
     createdAt?: Date | string
+    isRead?: boolean
     senderId: string
-    orderId: string
+    orderId?: string | null
   }
 
   export type SessionUpdateWithoutUserInput = {
@@ -23199,48 +23221,54 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
     recipient?: UserUpdateOneRequiredWithoutReceivedMessagesNestedInput
-    order?: OrderUpdateOneRequiredWithoutMessagesNestedInput
+    order?: OrderUpdateOneWithoutMessagesNestedInput
   }
 
   export type MessageUncheckedUpdateWithoutSenderInput = {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
     recipientId?: StringFieldUpdateOperationsInput | string
-    orderId?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type MessageUncheckedUpdateManyWithoutSenderInput = {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
     recipientId?: StringFieldUpdateOperationsInput | string
-    orderId?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type MessageUpdateWithoutRecipientInput = {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
     sender?: UserUpdateOneRequiredWithoutSentMessagesNestedInput
-    order?: OrderUpdateOneRequiredWithoutMessagesNestedInput
+    order?: OrderUpdateOneWithoutMessagesNestedInput
   }
 
   export type MessageUncheckedUpdateWithoutRecipientInput = {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
     senderId?: StringFieldUpdateOperationsInput | string
-    orderId?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type MessageUncheckedUpdateManyWithoutRecipientInput = {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
     senderId?: StringFieldUpdateOperationsInput | string
-    orderId?: StringFieldUpdateOperationsInput | string
+    orderId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type ReviewCreateManyProfileInput = {
@@ -23288,6 +23316,7 @@ export namespace Prisma {
     id?: string
     text: string
     createdAt?: Date | string
+    isRead?: boolean
     senderId: string
     recipientId: string
   }
@@ -23333,6 +23362,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
     sender?: UserUpdateOneRequiredWithoutSentMessagesNestedInput
     recipient?: UserUpdateOneRequiredWithoutReceivedMessagesNestedInput
   }
@@ -23341,6 +23371,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
     senderId?: StringFieldUpdateOperationsInput | string
     recipientId?: StringFieldUpdateOperationsInput | string
   }
@@ -23349,6 +23380,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     text?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    isRead?: BoolFieldUpdateOperationsInput | boolean
     senderId?: StringFieldUpdateOperationsInput | string
     recipientId?: StringFieldUpdateOperationsInput | string
   }

@@ -66,10 +66,10 @@ model Profile {
   bio       String? // Кратко о себе / Опыт работы
 
   // --- ПРОФЕССИОНАЛЬНЫЕ ДАННЫЕ (PRO) ---
-  skills         String[] @default([]) // Массив навыков (Электрика, Сантехника и т.д.)
-  rating         Float    @default(5.0)
-  isOnline       Boolean  @default(false)
-  completedCount Int      @default(0) // Сколько заказов реально завершено
+  skills String[] @default([]) // Массив навыков (Электрика, Сантехника и т.д.)
+  rating Float    @default(5.0)
+
+  completedCount Int @default(0) // Сколько заказов реально завершено
 
   // --- ГЕОПОЗИЦИЯ (Uber-механика) ---
   lastLat  Float?
@@ -241,24 +241,23 @@ model Notification {
   @@map("notification")
 }
 
-// ОБНОВЛЕННАЯ МОДЕЛЬ СООБЩЕНИЯ
 model Message {
   id        String   @id @default(cuid())
   text      String
   createdAt DateTime @default(now())
+  isRead    Boolean  @default(false)
 
-  // КТО ОТПРАВИЛ
-  senderId String
-  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
-
-  // КТО ПОЛУЧАЕТ
+  // Кто отправил и кто получил (основная связь)
+  senderId    String
+  sender      User   @relation("SentMessages", fields: [senderId], references: [id])
   recipientId String
   recipient   User   @relation("ReceivedMessages", fields: [recipientId], references: [id])
 
-  // КОНТЕКСТ ЗАКАЗА
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Опциональная привязка к заказу (контекст)
+  orderId String? // Ставим знак вопроса — теперь не обязательно!
+  order   Order?  @relation(fields: [orderId], references: [id])
 
+  @@index([senderId, recipientId])
   @@map("message")
 }
 

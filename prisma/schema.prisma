@@ -241,26 +241,27 @@ model Notification {
   @@map("notification")
 }
 
-// ОБНОВЛЕННАЯ МОДЕЛЬ СООБЩЕНИЯ
 model Message {
-  id        String   @id @default(cuid())
-  text      String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  text        String
+  createdAt   DateTime @default(now())
+  isRead      Boolean  @default(false)
 
-  // КТО ОТПРАВИЛ
-  senderId String
-  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
-
-  // КТО ПОЛУЧАЕТ
+  // Кто отправил и кто получил (основная связь)
+  senderId    String
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
   recipientId String
-  recipient   User   @relation("ReceivedMessages", fields: [recipientId], references: [id])
+  recipient   User     @relation("ReceivedMessages", fields: [recipientId], references: [id])
 
-  // КОНТЕКСТ ЗАКАЗА
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Опциональная привязка к заказу (контекст)
+  orderId     String?  // Ставим знак вопроса — теперь не обязательно!
+  order       Order?   @relation(fields: [orderId], references: [id])
 
-  @@map("message")
+  @@index([senderId, recipientId])
+
+  @@map ("message")
 }
+
 
 // --- ENUMS ---
 
