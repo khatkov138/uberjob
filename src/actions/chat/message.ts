@@ -4,16 +4,18 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "@/lib/get-session"
 import { revalidatePath } from "next/cache"
 import Pusher from "pusher";
+import { Message, User } from "../../../prisma/generated";
+import { delay } from "@/lib/utils";
 /**
  * 1. ОТПРАВКА СООБЩЕНИЯ
  * Универсальная функция: привязывает заказ, если передан orderId
  */
 const pusher = new Pusher({
-  appId: process.env.PUSHER_APP_ID!,
-  key: process.env.NEXT_PUBLIC_PUSHER_KEY!,
-  secret: process.env.PUSHER_SECRET!,
-  cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-  useTLS: true,
+    appId: process.env.PUSHER_APP_ID!,
+    key: process.env.NEXT_PUBLIC_PUSHER_KEY!,
+    secret: process.env.PUSHER_SECRET!,
+    cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    useTLS: true,
 });
 
 export async function sendMessage({ recipientId, text, orderId }: { recipientId: string, text: string, orderId?: string }) {
@@ -33,8 +35,8 @@ export async function sendMessage({ recipientId, text, orderId }: { recipientId:
 
     // 2. Публикуем событие в Pusher
     // Название канала: уникальное для пары пользователей или заказа
-    const channelName = orderId 
-        ? `chat-order-${orderId}` 
+    const channelName = orderId
+        ? `chat-order-${orderId}`
         : `chat-user-${[session.user.id, recipientId].sort().join('-')}`;
 
     await pusher.trigger(channelName, "new-message", message);
@@ -42,23 +44,60 @@ export async function sendMessage({ recipientId, text, orderId }: { recipientId:
     return { success: true, data: message };
 }
 
-/**
- * 2. ПОЛУЧЕНИЕ СООБЩЕНИЙ ПО ЗАКАЗУ
- * Используется в виджете на странице заказа
- */
-export async function getOrderMessages(orderId: string) {
-    const session = await getServerSession()
-    if (!session?.user?.id) return []
-
-    return await prisma.message.findMany({
-        where: { orderId },
-        orderBy: { createdAt: "asc" },
-        include: {
-            sender: { select: { name: true, id: true } }
-        }
-    })
+// Определяем тип сообщения с включенным отправителем
+export type MessageWithSender = Message & {
+    sender: Pick<User, "id" | "name">
 }
 
+export type InfiniteMessagesResponse = {
+    messages: MessageWithSender[]
+    nextCursor: string | null
+}
+
+
+
+export async function getMessages({
+    recipientId,
+    orderId,
+    cursor,
+    limit = 30
+}: {
+    recipientId: string,
+    orderId?: string,
+    cursor?: string,
+    limit?: number
+}): Promise<InfiniteMessagesResponse> {
+
+    const session = await getServerSession()
+    if (!session?.user?.id) return { messages: [], nextCursor: null }
+
+    await delay(2000);
+
+    const whereClause = orderId
+        ? { orderId }
+        : {
+            OR: [
+                { senderId: session.user.id, recipientId },
+                { senderId: recipientId, recipientId: session.user.id }
+            ]
+        }
+
+    const messages = await prisma.message.findMany({
+        where: whereClause,
+        take: limit,
+        ...(cursor && { skip: 1, cursor: { id: cursor } }),
+        orderBy: { createdAt: 'desc' }, // Берем самые свежие
+        include: { sender: { select: { id: true, name: true } } }
+    })
+
+    const nextCursor = messages.length === limit ? messages[messages.length - 1].id : null
+
+    return {
+        // Оставляем DESC для логики курсора, но в компоненте развернем для UI
+        messages,
+        nextCursor
+    }
+}
 /**
  * 3. ПОЛУЧЕНИЕ СПИСКА ВСЕХ ДИАЛОГОВ (Inbox)
  * Используется на главной странице сообщений /messages

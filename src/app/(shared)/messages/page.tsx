@@ -25,11 +25,15 @@ export default async function MessagesPage({
      * !p-0 — убираем внутренние паддинги контейнера, чтобы чат касался его краев.
      * overflow-hidden — гарантирует, что скроллиться будут только списки внутри.
      */
-    <div className="flex-1 h-full overflow-hidden">
-      <Container className={cn(
-        "bg-white flex !flex-row !p-0 overflow-hidden border-2 border-slate-100 rounded-[3rem] shadow-xl",
-        "h-full"
-      )}>
+    <div className="flex-1 h-full w-full flex flex-col overflow-hidden p-4 md:p-10">
+
+      {/* 
+          ОСНОВНАЯ РАМКА ЧАТА 
+          max-w-7xl — чтобы на огромных мониторах чат не растягивался на 2 метра, 
+          но был шире, чем обычный Container (1024px).
+      */}
+      <div className="flex-1 w-full max-w-7xl mx-auto bg-white flex flex-row overflow-hidden border-2 border-slate-100 rounded-[3rem] shadow-2xl">
+
 
         {/* ЛЕВАЯ ЧАСТЬ: СПИСОК ДИАЛОГОВ */}
         <aside className="w-80 md:w-96 border-r border-slate-100 flex flex-col h-full bg-slate-50/50 shrink-0">
@@ -60,7 +64,7 @@ export default async function MessagesPage({
             </div>
           )}
         </main>
-      </Container>
+      </div>
     </div>
   )
 }
