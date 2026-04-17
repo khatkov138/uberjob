@@ -16,16 +16,20 @@ export default function Navbar() {
     const user = session?.user
     const { mode } = useRoleModeStore()
     const pathname = usePathname()
-    
+
     const [mounted, setMounted] = React.useState(false)
     React.useEffect(() => setMounted(true), [])
+
+
+    const isAdminPage = pathname.startsWith('/admin')
+    if (isAdminPage) return null
 
     const logoHref = user ? (mode === 'PRO' ? '/pro/dashboard' : '/client/dashboard') : "/"
 
     return (
         <header className="sticky top-0 z-50 w-full h-20 bg-white/95 backdrop-blur-md border-b border-slate-100">
             <div className="max-w-5xl mx-auto h-full px-4 md:px-6 flex items-center justify-between gap-4">
-                
+
                 {/* 1. БРЕНД И КОРНЕВАЯ НАВИГАЦИЯ */}
                 <div className="flex items-center gap-8 shrink-0">
                     <Link href={logoHref} className="hover:opacity-80 transition-opacity">
@@ -36,7 +40,7 @@ export default function Navbar() {
 
                     {mounted && user && (
                         <nav className="hidden sm:flex items-center">
-                            <Link 
+                            <Link
                                 href={mode === 'PRO' ? "/pro/dashboard" : "/client/dashboard"}
                                 className={cn(
                                     "text-[11px] font-black uppercase tracking-[0.2em] transition-all relative py-1",
@@ -57,16 +61,16 @@ export default function Navbar() {
                     {mounted && user && (
                         <div className="animate-in fade-in zoom-in-95 duration-500">
                             {mode === 'CLIENT' ? (
-                                <Link 
-                                    href="/client/new-order" 
+                                <Link
+                                    href="/client/new-order"
                                     className="w-full h-12 flex items-center justify-center gap-3 bg-blue-600 hover:bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] transition-all shadow-lg shadow-blue-500/10 active:scale-95"
                                 >
                                     <PlusCircle size={18} className="stroke-[3px]" />
                                     <span>Создать заказ</span>
                                 </Link>
                             ) : (
-                                <Link 
-                                    href="/pro/feed" 
+                                <Link
+                                    href="/pro/feed"
                                     className="w-full h-12 flex items-center justify-center gap-3 bg-slate-900 hover:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] transition-all shadow-xl shadow-slate-200 active:scale-95"
                                 >
                                     <Search size={18} className="stroke-[3px]" />
@@ -84,7 +88,7 @@ export default function Navbar() {
                             <div className="hidden lg:block">
                                 <RoleSwitcher />
                             </div>
-                            
+
                             <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-[1.3rem] border border-slate-100 relative">
                                 {/* ГЛОБАЛЬНЫЙ ИНДИКАТОР ОНЛАЙНА */}
                                 <div className="absolute -top-1.5 -left-1.5 z-20">
@@ -95,8 +99,8 @@ export default function Navbar() {
                                 </div>
 
                                 {/* СООБЩЕНИЯ */}
-                                <Link 
-                                    href="/messages" 
+                                <Link
+                                    href="/messages"
                                     className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-400 hover:bg-white hover:text-blue-600 transition-all relative group bg-white/50 border border-transparent hover:border-slate-200 shadow-sm"
                                 >
                                     <MessageSquare size={20} className="group-hover:scale-110 transition-transform" />

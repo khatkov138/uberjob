@@ -10,19 +10,25 @@ import {
 } from "lucide-react";
 import { GitHubIcon } from "./icons/GitHubIcon";
 import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 
-export function Footer() {
+interface FooterProps {
+
+  className?: string
+}
+
+export function Footer({ className }: FooterProps) {
   const currentYear = new Date().getFullYear();
 
   const pathname = usePathname()
 
   // Список страниц, где футер НЕ НУЖЕН (например, в чате)
-  const isChat = pathname.includes("/messages/")
+  const isChat = pathname.includes("/messages")
 
   if (isChat) return null
 
   return (
-    <footer className="w-full border-t bg-background mt-20">
+    <footer className={cn("w-full border-t bg-background mt-20", className)}>
       <div className="max-w-7xl mx-auto px-4 py-12 md:py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-8">
 

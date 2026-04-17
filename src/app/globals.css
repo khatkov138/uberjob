@@ -128,3 +128,46 @@
     @apply font-sans;
   }
 }
+
+/* Кастомный скроллбар для чата */
+.chat-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 10px; /* Отступ сверху и снизу, чтобы не прилипал к краям */
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0; /* Цвет slate-200 */
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.chat-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* Цвет slate-300 при наведении */
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #2563eb; /* Цвет blue-600 при прямом наведении на скролл */
+}
+
+
+::-webkit-scrollbar {
+  width: 10px; /* Для страницы чуть шире, чем для чата */
+}
+
+::-webkit-scrollbar-track {
+  background: #f8fafc; /* Очень светлый фон (slate-50) */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e2e8f0; /* Светло-серый (slate-200) */
+  border: 2px solid #f8fafc; /* Создает эффект отступа от краев */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* Чуть темнее при наведении (slate-400) */
+}

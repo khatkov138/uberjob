@@ -20,7 +20,7 @@ export async function GET() {
         skills: true,
         bio: true,
         rating: true,
-        isOnline: true,
+        
       },
     });
 
