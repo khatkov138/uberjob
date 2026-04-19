@@ -3,13 +3,15 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { UserDropdown } from "@/components/user-dropdown"
-import { NotificationsBell } from "./notifications-bell"
+import { UserDropdown } from "@/components/navbar/user-dropdown"
+
 import { useRoleModeStore } from "@/store/use-role-store"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
 import { MessageSquare, PlusCircle, Search, Radio } from "lucide-react"
-import { RoleSwitcher } from "./shared/role-switcher"
+import { RoleSwitcher } from "../shared/role-switcher"
+import { NotificationsBell } from "./notifications-bell"
+import { UnreadBadge } from "./unread-badge"
 
 export default function Navbar() {
     const { data: session } = authClient.useSession()
@@ -104,7 +106,7 @@ export default function Navbar() {
                                     className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-400 hover:bg-white hover:text-blue-600 transition-all relative group bg-white/50 border border-transparent hover:border-slate-200 shadow-sm"
                                 >
                                     <MessageSquare size={20} className="group-hover:scale-110 transition-transform" />
-                                    <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-blue-600 rounded-full border-2 border-white" />
+                                    {session?.user?.id && <UnreadBadge userId={session.user.id} />}
                                 </Link>
 
                                 {/* УВЕДОМЛЕНИЯ */}

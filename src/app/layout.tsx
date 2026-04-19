@@ -3,12 +3,13 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import TanstackProvider from "@/providers/TanstackProvider";
-import Navbar from "@/components/navbar";
+
 import { Toaster } from "@/components/ui/sonner";
 import { Footer } from "@/components/footer";
 import { LivePulseMarquee } from "@/components/shared/live-pulse-marquee";
 import { RoleAutoswitcher } from "@/components/shared/role-autoswitcher";
 import { Heartbeat } from "@/components/shared/heartbeat";
+import Navbar from "@/components/navbar/navbar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

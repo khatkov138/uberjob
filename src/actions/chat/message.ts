@@ -40,6 +40,8 @@ export async function sendMessage({ recipientId, text, orderId }: { recipientId:
         : `chat-user-${[session.user.id, recipientId].sort().join('-')}`;
 
     await pusher.trigger(channelName, "new-message", message);
+    await pusher.trigger(`user-notifications-${recipientId}`, "new-unread-message", {});
+
 
     return { success: true, data: message };
 }
@@ -184,5 +186,17 @@ export async function markMessagesAsRead(senderId: string, orderId?: string) {
 
     await pusher.trigger(channelName, "messages-read", {
         readerId: currentUserId // Кто прочитал
+    });
+}
+
+export async function getGlobalUnreadCount() {
+    const session = await getServerSession();
+    if (!session?.user?.id) return 0;
+
+    return await prisma.message.count({
+        where: {
+            recipientId: session.user.id,
+            isRead: false
+        }
     });
 }
