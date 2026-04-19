@@ -3,10 +3,10 @@
 
 import * as React from "react"
 import { useInfiniteQuery, useMutation, useQueryClient, InfiniteData } from "@tanstack/react-query"
-import { Send, Loader2, CheckCheck, ChevronDown, Zap } from "lucide-react"
+import { Send, Loader2, CheckCheck, ChevronDown, Zap, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Pusher from "pusher-js"
-import { getMessages, sendMessage, type MessageWithSender, type InfiniteMessagesResponse } from "@/actions/chat/message"
+import { getMessages, sendMessage, type MessageWithSender, type InfiniteMessagesResponse, markMessagesAsRead } from "@/actions/chat/message"
 import { toast } from "sonner"
 
 type ChatMessage = MessageWithSender & { isOptimistic?: boolean }
@@ -161,6 +161,25 @@ export function ChatWindow({ recipientId, orderId, currentUserId }: ChatWindowPr
 
       queryClient.invalidateQueries({ queryKey: ["dialogs"] });
     })
+    //messages-read
+    channel.bind("messages-read", ({ readerId }: { readerId: string }) => {
+      // Если прочитал собеседник, а не я
+      if (readerId !== currentUserId) {
+        queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map(page => ({
+              ...page,
+              // Помечаем все МОИ сообщения как прочитанные
+              messages: page.messages.map(m =>
+                m.senderId === currentUserId ? { ...m, isRead: true } : m
+              )
+            }))
+          };
+        });
+      }
+    });
 
     return () => { pusher.unsubscribe(channelName); pusher.disconnect() }
   }, [orderId, recipientId, currentUserId])
@@ -179,6 +198,17 @@ export function ChatWindow({ recipientId, orderId, currentUserId }: ChatWindowPr
     if (loadMoreRef.current) observer.observe(loadMoreRef.current)
     return () => observer.disconnect()
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  React.useEffect(() => {
+    if (messages.length > 0) {
+      // Если последнее сообщение в списке — от собеседника и оно не прочитано
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.senderId !== currentUserId && !lastMsg.isRead) {
+        markMessagesAsRead(recipientId, orderId);
+        queryClient.invalidateQueries({ queryKey: ["unread-count"] });
+      }
+    }
+  }, [messages.length, recipientId, currentUserId]);
 
   return (
     <div className="flex flex-col h-full w-full bg-white overflow-hidden relative">
@@ -228,7 +258,19 @@ export function ChatWindow({ recipientId, orderId, currentUserId }: ChatWindowPr
                 <span className="text-[8px] font-black uppercase text-slate-400">
                   {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
-                {msg.senderId === currentUserId && <CheckCheck size={10} className="text-blue-600" />}
+                {msg.senderId === currentUserId &&
+                  (
+                    <div className="flex items-center ml-1">
+                      {msg.isRead ? (
+                        // ДВЕ ГАЛОЧКИ: Прочитано (синие или голубые)
+                        <CheckCheck size={12} className="text-blue-400" />
+                      ) : (
+                        // ОДНА ГАЛОЧКА: Доставлено (серые)
+                        <Check size={12} className="text-slate-300" />
+                      )}
+                    </div>
+                  )
+                }
               </div>
             </div>
           ))}

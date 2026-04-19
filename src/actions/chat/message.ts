@@ -71,7 +71,7 @@ export async function getMessages({
     const session = await getServerSession()
     if (!session?.user?.id) return { messages: [], nextCursor: null }
 
-    await delay(2000);
+    //await delay(2000);
 
     const whereClause = orderId
         ? { orderId }
@@ -156,4 +156,33 @@ export async function getUserDialogs() {
             orderTitle: msg!.order?.title
         }))
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+}
+
+
+
+export async function markMessagesAsRead(senderId: string, orderId?: string) {
+    const session = await getServerSession();
+    if (!session?.user?.id) return;
+
+    const currentUserId = session.user.id;
+
+    // 1. Обновляем в БД
+    await prisma.message.updateMany({
+        where: {
+            senderId: senderId,       // Сообщения ОТ собеседника
+            recipientId: currentUserId, // Предназначенные МНЕ
+            isRead: false,
+            ...(orderId && { orderId }) // Если в контексте заказа
+        },
+        data: { isRead: true }
+    });
+
+    // 2. Генерируем событие "прочитано" для отправителя через Pusher
+    const channelName = orderId
+        ? `chat-order-${orderId}`
+        : `chat-user-${[currentUserId, senderId].sort().join('-')}`;
+
+    await pusher.trigger(channelName, "messages-read", {
+        readerId: currentUserId // Кто прочитал
+    });
 }
