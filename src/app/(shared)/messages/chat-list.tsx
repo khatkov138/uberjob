@@ -19,7 +19,7 @@ export function ChatList({ currentUserId, activeUserId, initialData }: ChatListP
     queryKey: ["dialogs"],
     queryFn: () => getUserDialogs(),
     initialData: initialData,
-    refetchInterval: 4000, // Обновляем список каждые 4 сек
+   // refetchInterval: 4000, // Обновляем список каждые 4 сек
   })
 
   if (!dialogs || dialogs.length === 0) {
