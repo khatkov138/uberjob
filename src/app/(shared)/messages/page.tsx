@@ -5,6 +5,7 @@ import { getUserDialogs } from "@/actions/chat/message"
 import { ChatList } from "./chat-list"
 import { ChatWindow } from "./chat-window"
 import { cn } from "@/lib/utils"
+import prisma from "@/lib/prisma"
 
 export default async function MessagesPage({
   searchParams
@@ -15,6 +16,13 @@ export default async function MessagesPage({
   if (!session?.user) redirect("/sign-in")
 
   const { userId, orderId } = await searchParams
+
+  const partner = userId
+    ? await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true }
+    })
+    : null;
 
   // Получаем начальные данные на сервере (SSR)
   const initialDialogs = await getUserDialogs()
@@ -50,6 +58,7 @@ export default async function MessagesPage({
           {userId ? (
             <ChatWindow
               recipientId={userId}
+              recipientName={partner?.name || "Пользователь"}
               orderId={orderId}
               currentUserId={session.user.id}
             />

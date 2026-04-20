@@ -2,35 +2,15 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { getGlobalUnreadCount } from "@/actions/chat/message"
-import * as React from "react"
-import Pusher from "pusher-js"
 
-export function UnreadBadge({ userId }: { userId: string }) {
-  const queryClient = useQueryClient()
-
+export function UnreadBadge() {
+ 
   const { data: count } = useQuery({
     queryKey: ["unread-count"],
     queryFn: () => getGlobalUnreadCount(),
   })
 
-  React.useEffect(() => {
-    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-    })
-
-    // Слушаем личный канал пользователя для уведомлений
-    const channel = pusher.subscribe(`user-notifications-${userId}`)
-    
-    channel.bind("new-unread-message", () => {
-      // Когда прилетает сигнал о новом сообщении — обновляем счетчик
-      queryClient.invalidateQueries({ queryKey: ["unread-count"] })
-    })
-
-    return () => {
-      pusher.unsubscribe(`user-notifications-${userId}`)
-      pusher.disconnect()
-    }
-  }, [userId, queryClient])
+ 
 
   if (!count || count === 0) return null
 

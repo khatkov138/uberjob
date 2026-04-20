@@ -40,7 +40,10 @@ export async function sendMessage({ recipientId, text, orderId }: { recipientId:
         : `chat-user-${[session.user.id, recipientId].sort().join('-')}`;
 
     await pusher.trigger(channelName, "new-message", message);
-    await pusher.trigger(`user-notifications-${recipientId}`, "new-unread-message", {});
+    await pusher.trigger(`user-notifications-${recipientId}`, "new-unread-message", {
+        senderId: session.user.id, // Кто отправил
+        orderId: orderId,       // В каком заказе (если есть)
+    });
 
 
     return { success: true, data: message };
@@ -53,10 +56,9 @@ export type MessageWithSender = Message & {
 
 export type InfiniteMessagesResponse = {
     messages: MessageWithSender[]
-    nextCursor: string | null
+    nextCursor: string | null,
+    totalUnread: number
 }
-
-
 
 export async function getMessages({
     recipientId,
@@ -67,99 +69,130 @@ export async function getMessages({
     recipientId: string,
     orderId?: string,
     cursor?: string,
-    limit?: number
+    limit?: number,
 }): Promise<InfiniteMessagesResponse> {
 
     const session = await getServerSession()
-    if (!session?.user?.id) return { messages: [], nextCursor: null }
+    if (!session?.user?.id) return { messages: [], nextCursor: null, totalUnread: 0 }
 
-    //await delay(2000);
+    const currentUserId = session.user.id
 
-    const whereClause = orderId
-        ? { orderId }
-        : {
-            OR: [
-                { senderId: session.user.id, recipientId },
-                { senderId: recipientId, recipientId: session.user.id }
-            ]
-        }
+    const whereClause = orderId ? { orderId } : {
+        OR: [
+            { senderId: currentUserId, recipientId },
+            { senderId: recipientId, recipientId: currentUserId }
+        ]
+    }
 
+    // 1. Получаем сообщения
     const messages = await prisma.message.findMany({
         where: whereClause,
         take: limit,
         ...(cursor && { skip: 1, cursor: { id: cursor } }),
-        orderBy: { createdAt: 'desc' }, // Берем самые свежие
+        orderBy: { createdAt: 'desc' },
         include: { sender: { select: { id: true, name: true } } }
+    })
+
+    // 2. Считаем ОБЩЕЕ количество непрочитанных мной в этом чате (БЕЗ ЛИМИТА 30)
+    const totalUnread = await prisma.message.count({
+        where: {
+            senderId: recipientId,
+            recipientId: currentUserId,
+            isRead: false,
+            ...(orderId && { orderId })
+        }
     })
 
     const nextCursor = messages.length === limit ? messages[messages.length - 1].id : null
 
     return {
-        // Оставляем DESC для логики курсора, но в компоненте развернем для UI
         messages,
-        nextCursor
+        nextCursor,
+        totalUnread // <-- Теперь мы знаем правду
     }
 }
 /**
  * 3. ПОЛУЧЕНИЕ СПИСКА ВСЕХ ДИАЛОГОВ (Inbox)
  * Используется на главной странице сообщений /messages
  */
-export async function getUserDialogs() {
-    const session = await getServerSession()
-    if (!session?.user?.id) return []
 
-    const userId = session.user.id
 
-    // 1. Находим все уникальные ID людей, с которыми мы переписывались
-    // Мы берем только senderId и recipientId, это очень легкий запрос
-    const participants = await prisma.message.findMany({
-        where: {
-            OR: [{ senderId: userId }, { recipientId: userId }]
-        },
-        select: { senderId: true, recipientId: true },
-        orderBy: { createdAt: 'desc' },
-    })
-
-    // 2. Формируем список уникальных ID собеседников
-    const otherUserIds = Array.from(new Set(
-        participants.map(m => m.senderId === userId ? m.recipientId : m.senderId)
-    ))
-
-    // 3. Для каждого собеседника тянем ТОЛЬКО ОДНО последнее сообщение
-    // Используем Promise.all для параллельного выполнения
-    const dialogs = await Promise.all(
-        otherUserIds.map(async (otherId) => {
-            return await prisma.message.findFirst({
-                where: {
-                    OR: [
-                        { senderId: userId, recipientId: otherId },
-                        { senderId: otherId, recipientId: userId }
-                    ]
-                },
-                orderBy: { createdAt: 'desc' },
-                include: {
-                    sender: { select: { id: true, name: true } },
-                    recipient: { select: { id: true, name: true } },
-                    order: { select: { id: true, title: true } }
-                }
-            })
-        })
-    )
-
-    // 4. Фильтруем пустые и сортируем по дате (самые свежие наверху)
-    return dialogs
-        .filter(Boolean)
-        .map(msg => ({
-            id: msg!.id,
-            lastMessage: msg!.text,
-            createdAt: msg!.createdAt,
-            otherUser: msg!.senderId === userId ? msg!.recipient : msg!.sender,
-            orderId: msg!.orderId,
-            orderTitle: msg!.order?.title
-        }))
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+// Тип одного диалога в списке
+export interface ChatDialog {
+    partner: {
+        id: string;
+        name: string;
+        image: string | null;
+    } | null;
+    lastMessage: {
+        id: string;
+        text: string;
+        senderId: string;
+        recipientId: string;
+        orderId: string | null;
+        isRead: boolean;
+        createdAt: Date;
+    } | null;
+    unreadCount: number;
 }
 
+export async function getUserDialogs(): Promise<ChatDialog[]> {
+    const session = await getServerSession();
+    if (!session?.user?.id) return [];
+
+    const currentUserId = session.user.id;
+
+    // 1. Находим всех, с кем была переписка
+    const messages = await prisma.message.findMany({
+        where: {
+            OR: [{ senderId: currentUserId }, { recipientId: currentUserId }],
+        },
+        orderBy: { createdAt: "desc" },
+    });
+
+    const uniqueUserIds = Array.from(
+        new Set(
+            messages.map((m) => (m.senderId === currentUserId ? m.recipientId : m.senderId))
+        )
+    );
+
+    // 2. Для каждого ID собираем инфо: последнее сообщение + кол-во непрочитанных
+    const dialogs = await Promise.all(
+        uniqueUserIds.map(async (partnerId) => {
+            const partner = await prisma.user.findUnique({
+                where: { id: partnerId },
+                select: { id: true, name: true, image: true },
+            });
+
+            const lastMessage = await prisma.message.findFirst({
+                where: {
+                    OR: [
+                        { senderId: currentUserId, recipientId: partnerId },
+                        { senderId: partnerId, recipientId: currentUserId },
+                    ],
+                },
+                orderBy: { createdAt: "desc" },
+            });
+
+            // Считаем только те, что прислали НАМ и которые мы еще не читали
+            const unreadCount = await prisma.message.count({
+                where: {
+                    senderId: partnerId,
+                    recipientId: currentUserId,
+                    isRead: false,
+                },
+            });
+
+            return {
+                partner,
+                lastMessage,
+                unreadCount, // <--- Наша новая цифра
+            };
+        })
+    );
+
+    return dialogs;
+}
 
 
 export async function markMessagesAsRead(senderId: string, orderId?: string) {

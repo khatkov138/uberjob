@@ -1,9 +1,10 @@
 
 
 import { cache } from "react";
-import { Role } from "../../prisma/generated";
+
 import { auth } from "./auth";
 import { headers } from "next/headers";
+import { UserRole } from "../../prisma/generated";
 
 export const getServerSession = cache(async () => {
     const sessionData = await auth.api.getSession({
@@ -17,7 +18,7 @@ export const getServerSession = cache(async () => {
         user: {
             ...sessionData.user,
             // Принудительно приводим роль к Enum, так как в БД у нас есть дефолт
-            role: (sessionData.user.role as Role) || Role.CLIENT,
+            role: (sessionData.user.role as UserRole) || UserRole.USER,
         },
     };
 })

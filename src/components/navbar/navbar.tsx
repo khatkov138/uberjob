@@ -12,6 +12,7 @@ import { MessageSquare, PlusCircle, Search, Radio } from "lucide-react"
 import { RoleSwitcher } from "../shared/role-switcher"
 import { NotificationsBell } from "./notifications-bell"
 import { UnreadBadge } from "./unread-badge"
+import { useNotifications } from "@/hooks/use-notifications"
 
 export default function Navbar() {
     const { data: session } = authClient.useSession()
@@ -26,7 +27,10 @@ export default function Navbar() {
     const isAdminPage = pathname.startsWith('/admin')
     if (isAdminPage) return null
 
-    const logoHref = user ? (mode === 'PRO' ? '/pro/dashboard' : '/client/dashboard') : "/"
+    const logoHref = user ? (mode === 'PRO' ? '/pro/dashboard' : '/client/dashboard') : "/";
+
+    // Запускаем единый слушатель Pusher
+    useNotifications(session?.user?.id)
 
     return (
         <header className="sticky top-0 z-50 w-full h-20 bg-white/95 backdrop-blur-md border-b border-slate-100">
@@ -106,7 +110,7 @@ export default function Navbar() {
                                     className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-400 hover:bg-white hover:text-blue-600 transition-all relative group bg-white/50 border border-transparent hover:border-slate-200 shadow-sm"
                                 >
                                     <MessageSquare size={20} className="group-hover:scale-110 transition-transform" />
-                                    {session?.user?.id && <UnreadBadge userId={session.user.id} />}
+                                    {session?.user?.id && <UnreadBadge />}
                                 </Link>
 
                                 {/* УВЕДОМЛЕНИЯ */}
