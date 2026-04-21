@@ -9,9 +9,17 @@ import { OrderStatus } from "../../../prisma/generated"
 async function analyzeTask(description: string) {
   try {
     const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) throw new Error("GROQ_API_KEY_MISSING");
+    const uri = process.env.GROQ_URI;
+    
+    if (!apiKey || !uri) throw new Error("GROQ_CONFIG_MISSING");
 
-    const response = await fetch("https://groq.com", {
+    const existing = await prisma.category.findMany({
+      select: { name: true },
+      take: 60 
+    });
+    const categoriesContext = existing.map(c => c.name).join(", ");
+
+    const response = await fetch(uri, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -22,29 +30,52 @@ async function analyzeTask(description: string) {
         messages: [
           {
             role: "system",
-            content: `Ты — диспетчер Uberjob. Твоя задача: проанализировать запрос и вернуть JSON.
-            Формат JSON:
+            content: `Ты — старший диспетчер ZWORK. Твоя задача — классифицировать заказ по проф. нишам.
+
+            СПИСОК СУЩЕСТВУЮЩИХ НИШ: [${categoriesContext}]
+
+            АЛГОРИТМ ВЫБОРА:
+            1. Если задача (н-р откачка ямы) НЕ относится к существующим нишам (н-р Сантехника) — ТЫ ОБЯЗАН ПРИДУМАТЬ НОВУЮ ТОЧНУЮ НИШУ (н-р "Ассенизация").
+            2. Сантехника — это ТОЛЬКО работа внутри зданий с трубами/кранами. Откачка ям — это "Ассенизация" или "Спецтехника".
+            3. Если в СПИСКЕ НЕТ подходящего названия, не пытайся подстроить, создай свое (1-2 слова, ед.ч, с Большой буквы).
+            
+            ТРЕБОВАНИЯ:
+            - Title: 3-5 слов, техническая суть.
+            - Categories: до 3-х штук.
+            - Keywords: 12-15 слов (инструменты, детали, синонимы). ОБЯЗАТЕЛЬНО.
+
+            ФОРМАТ JSON:
             {
-              "title": "краткое название услуги",
+              "title": "...",
               "categories": [
-                { "name": "Название категории", "keywords": ["ключ1", "ключ2"] }
+                { "name": "Название", "keywords": ["тег1", "тег2"] }
               ]
             }`
           },
           { role: "user", content: description }
         ],
         response_format: { type: "json_object" },
-        temperature: 0.1
+        temperature: 0 
       })
     });
 
     const result = await response.json();
-    return JSON.parse(result.choices[0].message.content);
+    const content = JSON.parse(result.choices[0].message.content);
+
+    if (content.categories) {
+      content.categories = content.categories.map((c: any) => ({
+        ...c,
+        name: c.name.trim().charAt(0).toUpperCase() + c.name.trim().slice(1).toLowerCase()
+      })).slice(0, 3);
+    }
+
+    return content;
   } catch (error) {
-    console.error("AI Error:", error);
+    console.error("ZWORK_AI_ERROR:", error);
     return { title: "Новый заказ", categories: [{ name: "Общие работы", keywords: [] }] };
   }
 }
+
 
 export async function createOrder(formData: CreateOrderValues) {
   const session = await getServerSession();
