@@ -100,9 +100,8 @@ export function OrderCard({ order, isMatched }: any) {
                  {order.distance} км от вас
                </div>
             )}
-            <div className="px-3 py-1 bg-slate-50 rounded-lg border border-slate-100 text-slate-400 text-[9px] font-black uppercase">
-              ID: {order.id.slice(-6).toUpperCase()}
-            </div>
+            
+          
           </div>
 
           {/* 5. НИЖНИЙ БЛОК */}

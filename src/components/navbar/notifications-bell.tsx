@@ -12,8 +12,9 @@ import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
 
-import { Notification } from "../../prisma/generated"
+
 import { markAllAsRead, markAsRead } from "@/actions/notifications"
+import { Notification } from "../../../prisma/generated"
 
 export function NotificationsBell() {
   const queryClient = useQueryClient()
