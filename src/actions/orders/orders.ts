@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 
 import { getServerSession } from "@/lib/get-session"
 import { OrderStatus } from "../../../prisma/generated"
+import { getDistance } from "@/lib/utils"
 
 
 
@@ -162,6 +163,164 @@ export async function confirmOrderCompletion(orderId: string) {
   revalidatePath(`/client/orders/${orderId}`)
   return { success: true }
 }
+
+
+export async function getProOrders() {
+  const session = await getServerSession()
+  if (!session?.user) return { success: false, error: "Unauthorized" }
+
+  try {
+    const orders = await prisma.order.findMany({
+      where: {
+        workerId: session.user.id
+      },
+      include: {
+        client: { select: { name: true, image: true } }
+      },
+      orderBy: { updatedAt: 'desc' }
+    })
+    return { success: true, data: orders }
+  } catch (e) {
+    return { success: false, error: "Ошибка загрузки" }
+  }
+}
+
+export async function getOrders(
+  lat?: number,
+  lng?: number,
+  radiusKm: number = 60
+) {
+  const session = await getServerSession()
+  const userId = session?.user?.id
+  if (!userId) return { success: false, error: "Unauthorized" }
+
+  try {
+    // 1. Получаем ID категорий (скиллов) мастера
+    const profile = await prisma.profile.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        skills: {
+          select: { categoryId: true }
+        }
+      }
+    })
+
+    const masterCategoryIds = profile?.skills.map(s => s.categoryId) || []
+
+    // 2. Запрашиваем заказы
+    const allOrders = await prisma.order.findMany({
+      where: { status: "PENDING" },
+      include: {
+        client: {
+          select: {
+            name: true,
+            image: true,
+            _count: { select: { ordersCreated: true } }
+          }
+        },
+        // Вот здесь часто бывает ошибка в названиях полей
+        categories: {
+          include: {
+            category: true // Это подтянет саму модель Category (с полем name)
+          }
+        },
+        _count: {
+          select: { offers: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (!lat || !lng) return { success: true, data: [] }
+
+    // 3. Обработка, расчет дистанции и разметка Match
+    const ordersWithDistance = allOrders
+      .map(order => {
+        const distance = getDistance(lat, lng, order.lat ?? 0, order.lng ?? 0);
+
+        // Проверяем совпадение через пересечение массивов ID
+        const orderCategoryIds = order.categories.map(c => c.categoryId);
+        const isMatch = orderCategoryIds.some(id => masterCategoryIds.includes(id));
+
+        return {
+          ...order,
+          distance,
+          isMatch,
+          client: {
+            name: order.client?.name || "Заказчик",
+            image: order.client?.image,
+            projects: order.client?._count.ordersCreated || 0,
+            hireRate: 0
+          },
+          offersCount: order._count?.offers || 0
+        }
+      })
+      .filter(order => order.distance <= radiusKm)
+      .sort((a, b) => {
+        // 1. Приоритет: Сначала подходящие по навыкам
+        if (a.isMatch && !b.isMatch) return -1;
+        if (!a.isMatch && b.isMatch) return 1;
+
+        // 2. Внутри групп: Сначала самые новые
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+
+    return { success: true, data: ordersWithDistance }
+  } catch (error) {
+    console.error("FEED_ERROR:", error)
+    return { success: false, error: "Не удалось обновить ленту" }
+  }
+}
+
+
+export async function getOrderById(id: string) {
+  const session = await getServerSession()
+  const userId = session?.user?.id
+
+  const order = await prisma.order.findUnique({
+    where: { id },
+    include: {
+      client: {
+        select: {
+          name: true,
+          image: true,
+          createdAt: true,
+          _count: { select: { ordersCreated: true } }
+        }
+      },
+      // ОБЯЗАТЕЛЬНО: Подтягиваем наши новые категории
+      categories: {
+        include: {
+          category: true
+        }
+      },
+      _count: {
+        select: { offers: true }
+      }
+    }
+  })
+
+  if (!order) return null
+
+  let existingOffer = null
+  if (userId) {
+    existingOffer = await prisma.offer.findFirst({
+      where: {
+        orderId: id,
+        workerId: userId
+      }
+    })
+  }
+
+  return {
+    order,
+    existingOffer: !!existingOffer,
+    userId
+  }
+}
+
+
 
 
 

@@ -1,14 +1,6 @@
-import { getServerSession } from "@/lib/get-session";
-import { redirect } from "next/navigation";
-import { Role } from "../../../prisma/generated";
-
-export default async function ProLayout({ children }: { children: React.ReactNode }) {
- 
-
-  return (
-    <div className="flex min-h-screen">
-      {/* Здесь будет боковое меню клиента */}
-      <main className="flex-1 p-6">{children}</main>
-    </div>
-  );
+export default async function ClientLayout({ children }: { children: React.ReactNode }) {
+  // Тут в будущем можно добавить проверку: 
+  // if (user.role !== 'PRO') redirect('/client/feed')
+  
+  return <>{children}</>; // Никаких div и p-6, чтобы не ломать верстку Container
 }

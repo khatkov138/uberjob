@@ -66,8 +66,8 @@ model Profile {
   bio       String? // Кратко о себе / Опыт работы
 
   // --- ПРОФЕССИОНАЛЬНЫЕ ДАННЫЕ (PRO) ---
-  skills String[] @default([]) // Массив навыков (Электрика, Сантехника и т.д.)
-  rating Float    @default(5.0)
+  skills ProfileCategory[] // Явная связь 
+  rating Float             @default(5.0)
 
   completedCount Int @default(0) // Сколько заказов реально завершено
 
@@ -95,7 +95,7 @@ model Order {
 
   title       String
   description String
-  categories  String[] // Храним названия категорий массивом
+  categories  OrderCategory[] // Явная связь
   price       Int // Бюджет в копейках
   address     String
 
@@ -118,11 +118,45 @@ model Order {
   @@map("order")
 }
 
+model Category {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  keywords  String[] // Для умного поиска и пре-фильтрации ИИ
+  orders    OrderCategory[]
+  profiles  ProfileCategory[]
+  createdAt DateTime          @default(now())
+
+  @@index([keywords]) // Ускоряет поиск, когда категорий станет много
+  @@map("category")
+}
+
+// Таблица-связка для Заказов
+model OrderCategory {
+  orderId    String
+  categoryId String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([orderId, categoryId])
+  @@map("order_category")
+}
+
+// Таблица-связка для Мастеров (Skills)
+model ProfileCategory {
+  profileId  String
+  categoryId String
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([profileId, categoryId])
+  @@map("profile_category")
+}
+
 // МОДЕЛЬ ОТКЛИКА (Bid/Offer)
 model Offer {
   id        String      @id @default(cuid())
-  price     Int // Какую цену предложил исполнитель
-  message   String? // Сопроводительный текст
+  price     Int
+  message   String?
   status    OfferStatus @default(PENDING)
   createdAt DateTime    @default(now())
 
@@ -132,6 +166,8 @@ model Offer {
   workerId String
   worker   User   @relation(fields: [workerId], references: [id])
 
+  // ГАРАНТИЯ: Один мастер — один отклик на конкретный заказ
+  @@unique([orderId, workerId])
   @@map("offer")
 }
 
@@ -155,16 +191,6 @@ model Transaction {
 }
 
 // --- СПРАВОЧНИКИ И ОТЗЫВЫ ---
-
-model Category {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  keywords  String[] // Для умного поиска и пре-фильтрации ИИ
-  createdAt DateTime @default(now())
-
-  @@index([keywords]) // Ускоряет поиск, когда категорий станет много
-  @@map("category")
-}
 
 model Review {
   id        String   @id @default(cuid())

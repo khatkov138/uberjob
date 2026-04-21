@@ -1,19 +1,27 @@
-// app/(pro)/pro/feed/_components/feed-header.tsx
 "use client"
 
 import * as React from "react"
-import { MapPin, ChevronDown, Plus, X, Settings2, Sparkles } from "lucide-react"
+import { MapPin, ChevronDown, Plus, X, Settings2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useLocationStore } from "@/store/use-location-store"
 import { CategorySearchModal } from "./category-search-modal"
 
-export function FeedHeader({ userCategories = [], toggleCategory, filterMode, setFilterMode }: any) {
+// Принимаем массив объектов [{id, name}]
+export function FeedHeader({ 
+  userSkills = [], // Массив объектов из профиля
+  onAddSkill,      // Функция (id) => void
+  onRemoveSkill,   // Функция (id) => void
+  filterMode, 
+  setFilterMode 
+}: any) {
   const { city, radius, setRadius, openModal } = useLocationStore()
   const [isSearchOpen, setIsSearchOpen] = React.useState(false)
 
+  // Вытаскиваем только ID для модалки, чтобы она знала, что уже выбрано
+  const userCategoryIds = userSkills.map((s: any) => s.categoryId)
+
   return (
     <div className="space-y-6">
-      {/* ... (Верхняя часть с Названием и Локацией остается как была) ... */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div className="space-y-4">
           <h1 className="text-5xl font-black italic tracking-tighter uppercase text-slate-900 leading-none">
@@ -44,7 +52,6 @@ export function FeedHeader({ userCategories = [], toggleCategory, filterMode, se
         </div>
       </header>
 
-      {/* ПАНЕЛЬ УПРАВЛЕНИЯ СПЕЦИАЛИЗАЦИЯМИ */}
       <div className="p-6 bg-white border-2 border-slate-100 rounded-[2.5rem] shadow-sm">
         <div className="flex items-center gap-2 mb-5">
           <Settings2 className="w-4 h-4 text-blue-600" />
@@ -52,11 +59,13 @@ export function FeedHeader({ userCategories = [], toggleCategory, filterMode, se
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {userCategories?.map((skill: string) => (
-            <div key={skill} className="flex items-center gap-2 bg-slate-900 text-white pl-4 pr-1.5 py-1.5 rounded-xl group transition-all hover:bg-red-600">
-              <span className="text-[10px] font-black uppercase tracking-widest italic">{skill}</span>
+          {userSkills?.map((skill: any) => (
+            <div key={skill.categoryId} className="flex items-center gap-2 bg-slate-900 text-white pl-4 pr-1.5 py-1.5 rounded-xl group transition-all hover:bg-red-600">
+              <span className="text-[10px] font-black uppercase tracking-widest italic">
+                {skill.category?.name || "..."}
+              </span>
               <button 
-                onClick={() => toggleCategory(skill)} 
+                onClick={() => onRemoveSkill(skill.categoryId)} 
                 className="p-1 hover:bg-white/20 rounded-lg transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
@@ -77,8 +86,11 @@ export function FeedHeader({ userCategories = [], toggleCategory, filterMode, se
       <CategorySearchModal 
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
-        userCategories={userCategories}
-        onAdd={toggleCategory}
+        userCategoryIds={userCategoryIds}
+        onAdd={(id) => {
+          onAddSkill(id)
+          // setIsSearchOpen(false) // Опционально: закрывать ли после добавления
+        }}
       />
     </div>
   )

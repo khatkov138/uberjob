@@ -10,7 +10,7 @@ import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
 
-export function OrderCard({ order, userCategories = [], isMatched, toggleCategory }: any) {
+export function OrderCard({ order, isMatched }: any) {
   const isNegotiable = order.price === 0
   
   const timeAgo = order.createdAt 
@@ -36,22 +36,24 @@ export function OrderCard({ order, userCategories = [], isMatched, toggleCategor
           {/* 2. ВЕРХ: ТИТУЛ И ЦЕНА */}
           <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-1">
             <div className="space-y-3 flex-1 w-full">
-              <Link href={`/pro/feed/orders/${order.id}`} className="block">
+              <Link href={`/pro/orders/${order.id}`} className="block">
                 <h3 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase text-slate-900 leading-[0.95]">
                   {order.title}
                 </h3>
               </Link>
               
               <div className="flex flex-wrap gap-2">
-                {order.categories?.map((cat: string) => (
+                {/* ИСПРАВЛЕНО: Обработка новой структуры категорий */}
+                {order.categories.map((catObj: any) => (
                   <span
-                    key={cat}
+                    key={catObj.categoryId}
                     className={cn(
                       "text-[9px] font-black uppercase tracking-widest transition-all",
-                      userCategories.includes(cat) ? "text-blue-600" : "text-slate-300"
+                      // Если это "матч", подсвечиваем синим
+                      isMatched ? "text-blue-600" : "text-slate-300"
                     )}
                   >
-                    #{cat.replace(/\s+/g, '')}
+                    #{catObj.category.name}
                   </span>
                 ))}
               </div>
@@ -71,7 +73,7 @@ export function OrderCard({ order, userCategories = [], isMatched, toggleCategor
                   <div className="flex items-center gap-1.5 text-slate-900">
                     <Banknote className="w-4 h-4 text-slate-300" />
                     <span className="text-2xl md:text-3xl font-black italic tracking-tighter">
-                      {order.price / 100} ₽
+                      {Math.floor(order.price / 100)} ₽
                     </span>
                   </div>
                   <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">ФИКС. ОПЛАТА</span>
@@ -92,6 +94,12 @@ export function OrderCard({ order, userCategories = [], isMatched, toggleCategor
             <div className="flex items-center gap-1.5 px-3 py-1 bg-orange-50 rounded-lg border border-orange-100 text-orange-500 text-[9px] font-black uppercase italic">
               <Zap className="w-3 h-3 fill-current" /> Срочно
             </div>
+            {/* Добавил отображение дистанции */}
+            {order.distance !== undefined && (
+               <div className="px-3 py-1 bg-blue-50 rounded-lg border border-blue-100 text-blue-600 text-[9px] font-black uppercase">
+                 {order.distance} км от вас
+               </div>
+            )}
             <div className="px-3 py-1 bg-slate-50 rounded-lg border border-slate-100 text-slate-400 text-[9px] font-black uppercase">
               ID: {order.id.slice(-6).toUpperCase()}
             </div>
@@ -103,8 +111,12 @@ export function OrderCard({ order, userCategories = [], isMatched, toggleCategor
             {/* Этаж 1: Заказчик */}
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white font-black text-sm shadow-md">
-                  {order.client?.name?.charAt(0).toUpperCase() || "З"}
+                <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white font-black text-sm shadow-md overflow-hidden">
+                  {order.client?.image ? (
+                    <img src={order.client.image} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    order.client?.name?.charAt(0).toUpperCase() || "З"
+                  )}
                 </div>
                 <div>
                   <div className="text-[8px] font-black text-slate-300 uppercase leading-none mb-0.5 tracking-widest">Заказчик</div>
@@ -139,7 +151,6 @@ export function OrderCard({ order, userCategories = [], isMatched, toggleCategor
                   </span>
                 </div>
 
-                {/* ВЫДЕЛЕННЫЙ НАСЕЛЕННЫЙ ПУНКТ */}
                 <div className="flex items-center gap-2 min-w-0 bg-blue-50/50 px-3 py-1.5 rounded-xl border border-blue-100/50">
                   <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-900 truncate max-w-[120px] md:max-w-[200px]">
@@ -149,7 +160,7 @@ export function OrderCard({ order, userCategories = [], isMatched, toggleCategor
               </div>
 
               <Link 
-                href={`/pro/feed/orders/${order.id}`}
+                href={`/pro/orders/${order.id}`}
                 className={cn(
                   "flex items-center justify-center gap-3 px-8 py-3.5 rounded-xl md:rounded-2xl text-[11px] font-black uppercase italic tracking-widest transition-all duration-500 w-full lg:w-auto shrink-0 whitespace-nowrap",
                   "bg-slate-100 text-slate-400 border border-slate-200", 

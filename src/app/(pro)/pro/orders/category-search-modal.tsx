@@ -4,8 +4,7 @@ import * as React from "react"
 import { X, Search, Plus, Check, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
-import { getAllCategories } from "@/actions/pro"
-
+import { getAllCategories } from "@/actions/category"
 
 interface Category {
   id: string
@@ -15,20 +14,19 @@ interface Category {
 interface Props {
   isOpen: boolean
   onClose: () => void
-  userCategories: string[]
-  onAdd: (category: string) => void
+  userCategoryIds: string[] // Изменили со строк на ID
+  onAdd: (categoryId: string) => void // Передаем ID
 }
 
-export function CategorySearchModal({ isOpen, onClose, userCategories, onAdd }: Props) {
+export function CategorySearchModal({ isOpen, onClose, userCategoryIds, onAdd }: Props) {
   const [query, setQuery] = React.useState("")
 
   const { data: dbCategories, isLoading } = useQuery<Category[]>({
     queryKey: ["all-categories"],
     queryFn: () => getAllCategories(),
-    enabled: isOpen, // Загружаем только когда модалка открыта
+    enabled: isOpen,
   });
 
-  // Фильтруем объекты из базы по полю name
   const filtered = (dbCategories || []).filter((cat) =>
     cat.name.toLowerCase().includes(query.toLowerCase())
   );
@@ -37,13 +35,11 @@ export function CategorySearchModal({ isOpen, onClose, userCategories, onAdd }: 
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* Overlay */}
       <div 
         className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" 
         onClick={onClose} 
       />
 
-      {/* Modal Content */}
       <div className="relative w-full max-w-lg bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="p-8 space-y-6">
           <div className="flex items-center justify-between">
@@ -72,17 +68,14 @@ export function CategorySearchModal({ isOpen, onClose, userCategories, onAdd }: 
               </div>
             ) : filtered.length > 0 ? (
               filtered.map((cat) => {
-                // Важно: сравниваем строку name с массивом строк userCategories
-                const isSelected = userCategories.includes(cat.name)
+                // ТЕПЕРЬ СРАВНИВАЕМ ПО ID
+                const isSelected = userCategoryIds.includes(cat.id)
                 
                 return (
                   <button
                     key={cat.id}
                     disabled={isSelected}
-                    onClick={() => {
-                      onAdd(cat.name)
-                      // Не закрываем модалку, чтобы можно было добавить несколько сразу
-                    }}
+                    onClick={() => onAdd(cat.id)} // Передаем ID
                     className={cn(
                       "w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all active:scale-[0.98] shrink-0",
                       isSelected

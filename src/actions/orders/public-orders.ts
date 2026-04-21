@@ -10,7 +10,11 @@ export async function getLatestPublicOrders() {
     select: {
       id: true,
       title: true,
-      categories: true,
+      categories: {
+        include: {
+          category: true
+        }
+      },
       address: true,
       createdAt: true, // Добавляем время
       client: {

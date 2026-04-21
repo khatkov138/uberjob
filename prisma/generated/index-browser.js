@@ -139,7 +139,6 @@ exports.Prisma.ProfileScalarFieldEnum = {
   city: 'city',
   avatarUrl: 'avatarUrl',
   bio: 'bio',
-  skills: 'skills',
   rating: 'rating',
   completedCount: 'completedCount',
   lastLat: 'lastLat',
@@ -157,13 +156,29 @@ exports.Prisma.OrderScalarFieldEnum = {
   dateType: 'dateType',
   title: 'title',
   description: 'description',
-  categories: 'categories',
   price: 'price',
   address: 'address',
   lat: 'lat',
   lng: 'lng',
   clientId: 'clientId',
   workerId: 'workerId'
+};
+
+exports.Prisma.CategoryScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  keywords: 'keywords',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.OrderCategoryScalarFieldEnum = {
+  orderId: 'orderId',
+  categoryId: 'categoryId'
+};
+
+exports.Prisma.ProfileCategoryScalarFieldEnum = {
+  profileId: 'profileId',
+  categoryId: 'categoryId'
 };
 
 exports.Prisma.OfferScalarFieldEnum = {
@@ -185,13 +200,6 @@ exports.Prisma.TransactionScalarFieldEnum = {
   createdAt: 'createdAt',
   userId: 'userId',
   orderId: 'orderId'
-};
-
-exports.Prisma.CategoryScalarFieldEnum = {
-  id: 'id',
-  name: 'name',
-  keywords: 'keywords',
-  createdAt: 'createdAt'
 };
 
 exports.Prisma.ReviewScalarFieldEnum = {
@@ -319,9 +327,11 @@ exports.Prisma.ModelName = {
   User: 'User',
   Profile: 'Profile',
   Order: 'Order',
+  Category: 'Category',
+  OrderCategory: 'OrderCategory',
+  ProfileCategory: 'ProfileCategory',
   Offer: 'Offer',
   Transaction: 'Transaction',
-  Category: 'Category',
   Review: 'Review',
   Session: 'Session',
   Account: 'Account',

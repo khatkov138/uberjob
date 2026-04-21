@@ -44,7 +44,7 @@ export default async function ProDashboardPage() {
         <div className="lg:col-span-8 space-y-6">
           
           {/* ГЛАВНОЕ ДЕЙСТВИЕ: ЛЕНТА */}
-          <Link href="/pro/feed" className="group block">
+          <Link href="/pro/orders" className="group block">
             <div className="bg-slate-900 rounded-[2.5rem] p-8 md:p-12 text-white relative overflow-hidden transition-all hover:scale-[1.01] active:scale-95 shadow-xl">
               <Search className="absolute top-0 right-0 w-64 h-64 -mr-16 -mt-16 opacity-10 group-hover:rotate-12 transition-transform duration-700 pointer-events-none" />
               <div className="relative z-10 space-y-4">
