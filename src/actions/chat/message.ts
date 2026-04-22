@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import Pusher from "pusher";
 import { Message, User } from "../../../prisma/generated";
 import { delay } from "@/lib/utils";
+import { ChatDialog, InfiniteMessagesResponse, MessageWithSender, PusherPayload } from "@/lib/types/chat";
 /**
  * 1. ОТПРАВКА СООБЩЕНИЯ
  * Универсальная функция: привязывает заказ, если передан orderId
@@ -22,43 +23,48 @@ export async function sendMessage({ recipientId, text, orderId }: { recipientId:
     const session = await getServerSession();
     if (!session?.user?.id) return { success: false };
 
-    // 1. Сохраняем в БД
-    const message = await prisma.message.create({
+    // СТРУКТУРА ТУТ ДОЛЖНА БЫТЬ 1-В-1 КАК В ТИПЕ MessageWithSender
+    const newMessage = await prisma.message.create({
         data: {
             text,
             senderId: session.user.id,
             recipientId,
             orderId: orderId || null,
         },
-        include: { sender: { select: { name: true } } }
+        include: {
+            sender: {
+                select: { id: true, name: true, image: true }
+            }
+        }
     });
 
-    // 2. Публикуем событие в Pusher
-    // Название канала: уникальное для пары пользователей или заказа
-    const channelName = orderId
+    const payload: PusherPayload = {
+        type: "NEW_MESSAGE",
+        data: {
+            message: newMessage,
+            orderId: orderId || null,
+            senderId: session.user.id,
+        }
+    };
+    // 1. Отправляем в канал ЧАТА (для мгновенного появления бабблов у обоих)
+    const chatChannel = orderId
         ? `chat-order-${orderId}`
-        : `chat-user-${[session.user.id, recipientId].sort().join('-')}`;
+        : `chat-direct-${[session.user.id, recipientId].sort().join('-')}`;
+    await pusher.trigger(chatChannel, "new-message", payload);
 
-    await pusher.trigger(channelName, "new-message", message);
-    await pusher.trigger(`user-notifications-${recipientId}`, "new-unread-message", {
-        senderId: session.user.id, // Кто отправил
-        orderId: orderId,       // В каком заказе (если есть)
-    });
+    // 2. Отправляем ПОЛУЧАТЕЛЮ (для уведомлений в Navbar)
+    await pusher.trigger(`user-${recipientId}`, "events", payload);
 
+    // 3. ВОТ ЭТОГО НЕ ХВАТАЛО: Отправляем СЕБЕ (для синхронизации вкладок)
+    // Твой хук useNotifications во второй вкладке поймает это 
+    // и обновит там список диалогов и само окно чата
+    await pusher.trigger(`user-${session.user.id}`, "events", payload);
 
-    return { success: true, data: message };
+    return { success: true, data: newMessage };
 }
 
-// Определяем тип сообщения с включенным отправителем
-export type MessageWithSender = Message & {
-    sender: Pick<User, "id" | "name">
-}
 
-export type InfiniteMessagesResponse = {
-    messages: MessageWithSender[]
-    nextCursor: string | null,
-    totalUnread: number
-}
+
 
 export async function getMessages({
     recipientId,
@@ -76,65 +82,53 @@ export async function getMessages({
     if (!session?.user?.id) return { messages: [], nextCursor: null, totalUnread: 0 }
 
     const currentUserId = session.user.id
+    const normalizedOrderId = orderId || null
 
-    const whereClause = orderId ? { orderId } : {
-        OR: [
-            { senderId: currentUserId, recipientId },
-            { senderId: recipientId, recipientId: currentUserId }
-        ]
-    }
+    const whereClause = normalizedOrderId
+        ? { orderId: normalizedOrderId }
+        : {
+            OR: [
+                { senderId: currentUserId, recipientId },
+                { senderId: recipientId, recipientId: currentUserId }
+            ],
+            orderId: null
+        }
 
     // 1. Получаем сообщения
+    // Prisma автоматически типизирует это как массив объектов, 
+    // соответствующих схеме БД + нашему include
     const messages = await prisma.message.findMany({
         where: whereClause,
         take: limit,
         ...(cursor && { skip: 1, cursor: { id: cursor } }),
         orderBy: { createdAt: 'desc' },
-        include: { sender: { select: { id: true, name: true } } }
+        include: {
+            sender: {
+                // Важно: берем те же поля, что в типе MessageWithSender
+                select: { id: true, name: true, image: true }
+            }
+        }
     })
 
-    // 2. Считаем ОБЩЕЕ количество непрочитанных мной в этом чате (БЕЗ ЛИМИТА 30)
+    // 2. Считаем непрочитанные
     const totalUnread = await prisma.message.count({
         where: {
             senderId: recipientId,
             recipientId: currentUserId,
             isRead: false,
-            ...(orderId && { orderId })
+            orderId: normalizedOrderId
         }
     })
 
     const nextCursor = messages.length === limit ? messages[messages.length - 1].id : null
 
     return {
-        messages,
+        messages, // Теперь TS пропустит это без 'as', так как структура совпадает 1-в-1
         nextCursor,
-        totalUnread // <-- Теперь мы знаем правду
+        totalUnread
     }
 }
-/**
- * 3. ПОЛУЧЕНИЕ СПИСКА ВСЕХ ДИАЛОГОВ (Inbox)
- * Используется на главной странице сообщений /messages
- */
 
-
-// Тип одного диалога в списке
-export interface ChatDialog {
-    partner: {
-        id: string;
-        name: string;
-        image: string | null;
-    } | null;
-    lastMessage: {
-        id: string;
-        text: string;
-        senderId: string;
-        recipientId: string;
-        orderId: string | null;
-        isRead: boolean;
-        createdAt: Date;
-    } | null;
-    unreadCount: number;
-}
 
 export async function getUserDialogs(): Promise<ChatDialog[]> {
     const session = await getServerSession();
@@ -142,56 +136,55 @@ export async function getUserDialogs(): Promise<ChatDialog[]> {
 
     const currentUserId = session.user.id;
 
-    // 1. Находим всех, с кем была переписка
     const messages = await prisma.message.findMany({
         where: {
             OR: [{ senderId: currentUserId }, { recipientId: currentUserId }],
         },
+        select: { senderId: true, recipientId: true },
         orderBy: { createdAt: "desc" },
     });
 
     const uniqueUserIds = Array.from(
-        new Set(
-            messages.map((m) => (m.senderId === currentUserId ? m.recipientId : m.senderId))
-        )
+        new Set(messages.map((m) => (m.senderId === currentUserId ? m.recipientId : m.senderId)))
     );
 
-    // 2. Для каждого ID собираем инфо: последнее сообщение + кол-во непрочитанных
     const dialogs = await Promise.all(
-        uniqueUserIds.map(async (partnerId) => {
-            const partner = await prisma.user.findUnique({
-                where: { id: partnerId },
-                select: { id: true, name: true, image: true },
-            });
+        uniqueUserIds.map(async (partnerId): Promise<ChatDialog | null> => {
+            const [partner, lastMessage, unreadCount] = await Promise.all([
+                prisma.user.findUnique({
+                    where: { id: partnerId },
+                    select: { id: true, name: true, image: true },
+                }),
+                prisma.message.findFirst({
+                    where: {
+                        OR: [
+                            { senderId: currentUserId, recipientId: partnerId },
+                            { senderId: partnerId, recipientId: currentUserId },
+                        ],
+                    },
+                    orderBy: { createdAt: "desc" },
+                }),
+                prisma.message.count({
+                    where: {
+                        senderId: partnerId,
+                        recipientId: currentUserId,
+                        isRead: false,
+                    },
+                })
+            ]);
 
-            const lastMessage = await prisma.message.findFirst({
-                where: {
-                    OR: [
-                        { senderId: currentUserId, recipientId: partnerId },
-                        { senderId: partnerId, recipientId: currentUserId },
-                    ],
-                },
-                orderBy: { createdAt: "desc" },
-            });
-
-            // Считаем только те, что прислали НАМ и которые мы еще не читали
-            const unreadCount = await prisma.message.count({
-                where: {
-                    senderId: partnerId,
-                    recipientId: currentUserId,
-                    isRead: false,
-                },
-            });
+            if (!partner) return null;
 
             return {
                 partner,
-                lastMessage,
-                unreadCount, // <--- Наша новая цифра
+                lastMessage, // Теперь это Message | null, типы идентичны
+                unreadCount,
             };
         })
     );
 
-    return dialogs;
+    // Здесь TS все равно может попросить Type Guard для возвращаемого массива
+    return dialogs.filter((d) => d !== null);
 }
 
 
@@ -201,35 +194,31 @@ export async function markMessagesAsRead(senderId: string, orderId?: string) {
 
     const currentUserId = session.user.id;
 
-    // 1. Обновляем в БД
-    await prisma.message.updateMany({
-        where: {
-            senderId: senderId,       // Сообщения ОТ собеседника
-            recipientId: currentUserId, // Предназначенные МНЕ
-            isRead: false,
-            ...(orderId && { orderId }) // Если в контексте заказа
-        },
-        data: { isRead: true }
-    });
+    try {
+        // 1. Обновляем в БД
+        await prisma.message.updateMany({
+            where: {
+                senderId: senderId,
+                recipientId: currentUserId,
+                isRead: false,
+                ...(orderId && { orderId })
+            },
+            data: { isRead: true }
+        });
 
-    // 2. Генерируем событие "прочитано" для отправителя через Pusher
-    const channelName = orderId
-        ? `chat-order-${orderId}`
-        : `chat-user-${[currentUserId, senderId].sort().join('-')}`;
+        // 2. Генерируем событие "прочитано"
+        // ПРАВКА: Используем те же названия каналов, что и в ChatWindow
+        const channelName = orderId
+            ? `chat-order-${orderId}`
+            : `chat-direct-${[currentUserId, senderId].sort().join('-')}`;
 
-    await pusher.trigger(channelName, "messages-read", {
-        readerId: currentUserId // Кто прочитал
-    });
+        await pusher.trigger(channelName, "messages-read", {
+            readerId: currentUserId
+        });
+
+    } catch (error) {
+        console.error("MARK_READ_ERROR:", error);
+    }
 }
 
-export async function getGlobalUnreadCount() {
-    const session = await getServerSession();
-    if (!session?.user?.id) return 0;
 
-    return await prisma.message.count({
-        where: {
-            recipientId: session.user.id,
-            isRead: false
-        }
-    });
-}

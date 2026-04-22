@@ -6,6 +6,7 @@ import { UserRole } from "../../prisma/generated"
 // По умолчанию "SERVER" - это и страницы, и экшены. Они делят один кэш.
 export const getServerSession = cache(async (source: "SERVER" | "API" = "SERVER") => {
   try {
+    
     const h = await headers()
     
     // По источнику сразу поймешь: пришло из роута /api или из недр рендеринга

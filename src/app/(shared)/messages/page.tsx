@@ -1,11 +1,9 @@
-import { getServerSession } from "@/lib/get-session"
-import { Container } from "@/components/shared/container"
-import { redirect } from "next/navigation"
-import { getUserDialogs } from "@/actions/chat/message"
-import { ChatList } from "./chat-list"
-import { ChatWindow } from "./chat-window"
-import { cn } from "@/lib/utils"
-import prisma from "@/lib/prisma"
+import { getUserDialogs } from "@/actions/chat/message";
+import { ChatList } from "./chat-list";
+import { ChatWindow } from "./chat-window";
+import { getServerSession } from "@/lib/get-session";
+import prisma from "@/lib/prisma";
+import { redirect } from "next/navigation";
 
 export default async function MessagesPage({
   searchParams
@@ -17,59 +15,49 @@ export default async function MessagesPage({
 
   const { userId, orderId } = await searchParams
 
-  const partner = userId
-    ? await prisma.user.findUnique({
-      where: { id: userId },
-      select: { name: true }
-    })
-    : null;
+  const [partner, orderInfo] = await Promise.all([
+    userId
+      ? prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, image: true },
+      })
+      : null,
+    orderId // Запрос заказа идет только если есть ID
+      ? prisma.order.findUnique({
+        where: { id: orderId },
+        select: { id: true, title: true, clientId: true, status: true },
+      })
+      : null,
+  ]);
 
-  // Получаем начальные данные на сервере (SSR)
   const initialDialogs = await getUserDialogs()
 
   return (
-    /**
-     * h-full — заставляет контейнер растянуться на всю высоту main (до футера).
-     * !p-0 — убираем внутренние паддинги контейнера, чтобы чат касался его краев.
-     * overflow-hidden — гарантирует, что скроллиться будут только списки внутри.
-     */
-    <div className="flex-1 h-full w-full flex flex-col overflow-hidden p-4 md:p-10">
-
-      {/* 
-          ОСНОВНАЯ РАМКА ЧАТА 
-          max-w-7xl — чтобы на огромных мониторах чат не растягивался на 2 метра, 
-          но был шире, чем обычный Container (1024px).
-      */}
+    <div className="flex-1 h-full w-full flex flex-col overflow-hidden p-4 md:p-10 bg-slate-50/30">
       <div className="flex-1 w-full max-w-7xl mx-auto bg-white flex flex-row overflow-hidden border-2 border-slate-100 rounded-[3rem] shadow-2xl">
 
-
-        {/* ЛЕВАЯ ЧАСТЬ: СПИСОК ДИАЛОГОВ */}
+        {/* ЛЕВАЯ ПАНЕЛЬ (Без изменений) */}
         <aside className="w-80 md:w-96 border-r border-slate-100 flex flex-col h-full bg-slate-50/50 shrink-0">
-          <div className="p-8 border-b border-slate-100 bg-white/50 shrink-0">
+          <div className="p-8 border-b border-slate-100 bg-white shrink-0">
             <h1 className="text-3xl font-black italic uppercase tracking-tighter text-slate-900">Чаты</h1>
           </div>
-          <div className="flex-1 overflow-y-auto chat-scrollbar">
+          <div className="flex-1 overflow-y-auto no-scrollbar">
             <ChatList currentUserId={session.user.id} activeUserId={userId} initialData={initialDialogs} />
           </div>
         </aside>
 
-        {/* ПРАВАЯ ЧАСТЬ: ОКНО СООБЩЕНИЙ */}
+        {/* ОКНО СООБЩЕНИЙ: Теперь проверяем только наличие партнера */}
         <main className="flex-1 flex flex-col bg-white h-full overflow-hidden relative min-w-0">
-          {userId ? (
+          {partner ? (
             <ChatWindow
-              recipientId={userId}
-              recipientName={partner?.name || "Пользователь"}
-              orderId={orderId}
+              partner={partner}
+              order={orderInfo} // Передаем заказ, если он есть
               currentUserId={session.user.id}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-12 text-center opacity-20 grayscale">
-              <div className="w-20 h-20 bg-slate-50 rounded-[2rem] border-2 border-slate-100 flex items-center justify-center mb-6 italic font-black text-4xl shadow-inner text-slate-400">
-                ?
-              </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.4em] leading-relaxed">
-                Выберите диалог <br /> из списка слева
-              </p>
+              <div className="w-20 h-20 bg-slate-50 rounded-[2rem] border-2 border-slate-100 flex items-center justify-center mb-6 italic font-black text-4xl shadow-inner text-slate-400">?</div>
+              <p className="text-[10px] font-black uppercase tracking-[0.4em] leading-relaxed">Выберите диалог</p>
             </div>
           )}
         </main>
