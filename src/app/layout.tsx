@@ -35,11 +35,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+
+  console.log("ROOOTLAYOUT")
+
   return (
     <html lang="ru" className="h-full">
       <body className={`${geistSans.className} antialiased h-screen flex flex-col overflow-hidden bg-white`}>
+
         <TanstackProvider>
-          
+          {/* <Heartbeat />*/}
           {/* HEADER: Занимает ровно столько, сколько нужно контенту */}
           <header className="flex-none z-50">
             <Navbar />
@@ -51,26 +55,27 @@ export default function RootLayout({
             overflow-hidden здесь критичен, чтобы скролл работал только внутри.
           */}
           <main className="flex-1 flex flex-col min-h-0 bg-slate-50 relative overflow-hidden">
-            
+
             {/* 
                SCROLL-AREA: Этот блок обеспечивает скролл для обычных страниц (Дашборд, Лента).
                Для чата он просто отдаст всю высоту, так как у чата внутри будет h-full.
             */}
             <div className="flex-1 overflow-y-auto flex flex-col chat-scrollbar">
-               <div className="flex-1">
-                  {children}
-               </div>
-               
-               {/* FOOTER: Теперь он всегда будет в конце контента и не перекроет плитки */}
-               <Footer />
+              <div className="flex-1">
+                {children}
+              </div>
+
+              {/* FOOTER: Теперь он всегда будет в конце контента и не перекроет плитки */}
+              <Footer />
             </div>
 
           </main>
 
           <RoleAutoswitcher />
           <Toaster richColors closeButton />
-          <Heartbeat />
+
         </TanstackProvider>
+
       </body>
     </html>
   );

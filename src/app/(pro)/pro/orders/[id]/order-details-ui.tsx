@@ -10,15 +10,17 @@ import { useQuery } from "@tanstack/react-query"
 import { getOrderById } from "@/actions/orders/orders"
 import { OrderWithDetails } from "@/lib/types"
 
+interface OrderDetailsUIProps {
+  order: OrderWithDetails
+  existingOffer: boolean
+  userId?: string
+}
+
 export function OrderDetailsUI({
   order: initialOrder,
   existingOffer: initialOfferStatus,
   userId
-}: {
-  order: OrderWithDetails,
-  existingOffer: boolean,
-  userId?: string
-}) {
+}: OrderDetailsUIProps) {
 
   // 1. Используем useQuery для синхронизации состояния
   const { data } = useQuery({

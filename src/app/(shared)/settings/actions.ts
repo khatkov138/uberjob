@@ -36,7 +36,7 @@ export async function updateProfile(values: unknown) {
                 where: { userId: session.user.id },
                 data: {
                     bio: data.bio,
-                    skills: data.skills
+                  //  skills: data.skills
                 }
             })
         })

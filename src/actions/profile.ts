@@ -76,3 +76,35 @@ export async function removeSkill(categoryId: string) {
     return { success: false, error: "Ошибка при удалении" }
   }
 }
+
+
+export async function getProfileData(id: string) {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: {
+      profile: {
+        include: {
+          skills: {
+            include: {
+              category: true
+            }
+          }
+        }
+      }
+    }
+  })
+
+  if (!user || !user.profile) return null
+
+  // Логика онлайна
+  const lastSeenDate = new Date(user.profile.lastSeen)
+  const isOnline = (Date.now() - lastSeenDate.getTime()) / (1000 * 60) < 5
+
+  return {
+    user,
+    profile: user.profile,
+    isOnline,
+    lastSeenDate
+  }
+}
+

@@ -2,19 +2,22 @@ import { inferAdditionalFields } from "better-auth/client/plugins"
 import { nextCookies } from 'better-auth/next-js'
 import { createAuthClient } from 'better-auth/react'
 import { auth } from './auth'
+import { UserRole } from "../../prisma/generated"
 
 export const authClient = createAuthClient({
-    plugins: [
-        inferAdditionalFields<typeof auth>(),
-        nextCookies()
-    ]
-}) 
+  baseURL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000", 
+  plugins: [
+    inferAdditionalFields<typeof auth>(),
+    nextCookies()
+  ]
+})
 
+//export const { useSession, signIn, signUp, signOut } = authClient;
 
-export const isAdmin = (role?: string | null) => {
-  return role === 'ADMIN' || role === 'SUPERADMIN'
+export const isAdmin = (role?: UserRole | string | null) => {
+  return role === UserRole.ADMIN || role === UserRole.SUPERADMIN
 }
 
-export const isSuperAdmin = (role?: string | null) => {
-  return role === 'SUPERADMIN'
+export const isSuperAdmin = (role?: UserRole | string | null) => {
+  return role === UserRole.SUPERADMIN
 }

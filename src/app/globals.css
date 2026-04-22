@@ -2,6 +2,23 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@theme {
+  /* Добавляем ключевые кадры анимации */
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  @keyframes shimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+  }
+
+  /* Регистрируем анимации как утилиты Tailwind */
+  --animate-marquee: marquee 70s linear infinite;
+  --animate-shimmer: shimmer 2s infinite;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -129,29 +146,7 @@
   }
 }
 
- 
-/* Контейнер сообщений
-.chat-container-fixed {
-  
-   scrollbar-gutter: auto; 
-  overflow-anchor: auto !important;
-  
- 
-  overflow-y: overlay;
-}
 
-
-.bubble-isolation {
-
-  contain: layout style; 
-  flex-shrink: 0 !important;
-  flex-grow: 0 !important;
- 
-  transform: translateZ(0);
-  backface-visibility: hidden;
-}
-   */
-/* Кастомный скроллбар (твой стиль) */
 .chat-scrollbar::-webkit-scrollbar {
   width: 6px;
 }

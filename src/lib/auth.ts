@@ -18,7 +18,7 @@ export const auth = betterAuth({
                 after: async (user) => {
                     try {
                         await prisma.profile.create({
-                            data: { userId: user.id, skills: [] }
+                            data: { userId: user.id }
                         });
                     } catch (e) {
                         // Если упало здесь, не страшно — getOrCreateProfile исправит это позже

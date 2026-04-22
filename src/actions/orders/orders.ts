@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache"
 import { getServerSession } from "@/lib/get-session"
 import { OrderStatus } from "../../../prisma/generated"
 import { getDistance } from "@/lib/utils"
+import { FeedOrder } from "@/lib/types"
 
 
 
@@ -139,12 +140,17 @@ export async function getOrderDetails(orderId: string) {
         select: {
           name: true,
           image: true,
-          workerProfile: { select: { id: true, rating: true, skills: true } }
+          profile: { select: { id: true, rating: true, skills: true } }
         },
       },
       review: true,
       messages: {
         orderBy: { createdAt: 'asc' } // Сортируем сообщения от старых к новым
+      },
+      categories: {
+        include: {
+          category: true
+        }
       },
     },
   })
@@ -189,87 +195,55 @@ export async function getOrders(
   lat?: number,
   lng?: number,
   radiusKm: number = 60
-) {
+): Promise<FeedOrder[]> { // Теперь возвращаем ЧИСТЫЙ МАССИВ
   const session = await getServerSession()
   const userId = session?.user?.id
-  if (!userId) return { success: false, error: "Unauthorized" }
+
+  if (!userId) return []
 
   try {
-    // 1. Получаем ID категорий (скиллов) мастера
     const profile = await prisma.profile.findUnique({
       where: { userId },
-      select: {
-        id: true,
-        skills: {
-          select: { categoryId: true }
-        }
-      }
+      select: { skills: { select: { categoryId: true } } }
     })
 
     const masterCategoryIds = profile?.skills.map(s => s.categoryId) || []
 
-    // 2. Запрашиваем заказы
     const allOrders = await prisma.order.findMany({
       where: { status: "PENDING" },
       include: {
-        client: {
-          select: {
-            name: true,
-            image: true,
-            _count: { select: { ordersCreated: true } }
-          }
-        },
-        // Вот здесь часто бывает ошибка в названиях полей
-        categories: {
-          include: {
-            category: true // Это подтянет саму модель Category (с полем name)
-          }
-        },
-        _count: {
-          select: { offers: true }
-        }
+        client: { select: { name: true, image: true, _count: { select: { ordersCreated: true } } } },
+        categories: { include: { category: true } },
+        _count: { select: { offers: true } }
       },
       orderBy: { createdAt: 'desc' }
     })
 
-    if (!lat || !lng) return { success: true, data: [] }
+    if (!lat || !lng) return allOrders;
 
-    // 3. Обработка, расчет дистанции и разметка Match
-    const ordersWithDistance = allOrders
-      .map(order => {
-        const distance = getDistance(lat, lng, order.lat ?? 0, order.lng ?? 0);
+    return allOrders.map(order => {
+      const distance = getDistance(lat, lng, order.lat ?? 0, order.lng ?? 0)
+      const orderCategoryIds = order.categories.map(c => c.categoryId)
+      const isMatch = orderCategoryIds.some(id => masterCategoryIds.includes(id))
 
-        // Проверяем совпадение через пересечение массивов ID
-        const orderCategoryIds = order.categories.map(c => c.categoryId);
-        const isMatch = orderCategoryIds.some(id => masterCategoryIds.includes(id));
-
-        return {
-          ...order,
-          distance,
-          isMatch,
-          client: {
-            name: order.client?.name || "Заказчик",
-            image: order.client?.image,
-            projects: order.client?._count.ordersCreated || 0,
-            hireRate: 0
-          },
-          offersCount: order._count?.offers || 0
-        }
-      })
+      return {
+        ...order,
+        distance,
+        isMatch,
+        client: {
+          name: order.client?.name || "Заказчик",
+          image: order.client?.image,
+          projects: order.client?._count.ordersCreated || 0,
+        },
+        offersCount: order._count?.offers || 0
+      }
+    })
       .filter(order => order.distance <= radiusKm)
-      .sort((a, b) => {
-        // 1. Приоритет: Сначала подходящие по навыкам
-        if (a.isMatch && !b.isMatch) return -1;
-        if (!a.isMatch && b.isMatch) return 1;
+      .sort((a, b) => (a.isMatch === b.isMatch ? 0 : a.isMatch ? -1 : 1))
 
-        // 2. Внутри групп: Сначала самые новые
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-
-    return { success: true, data: ordersWithDistance }
   } catch (error) {
     console.error("FEED_ERROR:", error)
-    return { success: false, error: "Не удалось обновить ленту" }
+    return [] // В случае ошибки просто пустая лента
   }
 }
 

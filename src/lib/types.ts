@@ -1,4 +1,4 @@
-import { Category, Order, Prisma } from "../../prisma/generated/client";
+import { Category, Order, Prisma, Profile } from "../../prisma/generated/client";
 
 export type ActionResponse<T = any> = {
   success: boolean;
@@ -21,8 +21,27 @@ export interface OrderWithDetails extends Order {
   _count: { offers: number }
 }
 
-interface OrderDetailsUIProps {
-  order: OrderWithDetails
-  existingOffer: boolean
-  userId?: string
+
+export interface ActiveOrder extends Order {
+  categories: {
+    category: Category
+  }[]
+  client: {
+    name: string
+    image: string | null
+  }
+}
+
+// Тип для профиля со вложенными навыками
+export type FullProfile = Profile & {
+  skills: {
+    category: Category;
+  }[];
+} | null;
+
+// Тип для заказа (упростим или используй свой OrderWithDetails)
+export interface FeedOrder extends Order {
+  isMatch?: boolean;
+  categories: { category: Category }[];
+  client: { name: string; image: string | null };
 }

@@ -2,9 +2,10 @@
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Info, Wallet } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ActiveOrder } from "@/lib/types"
 
 interface OrderStatusCardProps {
-  order: any
+  order: ActiveOrder
   showPrice?: boolean // Добавляем флаг
 }
 

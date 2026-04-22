@@ -1,6 +1,14 @@
+// app/(client)/layout.tsx
+import { getServerSession } from "@/lib/get-session"
+import { unauthorized } from "next/navigation"
+
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
-  // Тут в будущем можно добавить проверку: 
-  // if (user.role !== 'PRO') redirect('/client/feed')
-  
-  return <>{children}</>; // Никаких div и p-6, чтобы не ломать верстку Container
+  const session = await getServerSession()
+
+  // Если нет сессии — никто не пройдет дальше лейаута
+  if (!session?.user) {
+    unauthorized()
+  }
+
+  return <>{children}</>
 }

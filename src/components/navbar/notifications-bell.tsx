@@ -15,20 +15,24 @@ import { ru } from "date-fns/locale"
 
 import { markAllAsRead, markAsRead } from "@/actions/notifications"
 import { Notification } from "../../../prisma/generated"
+import { authClient } from "@/lib/auth-client"
 
 export function NotificationsBell() {
   const queryClient = useQueryClient()
 
+  const { data: session } = authClient.useSession() // Используем наш быстрый хук
+
   const { data: notifications, isLoading } = useQuery<Notification[]>({
-    queryKey: ["notifications"],
+    queryKey: ["notifications", session?.user?.id], // Добавляем ID в ключ
     queryFn: async () => {
       const res = await fetch("/api/notifications")
       if (!res.ok) throw new Error("Failed to fetch")
       return res.json()
     },
+    // ЗАПУСКАЕМ ТОЛЬКО ЕСЛИ ЕСТЬ ЮЗЕР
+    enabled: !!session?.user?.id,
     refetchInterval: 15000,
   })
-
   const unreadCount = notifications?.filter((n) => !n.isRead).length || 0
 
   const markAllMutation = useMutation({
@@ -62,7 +66,7 @@ export function NotificationsBell() {
         {/* КНОПКА: Теперь 1 в 1 как чат */}
         <button className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-400 hover:bg-white hover:text-blue-600 transition-all relative group bg-white/50 border border-transparent hover:border-slate-200 shadow-sm outline-none cursor-pointer">
           <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
-          
+
           {unreadCount > 0 && (
             <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-600 rounded-full border-2 border-white shadow-sm animate-in zoom-in" />
           )}

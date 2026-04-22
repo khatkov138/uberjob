@@ -4,7 +4,7 @@ import { getServerSession } from "@/lib/get-session";
 import { Search, ShieldCheck, Zap } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Role } from "../../prisma/generated";
+
 import { cookies } from "next/headers";
 
 export default async function HomePage() {

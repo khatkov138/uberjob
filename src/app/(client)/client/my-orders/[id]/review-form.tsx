@@ -2,13 +2,14 @@
 
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { leaveReviewAction } from "./actions"
+
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Star, Send, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Review } from "../../../../../../prisma/generated"
+import { leaveReviewAction } from "@/actions/review"
 
 
 interface ReviewFormProps {
