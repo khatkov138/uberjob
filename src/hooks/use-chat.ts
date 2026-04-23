@@ -3,7 +3,7 @@ import { useState, useRef, useMemo, useEffect } from "react"
 import { useInfiniteQuery, useQueryClient, useMutation, useQuery, InfiniteData } from "@tanstack/react-query"
 import { getMessages, markMessagesAsRead, sendMessage, sendTypingStatus } from "@/actions/chat/message"
 import { getContextKey, getMessagesQueryKey } from "@/lib/utils"
-import { InfiniteMessagesResponse } from "@/lib/types/chat"
+import { ChatDialog, InfiniteMessagesResponse, MessageWithSender } from "@/lib/types/chat"
 
 export function useChat(partnerId: string, orderId: string | undefined, currentUserId: string) {
   const queryClient = useQueryClient()
@@ -68,17 +68,71 @@ export function useChat(partnerId: string, orderId: string | undefined, currentU
 
   const mutation = useMutation({
     mutationFn: (text: string) => sendMessage({ recipientId: partnerId, text, orderId }),
+
     onMutate: async (newText) => {
-      await queryClient.cancelQueries({ queryKey })
-      const optimisticMsg: any = { id: `temp-${Date.now()}`, text: newText, senderId: currentUserId, recipientId: partnerId, createdAt: new Date(), isRead: false, isOptimistic: true, sender: { id: currentUserId, name: "Вы", image: null } }
+      await queryClient.cancelQueries({ queryKey });
+
+      const optimisticMsg: MessageWithSender = {
+        id: `temp-${Date.now()}`,
+        text: newText,
+        senderId: currentUserId,
+        recipientId: partnerId,
+        orderId: orderId || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isRead: false,
+        isOptimistic: true,
+        sender: {
+          id: currentUserId,
+          name: "Вы",
+          image: null,
+        }
+      };
+
+      // Обновляем сообщения (в этой вкладке, Broadcast разнесет остальным)
       queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
-        if (!old) return old
-        return { ...old, pages: old.pages.map((p, i) => i === 0 ? { ...p, messages: [...p.messages, optimisticMsg] } : p) }
-      })
-      setInput(""); requestAnimationFrame(() => scrollToBottom("auto"))
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((p, i) => i === 0 ? { ...p, messages: [...p.messages, optimisticMsg] } : p)
+        };
+      });
+
+      setInput("");
+      requestAnimationFrame(() => scrollToBottom("auto"));
+
+      return { optimisticMsg };
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey }) }
-  })
+
+    onSuccess: (response) => {
+      if (!response.data) return;
+      const realMsg = response.data;
+
+      // ТОЧЕЧНАЯ ЗАМЕНА: Никаких invalidate! 
+      // Просто заменяем temp на real, чтобы анимация не дергалась
+      queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page => ({
+            ...page,
+            messages: page.messages.map(m =>
+              (m.isOptimistic && m.text === realMsg.text) ? realMsg : m
+            )
+          }))
+        };
+      });
+
+      // Список диалогов тоже обновляем в памяти
+      queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => {
+        if (!old) return old;
+        return old.map(d => {
+          const isMatch = orderId ? d.lastMessage?.orderId === orderId : d.partner.id === partnerId;
+          return isMatch ? { ...d, lastMessage: realMsg } : d;
+        });
+      });
+    }
+  });
 
   useEffect(() => {
     if (messages[messages.length - 1]?.id && isReady) {

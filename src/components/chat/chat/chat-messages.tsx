@@ -2,8 +2,9 @@
 
 import * as React from "react"
 import { MessageWithSender } from "@/lib/types/chat"
-import { MessageBubble } from "./message-bubble"
+
 import { cn } from "@/lib/utils"
+import { MessageBubble } from "./message-bubble"
 
 interface ChatMessagesProps {
   messages: MessageWithSender[]

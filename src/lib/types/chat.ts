@@ -1,10 +1,13 @@
-import { Message, Notification as DbNotification, Prisma } from "../../../prisma/generated";
+import {  Notification as DbNotification, Prisma } from "../../../prisma/generated";
 
 export type MessageWithSender = Prisma.MessageGetPayload<{
   include: {
     sender: { select: { id: true; name: true; image: true } }
   }
-}> & { isOptimistic?: boolean };
+}> & {
+  isOptimistic?: boolean
+  updatedAt?: Date;
+};
 
 export interface InfiniteMessagesResponse {
   messages: MessageWithSender[];
@@ -17,7 +20,7 @@ export interface ChatDialog {
   unreadCount: number;
 }
 
-export type PusherPayload = 
+export type PusherPayload =
 
   | { type: "NEW_MESSAGE"; contextKey: string; data: { message: MessageWithSender; orderId?: string | null; senderId: string } }
   | { type: "MESSAGES_READ"; contextKey: string; data: { readerId: string } }
