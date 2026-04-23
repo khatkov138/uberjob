@@ -31,7 +31,7 @@ export function NotificationsBell() {
     },
     // ЗАПУСКАЕМ ТОЛЬКО ЕСЛИ ЕСТЬ ЮЗЕР
     enabled: !!session?.user?.id,
-    refetchInterval: 15000,
+    
   })
   const unreadCount = notifications?.filter((n) => !n.isRead).length || 0
 

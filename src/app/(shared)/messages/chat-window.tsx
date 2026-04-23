@@ -1,35 +1,21 @@
 "use client"
 
 import * as React from "react"
+import { useInfiniteQuery, useQueryClient, InfiniteData } from "@tanstack/react-query"
+import { Loader2, Send, Zap, ShieldAlert, ChevronDown, Check, CheckCheck, Clock } from "lucide-react"
 import Link from "next/link"
-import { useInfiniteQuery, useMutation, useQueryClient, InfiniteData } from "@tanstack/react-query"
-import {
-  Send, Loader2, Zap, Check, CheckCheck,
-  Clock, ChevronDown, ShieldAlert
-} from "lucide-react"
-
+import { cn, getMessagesQueryKey, getContextKey } from "@/lib/utils"
+import { useMutation } from "@tanstack/react-query"
 import { getMessages, markMessagesAsRead, sendMessage } from "@/actions/chat/message"
-import { getPusherClient } from "@/lib/pusher-client"
-import { cn, getChatKey, getMessagesQueryKey } from "@/lib/utils"
-import { ChatDialog, InfiniteMessagesResponse, MessagesPage, MessageWithSender, PusherPayload } from "@/lib/types/chat"
+import { MessageWithSender, InfiniteMessagesResponse, ChatDialog } from "@/lib/types/chat"
 
-// --- ТИПЫ ---
 interface ChatWindowProps {
-  partner: {
-    id: string
-    name: string | null
-    image: string | null
-  }
-  order: {
-    id: string
-    title: string
-    clientId: string
-    status: string
-  } | null
+  partner: { id: string; name: string | null; image: string | null }
+  order: { id: string; title: string; clientId: string; status: string } | null
   currentUserId: string
 }
 
-
+// Глобальные стейты для сохранения позиции при переходах между чатами
 const scrollPositions: Record<string, number> = {}
 const isStickToBottom: Record<string, boolean> = {}
 
@@ -39,16 +25,14 @@ export function ChatWindow({ partner, order, currentUserId }: ChatWindowProps) {
   const [unreadCount, setUnreadCount] = React.useState(0)
   const [showScrollButton, setShowScrollButton] = React.useState(false)
   const [isReady, setIsReady] = React.useState(false)
-
   const scrollRef = React.useRef<HTMLDivElement>(null)
 
-  const chatKey = React.useMemo(() =>
-    getChatKey(order?.id, currentUserId, partner.id),
+  // 1. КОНТЕКСТНЫЙ КЛЮЧ (Тот же, что использует Server и useNotifications)
+  const contextKey = React.useMemo(() =>
+    getContextKey(order?.id, currentUserId, partner.id),
     [order?.id, currentUserId, partner.id]
-  );
-
-  const queryKey = React.useMemo(() => getMessagesQueryKey(chatKey), [chatKey]);
-
+  )
+  const queryKey = getMessagesQueryKey(contextKey)
 
   const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
     if (!scrollRef.current) return
@@ -56,254 +40,214 @@ export function ChatWindow({ partner, order, currentUserId }: ChatWindowProps) {
     container.scrollTo({ top: container.scrollHeight + 10000, behavior })
   }
 
-  // 1. ЗАГРУЗКА ИСТОРИИ
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading
-  } = useInfiniteQuery<InfiniteMessagesResponse>({
+  // 2. ЗАГРУЗКА ИСТОРИИ (TanStack Query)
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery<InfiniteMessagesResponse>({
     queryKey,
-    queryFn: ({ pageParam }) =>
-      getMessages({
-        recipientId: partner.id,
-        orderId: order?.id,
-        cursor: pageParam as string | undefined,
-        limit: 30
-      }),
+    queryFn: ({ pageParam }) => getMessages({
+      recipientId: partner.id,
+      orderId: order?.id,
+      cursor: pageParam as string | undefined,
+      limit: 30
+    }),
     initialPageParam: undefined,
-    // Теперь TS знает, что в lastPage есть nextCursor
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: !!partner.id,
   })
 
-  // 2. messages теперь автоматически получают тип MessageWithSender[]
   const messages = React.useMemo(() => {
-    // data?.pages теперь типизирован как InfiniteMessagesResponse[]
     const allMessages = data?.pages.flatMap((page) => page.messages) || []
-
-    // Больше не нужно "as ChatMessage[]", TS и так видит MessageWithSender[]
     return [...allMessages].reverse()
   }, [data?.pages])
 
-  // ЛОГИКА ZWORK: Разрешено ли писать?
-  const hasClientStarted = React.useMemo(() => {
-    if (!order) return true
-    const isMaster = order.clientId !== currentUserId
-    if (!isMaster) return true
-    return messages.some(m => m.senderId === order.clientId)
-  }, [messages, order, currentUserId])
-
-
-  // 2. PUSHER
+  // 3. АВТО-СКРОЛЛ ПРИ ПОЛУЧЕНИИ НОВЫХ ДАННЫХ
+  // Мы просто следим за ID последнего сообщения. Если оно изменилось — реагируем.
+  const lastMessageId = messages[messages.length - 1]?.id
   React.useEffect(() => {
-    const pusher = getPusherClient()
-    const channelName = order
-      ? `chat-order-${order.id}`
-      : `chat-direct-${[currentUserId, partner.id].sort().join('-')}`
+    if (!lastMessageId || !isReady) return
 
-    const channel = pusher.subscribe(channelName)
+    const lastMsg = messages[messages.length - 1]
+    const isMe = lastMsg.senderId === currentUserId
 
-    // Теперь сюда прилетает payload: PusherPayload
-    const handleNewMessage = (payload: PusherPayload) => {
-      // 1. Проверяем тип события (TS теперь спокоен благодаря дискриминантному объединению)
-      if (payload.type !== "NEW_MESSAGE") return
-
-      const msg = payload.data.message
-      if (!msg) return
-
-      // ВНИМАНИЕ: queryClient.setQueryData здесь НЕ НУЖЕН. 
-      // Его уже выполнил useNotifications, обновив кэш по ключу ["messages", chatKey]
-
-      // 2. Логика скролла
-      // Если сообщение отправили МЫ или мы и так находимся внизу чата ("прилипли")
-      if (msg.senderId === currentUserId || isStickToBottom[chatKey]) {
-        // Даем 100мс, чтобы React успел отрисовать новые данные, попавшие в кэш, и скроллим
-        setTimeout(() => scrollToBottom("auto"), 100)
-      } else {
-        // Если пишет собеседник, а мы читаем историю где-то наверху:
-        // Показываем кнопку "Вниз" и увеличиваем счетчик новых сообщений на ней
-        setUnreadCount(prev => prev + 1)
-        setShowScrollButton(true)
-      }
+    if (isMe || isStickToBottom[contextKey]) {
+      // Используем requestAnimationFrame, чтобы дождаться отрисовки нового баббла
+      requestAnimationFrame(() => scrollToBottom("smooth"))
+      setUnreadCount(0)
+    } else {
+      setUnreadCount(prev => prev + 1)
+      setShowScrollButton(true)
     }
+  }, [lastMessageId, isReady])
 
-
-    // Это событие остается без изменений (оно простое)
-    const handleRead = ({ readerId }: { readerId: string }) => {
-      if (readerId !== currentUserId) {
-        queryClient.setQueryData<InfiniteData<MessagesPage>>(queryKey, (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            pages: old.pages.map(page => ({
-              ...page,
-              messages: page.messages.map(m =>
-                m.senderId === currentUserId ? { ...m, isRead: true } : m
-              )
-            }))
-          }
-        })
-      }
-    }
-
-    channel.bind("new-message", handleNewMessage)
-    channel.bind("messages-read", handleRead)
-
-    return () => {
-      channel.unbind_all()
-      pusher.unsubscribe(channelName)
-    }
-  }, [partner.id, order?.id, currentUserId, chatKey, queryClient])
-
-  // 3. ВОССТАНОВЛЕНИЕ СКРОЛЛА
-  React.useLayoutEffect(() => {
-    if (isLoading || messages.length === 0) return
-    const timer = setTimeout(() => {
-      const savedPos = scrollPositions[chatKey]
-      if (isStickToBottom[chatKey] || savedPos === undefined) {
-        scrollToBottom("auto")
-        isStickToBottom[chatKey] = true
-      } else {
-        if (scrollRef.current) scrollRef.current.scrollTop = savedPos
-      }
-      setIsReady(true)
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [chatKey, isLoading, messages.length])
-
-  // 4. ОБРАБОТКА СКРОЛЛА (ЧТЕНИЕ)
-  const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-    scrollPositions[chatKey] = scrollTop
-    const fromBottom = scrollHeight - scrollTop - clientHeight
-
-    isStickToBottom[chatKey] = fromBottom < 100
-    setShowScrollButton(fromBottom > 150)
-
-    if (fromBottom < 50) {
-      // 1. Считаем, сколько именно сообщений мы сейчас "прочитаем"
-      const unreadInThisChat = messages.filter(m => m.senderId === partner.id && !m.isRead)
-      const countToReduce = unreadInThisChat.length
-
-      if (countToReduce > 0) {
-        try {
-          // 2. Мгновенно "обеляем" бабблы в текущем чате
-          queryClient.setQueryData<InfiniteData<MessagesPage>>(queryKey, (old) => {
-            if (!old) return old
-            return {
-              ...old,
-              pages: old.pages.map(p => ({
-                ...p,
-                messages: p.messages.map(m =>
-                  m.senderId === partner.id ? { ...m, isRead: true } : m
-                )
-              }))
-            }
-          })
-
-          // 3. Мгновенно обновляем список диалогов (ChatList) — обнуляем кружок
-          queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => {
-            if (!old) return old
-            return old.map(d => {
-              const isMatch = order?.id
-                ? d.lastMessage?.orderId === order.id
-                : d.partner.id === partner.id
-
-              return isMatch ? { ...d, unreadCount: 0 } : d
-            })
-          })
-
-          // 4. Мгновенно вычитаем прочитанное из глобального счетчика (Badge)
-          queryClient.setQueryData<{ count: number }>(["unread-count"], (old) => {
-            if (!old) return old
-            return { count: Math.max(0, old.count - countToReduce) }
-          })
-
-          setUnreadCount(0)
-
-          // 5. Просто уведомляем сервер в фоне (без await, если не критично)
-          // Но лучше оставить await, чтобы база успела обновиться до того, как юзер уйдет
-          await markMessagesAsRead(partner.id, order?.id)
-
-        } catch (error) {
-          console.error("Ошибка при чтении:", error)
-        }
-      }
-    }
-  }
-
-  // 5. ОТПРАВКА
+  // 4. ОТПРАВКА СООБЩЕНИЯ (Optimistic Update)
   const mutation = useMutation({
     mutationFn: (text: string) => sendMessage({ recipientId: partner.id, text, orderId: order?.id }),
-
     onMutate: async (newText) => {
+      // Отменяем исходящие запросы, чтобы они не перезаписали наш оптимистичный апдейт
       await queryClient.cancelQueries({ queryKey })
+      await queryClient.cancelQueries({ queryKey: ["dialogs"] })
+
       const optimisticMsg: MessageWithSender = {
-        id: `temp-${Date.now()}`, // Временный ID
+        id: `temp-${Date.now()}`,
         text: newText,
         senderId: currentUserId,
         recipientId: partner.id,
         orderId: order?.id || null,
         createdAt: new Date(),
         isRead: false,
-        isOptimistic: true, // Флаг для стилей (серое/прозрачное)
+        isOptimistic: true,
         sender: { id: currentUserId, name: "Вы", image: null }
       }
-      console.log("MUTATION", { chatKey })
-      queryClient.setQueryData<InfiniteData<MessagesPage>>(queryKey, (old) => {
+
+      // 1. Обновляем сообщения в окне (ЛОКАЛЬНО)
+      queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
         if (!old) return old
         return {
           ...old,
           pages: old.pages.map((p, i) => i === 0 ? { ...p, messages: [optimisticMsg, ...p.messages] } : p)
         }
       })
+
+      // 2. Обновляем список диалогов (ЛОКАЛЬНО)
+      queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => {
+        if (!old) return old
+        const dialogs = [...old]
+        const index = dialogs.findIndex(d =>
+          order?.id ? d.lastMessage?.orderId === order.id : d.partner.id === partner.id
+        )
+        if (index !== -1) {
+          const [updated] = dialogs.splice(index, 1)
+          return [{ ...updated, lastMessage: optimisticMsg }, ...dialogs]
+        }
+        return dialogs
+      })
+
       setInput("")
-      scrollToBottom("auto")
+      requestAnimationFrame(() => scrollToBottom("auto"))
     },
     onSuccess: (response) => {
       if (!response.data) return
-      console.log(queryKey, 'mutation')
-      queryClient.setQueryData<InfiniteData<MessagesPage>>(queryKey, (old) => {
+      const realMsg = response.data
+
+      // ЗАМЕНЯЕМ temp на real БЕЗ ЗАПРОСА К СЕРВЕРУ
+      queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
         if (!old) return old
         return {
           ...old,
-          pages: old.pages.map((page, i) => i === 0 ? {
+          pages: old.pages.map(page => ({
             ...page,
             messages: page.messages.map(m =>
-              // Заменяем свой временный баббл на реальный из ответа сервера
-              (m.isOptimistic && m.text === response.data.text) ? response.data : m
+              // Ищем по временному ID или по тексту (если ID уже заменился)
+              (m.isOptimistic && m.text === realMsg.text) ? realMsg : m
             )
-          } : page)
+          }))
         }
       })
+
+      // Обновляем текст в списке диалогов на финальный (тоже локально)
+      queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => {
+        if (!old) return old
+        return old.map(d => {
+          const isMatch = order?.id ? d.lastMessage?.orderId === order.id : d.partner.id === partner.id
+          return isMatch ? { ...d, lastMessage: realMsg } : d
+        })
+      })
     }
-
-
   })
+
+  // 5. ОБРАБОТКА СКРОЛЛА И ЧТЕНИЯ
+  const handleScroll = async (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const fromBottom = scrollHeight - scrollTop - clientHeight;
+
+    if (fromBottom < 50) {
+      // Находим сообщения собеседника, которые мы еще не "прочитали" в UI
+      const unreadMessages = messages.filter(m => m.senderId === partner.id && !m.isRead);
+
+      if (unreadMessages.length > 0) {
+
+        // 1. МГНОВЕННО КРАСИМ В БЕЛЫЙ (Обновляем кэш сообщений)
+        queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map(page => ({
+              ...page,
+              messages: page.messages.map(m =>
+                m.senderId === partner.id ? { ...m, isRead: true } : m
+              )
+            }))
+          };
+        });
+
+        // 2. МГНОВЕННО УБИРАЕМ ТОЧКУ В СПИСКЕ (ChatList)
+        queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => {
+
+          if (!old) return old;
+          return old.map(d => {
+            const isMatch = order?.id
+              ? d.lastMessage?.orderId === order.id
+              : d.partner.id === partner.id;
+            return isMatch ? { ...d, unreadCount: 0 } : d;
+          });
+        });
+
+        // 3. МГНОВЕННО УМЕНЬШАЕМ СЧЕТЧИК В НАВБАРЕ
+        const countToReduce = unreadMessages.length;
+        queryClient.setQueryData<{ count: number }>(["unread-count"], (old) => ({
+          count: Math.max(0, (old?.count || 0) - countToReduce)
+        }));
+
+        // 4. ШЛЕМ НА СЕРВЕР (чтобы он уведомил собеседника и обновил БД)
+        markMessagesAsRead(partner.id, order?.id);
+      }
+    }
+  };
+
+  // Восстановление позиции при заходе в чат
+  React.useLayoutEffect(() => {
+    if (isLoading || messages.length === 0) return
+    const timer = setTimeout(() => {
+      const savedPos = scrollPositions[contextKey]
+      if (isStickToBottom[contextKey] || savedPos === undefined) {
+        scrollToBottom("auto")
+        isStickToBottom[contextKey] = true
+      } else {
+        if (scrollRef.current) scrollRef.current.scrollTop = savedPos
+      }
+      setIsReady(true)
+    }, 50)
+    return () => clearTimeout(timer)
+  }, [contextKey, isLoading])
+
+  // Логика ZWORK: Мастер ждет первого сообщения клиента
+  const hasClientStarted = React.useMemo(() => {
+    if (!order) return true
+    if (order.clientId === currentUserId) return true
+    return messages.some(m => m.senderId === order.clientId)
+  }, [messages, order, currentUserId])
 
   return (
     <div className="flex flex-col h-full w-full bg-white overflow-hidden relative">
       {/* HEADER */}
       <div className="px-10 py-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white z-20 shadow-sm">
-        <Link href={`/profile/${partner.id}`} className="flex items-center gap-4 group">
+        <Link href={`/profile/${partner.id}`} className="flex items-center gap-4 group text-left">
           <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black italic shadow-lg group-hover:bg-blue-600 transition-all shrink-0 overflow-hidden">
             {partner.image ? <img src={partner.image} className="w-full h-full object-cover" /> : partner.name?.charAt(0).toUpperCase()}
           </div>
-          <div className="text-left">
-            <p className="text-[10px] font-black uppercase text-slate-400 mb-1 leading-none italic">Профиль</p>
+          <div>
+            <p className="text-[10px] font-black uppercase text-slate-400 mb-1 leading-none italic tracking-tighter">Профиль</p>
             <h2 className="text-lg font-black uppercase italic text-slate-900 leading-none truncate max-w-[200px]">{partner.name}</h2>
           </div>
         </Link>
         {order && (
-          <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 flex items-center gap-2">
-            <Zap size={14} className="text-blue-600 fill-blue-600" />
-            <span className="text-[9px] font-black uppercase text-blue-600 italic leading-none truncate max-w-[150px]">Заказ: {order.title}</span>
+          <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 flex items-center gap-2 max-w-[200px]">
+            <Zap size={14} className="text-blue-600 fill-blue-600 shrink-0" />
+            <span className="text-[9px] font-black uppercase text-blue-600 italic leading-none truncate tracking-tight">Заказ: {order.title}</span>
           </div>
         )}
       </div>
 
+      {/* MESSAGES */}
       <div className="flex-1 relative bg-slate-50/20 overflow-hidden flex flex-col">
         {(!isReady || isLoading) && (
           <div className="absolute inset-0 z-50 bg-white flex items-center justify-center">
@@ -314,39 +258,64 @@ export function ChatWindow({ partner, order, currentUserId }: ChatWindowProps) {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className={cn("absolute inset-0 overflow-y-auto p-6 md:p-10 chat-scrollbar", isReady ? "opacity-100" : "opacity-0")}
-          style={{ scrollBehavior: 'auto' }}
+          className={cn("absolute inset-0 overflow-y-auto p-6 md:p-10 chat-scrollbar transition-opacity duration-300", isReady ? "opacity-100" : "opacity-0")}
         >
-          {hasNextPage && <button onClick={() => fetchNextPage()} className="w-full py-4 text-[8px] font-black uppercase text-slate-300 hover:text-blue-600 italic">Загрузить историю</button>}
+          {hasNextPage && (
+            <button onClick={() => fetchNextPage()} disabled={isFetchingNextPage} className="w-full py-4 text-[8px] font-black uppercase text-slate-300 hover:text-blue-600 italic tracking-widest">
+              {isFetchingNextPage ? "Загрузка..." : "Загрузить историю"}
+            </button>
+          )}
 
-          <div className="flex flex-col gap-6 messages-wrapper pb-10">
-            {messages.map((msg) => {
+          <div className="flex flex-col gap-6 pb-10">
+            {messages.map((msg, index) => {
               const isMe = msg.senderId === currentUserId;
+              const prevMsg = messages[index - 1];
+              const nextMsg = messages[index + 1];
+
+              // Проверяем: это начало блока сообщений от одного автора?
+              const isFirstInGroup = !prevMsg || prevMsg.senderId !== msg.senderId;
+              // Проверяем: это последнее сообщение в блоке?
+              const isLastInGroup = !nextMsg || nextMsg.senderId !== msg.senderId;
+
               return (
-                <div key={msg.id} className={cn("flex flex-col max-w-[85%] md:max-w-[75%] shrink-0", isMe ? "ml-auto items-end" : "items-start")}>
+                <div key={msg.id} className={cn(
+                  "flex flex-col max-w-[85%] md:max-w-[75%] shrink-0",
+                  isMe ? "ml-auto items-end" : "items-start",
+                  isFirstInGroup ? "mt-6" : "mt-1" // Большой отступ только для нового блока
+                )}>
                   <div className={cn(
-                    "px-5 py-3.5 rounded-[2rem] text-sm font-bold italic tracking-tight shadow-sm w-fit break-words transition-all duration-500",
+                    "px-5 py-3.5 text-sm font-bold italic tracking-tight shadow-sm w-fit break-words transition-all duration-500",
                     isMe
-                      ? msg.isOptimistic ? "bg-blue-400 text-white/80 scale-[0.98]" : "bg-blue-600 text-white rounded-tr-none shadow-lg shadow-blue-50"
+                      ? cn(
+                        "bg-blue-600 text-white shadow-lg shadow-blue-50",
+                        "rounded-[2rem]",
+                        !isLastInGroup && "rounded-br-lg", // "Сглаживаем" угол, если дальше пишет тот же юзер
+                        !isFirstInGroup && "rounded-tr-lg"
+                      )
                       : cn(
-                        "rounded-tl-none shadow-sm border-2",
-                        (!msg.isRead && msg.senderId === partner.id)
-                          ? "bg-slate-100 border-blue-100 text-slate-600 italic"
-                          : "bg-white border-slate-50 text-slate-900"
+                        "bg-white border-2 border-slate-50 text-slate-900",
+                        "rounded-[2rem]",
+                        !isLastInGroup && "rounded-bl-lg",
+                        !isFirstInGroup && "rounded-tl-lg",
+                        (!msg.isRead && msg.senderId === partner.id) && "bg-slate-100 border-blue-100"
                       )
                   )}>
                     {msg.text}
                   </div>
-                  <div className="flex items-center gap-2 mt-2 px-3 opacity-40">
-                    <span className="text-[8px] font-black uppercase italic tracking-tighter">
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    {isMe && (
-                      <div className="flex items-center">
-                        {msg.isOptimistic ? <Clock size={10} className="animate-pulse" /> : msg.isRead ? <CheckCheck size={11} className="text-blue-600" /> : <Check size={11} className="text-slate-400" />}
-                      </div>
-                    )}
-                  </div>
+
+                  {/* Время и галочки показываем только у ПОСЛЕДНЕГО сообщения в группе */}
+                  {isLastInGroup && (
+                    <div className="flex items-center gap-2 mt-2 px-3 opacity-40">
+                      <span className="text-[8px] font-black uppercase italic tracking-tighter">
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {isMe && (
+                        <div className="flex items-center">
+                          {msg.isOptimistic ? <Clock size={10} className="animate-pulse" /> : msg.isRead ? <CheckCheck size={11} className="text-blue-600" /> : <Check size={11} className="text-slate-400" />}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -361,11 +330,12 @@ export function ChatWindow({ partner, order, currentUserId }: ChatWindowProps) {
         )}
       </div>
 
+      {/* INPUT */}
       <div className="p-6 md:p-8 bg-white border-t border-slate-100 shrink-0">
         {!hasClientStarted ? (
           <div className="bg-amber-50 border-2 border-amber-100 p-6 rounded-[2.5rem] flex items-center gap-4">
             <ShieldAlert className="text-amber-600 shrink-0" size={24} />
-            <p className="text-[10px] font-black uppercase text-amber-700 tracking-widest italic">Мастер может ответить только после первого сообщения от заказчика.</p>
+            <p className="text-[10px] font-black uppercase text-amber-700 tracking-widest italic">Мастер может ответить только после сообщения заказчика.</p>
           </div>
         ) : (
           <form

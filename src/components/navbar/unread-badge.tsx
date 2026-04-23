@@ -17,7 +17,7 @@ export function UnreadBadge() {
       return res.json()
     },
     enabled: !!session?.user?.id,
-    refetchInterval: 30000, // Рефетч раз в полминуты (остальное доделает Pusher)
+   
   })
 
   const count = countData?.count || 0

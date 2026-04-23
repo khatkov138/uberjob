@@ -5,7 +5,8 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { MessageSquare, Zap } from "lucide-react"
-import { ChatDialog, getUserDialogs } from "@/actions/chat/message"
+import {  getUserDialogs } from "@/actions/chat/message"
+import { ChatDialog } from "@/lib/types/chat"
 
 interface ChatListProps {
   currentUserId: string

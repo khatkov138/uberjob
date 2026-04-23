@@ -5,7 +5,7 @@ import { getServerSession } from "@/lib/get-session"
 import { revalidatePath } from "next/cache"
 import Pusher from "pusher";
 import { Message, User } from "../../../prisma/generated";
-import { delay } from "@/lib/utils";
+import { delay, getContextKey } from "@/lib/utils";
 import { ChatDialog, InfiniteMessagesResponse, MessageWithSender, PusherPayload } from "@/lib/types/chat";
 /**
  * 1. ОТПРАВКА СООБЩЕНИЯ
@@ -23,7 +23,7 @@ export async function sendMessage({ recipientId, text, orderId }: { recipientId:
     const session = await getServerSession();
     if (!session?.user?.id) return { success: false };
 
-    // СТРУКТУРА ТУТ ДОЛЖНА БЫТЬ 1-В-1 КАК В ТИПЕ MessageWithSender
+    // 1. Создаем сообщение в БД
     const newMessage = await prisma.message.create({
         data: {
             text,
@@ -38,27 +38,28 @@ export async function sendMessage({ recipientId, text, orderId }: { recipientId:
         }
     });
 
+    // 2. Генерируем универсальный ключ контекста для фронтенда
+    const contextKey = getContextKey(orderId, session.user.id, recipientId);
+
+    // 3. Формируем единый Payload по новому типу PusherPayload
     const payload: PusherPayload = {
         type: "NEW_MESSAGE",
+        contextKey: contextKey,
         data: {
             message: newMessage,
             orderId: orderId || null,
             senderId: session.user.id,
         }
     };
-    // 1. Отправляем в канал ЧАТА (для мгновенного появления бабблов у обоих)
-    const chatChannel = orderId
-        ? `chat-order-${orderId}`
-        : `chat-direct-${[session.user.id, recipientId].sort().join('-')}`;
-    await pusher.trigger(chatChannel, "new-message", payload);
 
-    // 2. Отправляем ПОЛУЧАТЕЛЮ (для уведомлений в Navbar)
-    await pusher.trigger(`user-${recipientId}`, "events", payload);
-
-    // 3. ВОТ ЭТОГО НЕ ХВАТАЛО: Отправляем СЕБЕ (для синхронизации вкладок)
-    // Твой хук useNotifications во второй вкладке поймает это 
-    // и обновит там список диалогов и само окно чата
-    await pusher.trigger(`user-${session.user.id}`, "events", payload);
+    // 4. Отправляем всего в два персональных канала
+    // Это обновит и чат, и список диалогов, и счетчики у обоих участников
+    await Promise.all([
+        // Получателю
+        pusher.trigger(`user-${recipientId}`, "events", payload),
+        // Себе (для синхронизации вкладок)
+       // pusher.trigger(`user-${session.user.id}`, "events", payload)
+    ]);
 
     return { success: true, data: newMessage };
 }
@@ -195,7 +196,7 @@ export async function markMessagesAsRead(senderId: string, orderId?: string) {
     const currentUserId = session.user.id;
 
     try {
-        // 1. Обновляем в БД
+        // 1. Обновляем статус в базе данных
         await prisma.message.updateMany({
             where: {
                 senderId: senderId,
@@ -206,15 +207,26 @@ export async function markMessagesAsRead(senderId: string, orderId?: string) {
             data: { isRead: true }
         });
 
-        // 2. Генерируем событие "прочитано"
-        // ПРАВКА: Используем те же названия каналов, что и в ChatWindow
-        const channelName = orderId
-            ? `chat-order-${orderId}`
-            : `chat-direct-${[currentUserId, senderId].sort().join('-')}`;
+        // 2. Генерируем универсальный ключ контекста (order_ID или direct_ID_ID)
+        const contextKey = getContextKey(orderId, currentUserId, senderId);
 
-        await pusher.trigger(channelName, "messages-read", {
-            readerId: currentUserId
-        });
+        // 3. Формируем Payload по нашему новому стандарту
+        const payload: PusherPayload = {
+            type: "MESSAGES_READ",
+            contextKey: contextKey,
+            data: {
+                readerId: currentUserId // Кто именно прочитал
+            }
+        };
+
+        // 4. Рассылаем уведомление через персональные каналы
+        await Promise.all([
+            // Отправляем ОТПРАВИТЕЛЮ (чтобы он увидел галочки у себя)
+            pusher.trigger(`user-${senderId}`, "events", payload),
+
+            // Отправляем СЕБЕ (чтобы синхронизировать счетчики во всех своих вкладках)
+          //  pusher.trigger(`user-${currentUserId}`, "events", payload)
+        ]);
 
     } catch (error) {
         console.error("MARK_READ_ERROR:", error);

@@ -37,25 +37,20 @@ function toRad(value: number): number {
 }
 
 
-/**
- * Генерирует стабильный ID для чата.
- * Для заказов: order-{id}
- * Для лички: direct-{sorted_ids}
- */
-export const getChatKey = (orderId?: string | null, userId1?: string, userId2?: string) => {
-  if (orderId) return `order-${orderId}`;
+// lib/utils.ts
+
+// lib/utils.ts
+export const getContextKey = (orderId?: string | null, userId1?: string, userId2?: string) => {
+  if (orderId) return `order_${orderId}`;
   
   if (userId1 && userId2) {
-    const sortedIds = [userId1, userId2].sort().join("-");
-    return `direct-${sortedIds}`;
+    const sortedIds = [userId1, userId2].sort().join("_");
+    return `direct_${sortedIds}`;
   }
   
-  return "unknown";
+  return "global";
 };
 
-/**
- * Генерирует полный массив QueryKey для TanStack Query
- */
-export const getMessagesQueryKey = (chatKey: string) => ["messages", chatKey];
-
+// Хелпер для TanStack Query
+export const getMessagesQueryKey = (contextKey: string) => ["messages", contextKey];
 

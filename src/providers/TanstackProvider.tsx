@@ -3,14 +3,16 @@ import { ReactQueryStreamedHydration } from '@tanstack/react-query-next-experime
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+// Добавляем импорт адаптера
+import { broadcastQueryClient } from '@tanstack/query-broadcast-client-experimental';
 
 export default function TanstackProvider({
     children,
 }: {
     children: React.ReactNode;
 }) {
-  
+
 
     const [queryClient] = useState(
         () =>
@@ -35,7 +37,15 @@ export default function TanstackProvider({
             )
     );
 
+    // Подключаем широковещание через useEffect, чтобы оно работало только на клиенте
+    useEffect(() => {
+        const unsubscribe = broadcastQueryClient({
+            queryClient: queryClient as any,
+            broadcastChannel: 'zwork-context-sync',
+        });
 
+        return () => unsubscribe();
+    }, [queryClient]);
 
     return (
 
