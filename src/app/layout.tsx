@@ -48,7 +48,7 @@ export default function RootLayout({
       <body className={`${geistSans.className} antialiased h-screen flex flex-col overflow-hidden bg-white`}>
 
         <TanstackProvider>
-          {/* <Heartbeat />*/}
+           <Heartbeat />
           {/* HEADER: Занимает ровно столько, сколько нужно контенту */}
           <header className="flex-none z-50">
             <Navbar />

@@ -111,7 +111,7 @@ export function NavbarUI({ user }: NavbarUIProps) {
                                 </div>
 
                                 <Link
-                                    href="/messages"
+                                    href="/chat"
                                     className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-400 hover:bg-white hover:text-blue-600 transition-all relative group bg-white/50 border border-transparent hover:border-slate-200 shadow-sm"
                                 >
                                     <MessageSquare size={20} className="group-hover:scale-110 transition-transform" />

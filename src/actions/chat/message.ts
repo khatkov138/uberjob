@@ -58,7 +58,7 @@ export async function sendMessage({ recipientId, text, orderId }: { recipientId:
         // Получателю
         pusher.trigger(`user-${recipientId}`, "events", payload),
         // Себе (для синхронизации вкладок)
-       // pusher.trigger(`user-${session.user.id}`, "events", payload)
+        pusher.trigger(`user-${session.user.id}`, "events", payload)
     ]);
 
     return { success: true, data: newMessage };
@@ -164,6 +164,12 @@ export async function getUserDialogs(): Promise<ChatDialog[]> {
                         ],
                     },
                     orderBy: { createdAt: "desc" },
+                    // ДОБАВЛЯЕМ INCLUDE ЗДЕСЬ:
+                    include: {
+                        sender: {
+                            select: { id: true, name: true, image: true }
+                        }
+                    }
                 }),
                 prisma.message.count({
                     where: {
@@ -178,15 +184,15 @@ export async function getUserDialogs(): Promise<ChatDialog[]> {
 
             return {
                 partner,
-                lastMessage, // Теперь это Message | null, типы идентичны
+                lastMessage: lastMessage as MessageWithSender | null, // Принудительно кастим, так как Prisma возвращает нужный нам Payload
                 unreadCount,
             };
         })
     );
 
-    // Здесь TS все равно может попросить Type Guard для возвращаемого массива
-    return dialogs.filter((d) => d !== null);
+    return dialogs.filter((d): d is ChatDialog => d !== null);
 }
+
 
 
 export async function markMessagesAsRead(senderId: string, orderId?: string) {
@@ -225,7 +231,7 @@ export async function markMessagesAsRead(senderId: string, orderId?: string) {
             pusher.trigger(`user-${senderId}`, "events", payload),
 
             // Отправляем СЕБЕ (чтобы синхронизировать счетчики во всех своих вкладках)
-          //  pusher.trigger(`user-${currentUserId}`, "events", payload)
+            pusher.trigger(`user-${currentUserId}`, "events", payload)
         ]);
 
     } catch (error) {
@@ -233,4 +239,21 @@ export async function markMessagesAsRead(senderId: string, orderId?: string) {
     }
 }
 
+export async function sendTypingStatus(recipientId: string, contextKey: string) {
+    const session = await getServerSession();
+    if (!session?.user?.id) return;
+
+    const payload: PusherPayload = {
+        type: "USER_TYPING",
+        contextKey: contextKey,
+        data: {
+            userId: session.user.id
+        }
+    };
+
+    // Отправляем событие ТОЛЬКО получателю. 
+    // Себе слать не обязательно, так как мы и так знаем, что печатаем, 
+    // а Broadcast во второй вкладке это увидит через локальный стейт, если нужно.
+    await pusher.trigger(`user-${recipientId}`, "events", payload);
+}
 

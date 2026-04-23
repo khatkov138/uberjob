@@ -6,7 +6,10 @@ import { useQueryClient, InfiniteData } from "@tanstack/react-query"
 import { getPusherClient } from "@/lib/pusher-client"
 import { ChatDialog, MessagesPage, PusherPayload } from "@/lib/types/chat"
 import { Notification as DbNotification } from "../../prisma/generated"
-import { getMessagesQueryKey } from "@/lib/utils"
+import { getMessagesQueryKey, getContextKey } from "@/lib/utils"
+
+// Храним ID таймеров вне хука, чтобы они выживали между ререндерами
+const typingTimeouts: Record<string, NodeJS.Timeout> = {};
 
 export function useNotifications(userId: string | undefined) {
   const queryClient = useQueryClient()
@@ -19,135 +22,94 @@ export function useNotifications(userId: string | undefined) {
     const channelName = `user-${userId}`
     const channel = pusher.subscribe(channelName)
 
-    // Слушаем единое событие "events" для всех типов уведомлений
     channel.bind("events", (payload: PusherPayload) => {
       const { type, contextKey, data } = payload
 
-      // 1. НОВОЕ СООБЩЕНИЕ
+      // 1. СТАТУС "ПЕЧАТАЕТ..."
+      if (type === "USER_TYPING") {
+        if (typingTimeouts[contextKey]) clearTimeout(typingTimeouts[contextKey]);
+
+        // Сохраняем не просто true, а ID или данные пользователя
+        queryClient.setQueryData(["typing", contextKey], {
+          isTyping: true,
+          userId: data.userId
+        });
+
+        typingTimeouts[contextKey] = setTimeout(() => {
+          queryClient.setQueryData(["typing", contextKey], { isTyping: false });
+          delete typingTimeouts[contextKey];
+        }, 4000);
+      }
+
+      // 2. НОВОЕ СООБЩЕНИЕ
       if (type === "NEW_MESSAGE") {
         const { message: msg, orderId } = data
         const isMe = msg.senderId === userId
         const queryKey = getMessagesQueryKey(contextKey)
-
-        // Определяем, открыт ли этот чат прямо сейчас через URL
-        const activeUserId = searchParams.get("userId")
-        const activeOrderId = searchParams.get("orderId")
-
         const isCurrentChat = orderId
-          ? activeOrderId === orderId
-          : activeUserId === (isMe ? msg.recipientId : msg.senderId)
+          ? searchParams.get("orderId") === orderId
+          : searchParams.get("userId") === (isMe ? msg.recipientId : msg.senderId)
 
-        // А) Обновляем бабблы в окне чата
+        // Сразу убираем статус "печатает", раз сообщение пришло
+        queryClient.setQueryData(["typing", contextKey], false);
+        if (typingTimeouts[contextKey]) {
+          clearTimeout(typingTimeouts[contextKey]);
+          delete typingTimeouts[contextKey];
+        }
+
         queryClient.setQueryData<InfiniteData<MessagesPage>>(queryKey, (old) => {
-          if (!old) {
-            if (isCurrentChat) queryClient.invalidateQueries({ queryKey })
-            return old
-          }
-          // Защита от дублей
+          if (!old) return isCurrentChat ? (queryClient.invalidateQueries({ queryKey }), old) : old
           if (old.pages.flatMap(p => p.messages).some(m => m.id === msg.id)) return old
-
           return {
             ...old,
-            pages: old.pages.map((page, index) => {
-              if (index !== 0) return page
-              // Убираем оптимистичное сообщение при замене реальным
-              const filtered = page.messages.filter(m =>
-                !(m.isOptimistic && m.senderId === msg.senderId && m.text === msg.text)
-              )
-              return { ...page, messages: [msg, ...filtered] }
+            pages: old.pages.map((page, i) => i !== 0 ? page : {
+              ...page,
+              messages: [msg, ...page.messages.filter(m => !(m.isOptimistic && m.text === msg.text))]
             })
           }
         })
 
-        // Б) Обновляем список диалогов (ChatList)
+        let shouldIncrementNavbar = false
         queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => {
           if (!old) return old
           const dialogs = [...old]
           const partnerId = isMe ? msg.recipientId : msg.senderId
-
-          const index = dialogs.findIndex(d =>
-            orderId ? d.lastMessage?.orderId === orderId : d.partner.id === partnerId
-          )
+          const index = dialogs.findIndex(d => orderId ? d.lastMessage?.orderId === orderId : d.partner.id === partnerId)
 
           if (index !== -1) {
-            const [updated] = dialogs.splice(index, 1)
-            return [{
-              ...updated,
-              lastMessage: msg,
-              unreadCount: (!isMe && !isCurrentChat) ? updated.unreadCount + 1 : updated.unreadCount
-            }, ...dialogs]
-          }
-
-          // Если диалога нет (новый контакт), просто перегружаем список
-          queryClient.invalidateQueries({ queryKey: ["dialogs"] })
-          return old
-        })
-
-        // В) Обновляем счетчик непрочитанных в Navbar
-        if (!isCurrentChat && !isMe) {
-          queryClient.setQueryData<{ count: number }>(["unread-count"], (old) => ({
-            count: (old?.count || 0) + 1
-          }))
-        }
-      }
-
-      // 2. ПОДТВЕРЖДЕНИЕ ПРОЧТЕНИЯ (Галочки)
-      if (type === "MESSAGES_READ") {
-        const queryKey = getMessagesQueryKey(contextKey);
-        let countToReduce = 0;
-
-        // А) Обнуляем unreadCount в списке диалогов и считаем, сколько сообщений "ушло"
-        queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => {
-          if (!old) return old;
-          return old.map(d => {
-            const isMatch = d.lastMessage?.orderId
-              ? `order_${d.lastMessage.orderId}` === contextKey
-              : `direct_${[userId, d.partner.id].sort().join('_')}` === contextKey;
-
-            if (isMatch) {
-              countToReduce = d.unreadCount; // Запоминаем, сколько было непрочитанных
-              return { ...d, unreadCount: 0 };
+            const existing = dialogs[index]
+            if (existing.lastMessage?.id === msg.id || (isMe && existing.lastMessage?.isOptimistic && existing.lastMessage?.text === msg.text)) {
+              if (isMe) dialogs[index] = { ...existing, lastMessage: msg };
+              return dialogs;
             }
-            return d;
-          });
-        });
+            const [updated] = dialogs.splice(index, 1)
+            if (!isMe && !isCurrentChat) shouldIncrementNavbar = true
+            return [{ ...updated, lastMessage: msg, unreadCount: (!isMe && !isCurrentChat) ? updated.unreadCount + 1 : updated.unreadCount }, ...dialogs]
+          }
+          queryClient.invalidateQueries({ queryKey: ["dialogs"] }); return old
+        })
 
-        // Б) Вычитаем это количество из глобального баджа в Navbar
-        if (countToReduce > 0) {
-          queryClient.setQueryData<{ count: number }>(["unread-count"], (old) => ({
-            count: Math.max(0, (old?.count || 0) - countToReduce)
-          }));
+        if (shouldIncrementNavbar) {
+          queryClient.setQueryData<{ count: number }>(["unread-count"], (old) => ({ count: (old?.count || 0) + 1 }))
         }
-
-        // В) Ставим галочки в самом окне чата (если оно открыто)
-        queryClient.setQueryData<InfiniteData<MessagesPage>>(queryKey, (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            pages: old.pages.map(page => ({
-              ...page,
-              messages: page.messages.map(m =>
-                // Если мы отправитель — ставим "прочитано", так как получили сигнал от получателя
-                m.senderId === userId ? { ...m, isRead: true } : m
-              )
-            }))
-          };
-        });
       }
 
-      // 3. СИСТЕМНЫЕ УВЕДОМЛЕНИЯ (Колокольчик)
-      if (type === "SYSTEM_NOTIFICATION") {
-        queryClient.setQueryData<DbNotification[]>(["notifications", userId], (old) => {
-          const notification = data.notification
-          if (old?.some(n => n.id === notification.id)) return old
-          return [notification, ...(old || [])]
+      // 3. ПРОЧТЕНИЕ
+      if (type === "MESSAGES_READ") {
+        const queryKey = getMessagesQueryKey(contextKey)
+        const isReadByMe = data.readerId === userId
+        queryClient.setQueryData<InfiniteData<MessagesPage>>(queryKey, (old) => {
+          if (!old) return old
+          return { ...old, pages: old.pages.map(p => ({ ...p, messages: p.messages.map(m => (isReadByMe ? m.senderId !== userId : m.senderId === userId) ? { ...m, isRead: true } : m) })) }
         })
+        queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => old?.map(d => {
+          const match = d.lastMessage?.orderId ? `order_${d.lastMessage.orderId}` === contextKey : getContextKey(null, userId, d.partner.id) === contextKey
+          return match ? { ...d, unreadCount: 0 } : d
+        }))
+        if (isReadByMe) queryClient.invalidateQueries({ queryKey: ["unread-count"] })
       }
     })
 
-    return () => {
-      channel.unbind("events")
-      pusher.unsubscribe(channelName)
-    }
+    return () => { channel.unbind("events"); pusher.unsubscribe(channelName) }
   }, [userId, queryClient, searchParams])
 }

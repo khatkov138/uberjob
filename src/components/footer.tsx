@@ -23,7 +23,7 @@ export function Footer({ className }: FooterProps) {
   const pathname = usePathname()
 
   // Список страниц, где футер НЕ НУЖЕН (например, в чате)
-  const isChat = pathname.includes("/messages")
+  const isChat = pathname.includes("/chat")
 
   if (isChat) return null
 
