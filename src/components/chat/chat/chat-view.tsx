@@ -30,14 +30,16 @@ export function ChatView({ partner, order, currentUserId }: ChatViewProps) {
 
     // Инициализация позиции скролла при первой загрузке
     React.useLayoutEffect(() => {
-        if (!c.isLoading && c.messages.length > 0) {
+        // Убираем проверку c.messages.length > 0
+        if (!c.isLoading) {
             const timer = setTimeout(() => {
-                c.scrollToBottom("auto")
-                c.setIsReady(true)
-            }, 100)
-            return () => clearTimeout(timer)
+                c.scrollToBottom("auto");
+                c.setIsReady(true); // Теперь чат готов, даже если он пустой
+            }, 100);
+            return () => clearTimeout(timer);
         }
-    }, [c.isLoading])
+    }, [c.isLoading]);
+
 
     return (
         <div className="flex-1 flex flex-col bg-white h-full overflow-hidden relative min-w-0">
@@ -78,7 +80,7 @@ export function ChatView({ partner, order, currentUserId }: ChatViewProps) {
 
             {/* BODY: Область сообщений */}
             <div className="flex-1 relative bg-slate-50/20 overflow-hidden flex flex-col">
-                {(!c.isReady || c.isLoading) && (
+                {c.isLoading && !c.isReady && (
                     <div className="absolute inset-0 z-50 bg-white flex items-center justify-center">
                         <Loader2 className="animate-spin text-blue-600 opacity-20 w-10 h-10" />
                     </div>

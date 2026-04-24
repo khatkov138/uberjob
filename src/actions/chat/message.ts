@@ -60,6 +60,7 @@ export async function sendMessage({ recipientId, text, orderId }: { recipientId:
         // Себе (для синхронизации вкладок)
         pusher.trigger(`user-${session.user.id}`, "events", payload)
     ]);
+    //await prisma.message.deleteMany({})
 
     return { success: true, data: newMessage };
 }
@@ -80,7 +81,7 @@ export async function getMessages({
 }): Promise<InfiniteMessagesResponse> {
 
     const session = await getServerSession()
-    if (!session?.user?.id) return { messages: [], nextCursor: null, totalUnread: 0 }
+    if (!session?.user?.id) return { messages: [], nextCursor: null }
 
     const currentUserId = session.user.id
     const normalizedOrderId = orderId || null
@@ -111,22 +112,14 @@ export async function getMessages({
         }
     })
 
-    // 2. Считаем непрочитанные
-    const totalUnread = await prisma.message.count({
-        where: {
-            senderId: recipientId,
-            recipientId: currentUserId,
-            isRead: false,
-            orderId: normalizedOrderId
-        }
-    })
+
 
     const nextCursor = messages.length === limit ? messages[messages.length - 1].id : null
 
     return {
         messages, // Теперь TS пропустит это без 'as', так как структура совпадает 1-в-1
         nextCursor,
-        totalUnread
+
     }
 }
 
