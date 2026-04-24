@@ -1,18 +1,19 @@
 "use client"
 
-import { useState, useRef, useMemo, useEffect, useLayoutEffect } from "react"
+import { useState, useRef, useMemo, useEffect, useLayoutEffect, useCallback } from "react"
 import { useInfiniteQuery, useQueryClient, useMutation, useQuery, InfiniteData } from "@tanstack/react-query"
 import { getMessages, markMessagesAsRead, sendMessage, sendTypingStatus } from "@/actions/chat/message"
 import { getContextKey, getMessagesQueryKey } from "@/lib/utils"
 import { ChatDialog, InfiniteMessagesResponse, MessageWithSender } from "@/lib/types/chat"
 
-// ГЛОБАЛЬНЫЕ ХРАНИЛИЩА ПОЗИЦИЙ (оставляем, так как это UI-состояние, а не данные БД)
 const scrollPositions: Record<string, number> = {};
-const isStickToBottomMap: Record<string, boolean> = {};
 
 export function useChat(partnerId: string, orderId: string | undefined, currentUserId: string) {
   const queryClient = useQueryClient()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const intObserver = useRef<IntersectionObserver | null>(null)
+  const lastRestoredKey = useRef<string | null>(null)
+  const lastTypingSentRef = useRef<number>(0)
 
   const contextKey = useMemo(() => getContextKey(orderId, currentUserId, partnerId), [orderId, currentUserId, partnerId])
   const queryKey = getMessagesQueryKey(contextKey)
@@ -20,24 +21,8 @@ export function useChat(partnerId: string, orderId: string | undefined, currentU
   const [input, setInput] = useState("")
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [isReady, setIsReady] = useState(false)
-  const lastTypingSentRef = useRef<number>(0)
 
-  // 1. ЕДИНЫЙ ИСТОЧНИК ИСТИНЫ ДЛЯ СЧЕТЧИКА
-  const { data: allDialogs } = useQuery<ChatDialog[]>({
-    queryKey: ["dialogs"],
-    queryFn: () => [], // Заглушка, данные придут из кэша
-    enabled: false,    // Не делать запрос самостоятельно
-    initialData: () => queryClient.getQueryData(["dialogs"]), // Берем текущее состояние
-  });
-  const unreadCount = useMemo(() => {
-    if (!allDialogs) return 0
-    const currentDialog = allDialogs.find(d =>
-      orderId ? d.lastMessage?.orderId === orderId : d.partner.id === partnerId
-    )
-    return currentDialog?.unreadCount || 0
-  }, [allDialogs, partnerId, orderId])
-
-  // 2. ЗАГРУЗКА СООБЩЕНИЙ
+  // 1. ЗАГРУЗКА
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery<InfiniteMessagesResponse>({
     queryKey,
     queryFn: ({ pageParam }) => getMessages({ recipientId: partnerId, orderId, cursor: pageParam as string | undefined, limit: 30 }),
@@ -46,150 +31,180 @@ export function useChat(partnerId: string, orderId: string | undefined, currentU
   })
 
   const messages = useMemo(() => {
-    const all = data?.pages.flatMap((page) => page.messages) || []
-    return [...all].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    return data?.pages.flatMap((page) => page.messages) || []
   }, [data?.pages])
 
-  const { data: typingData } = useQuery({
-    queryKey: ["typing", contextKey],
-    queryFn: () => ({ isTyping: false }),
-    initialData: { isTyping: false },
-    staleTime: Infinity
-  })
-
-  const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight + 10000, behavior })
-    }
+  // 2. ВОССТАНОВЛЕНИЕ ПОЗИЦИИ
+  if (lastRestoredKey.current !== contextKey && isReady) {
+    setIsReady(false)
   }
-
-  // 3. ВОССТАНОВЛЕНИЕ ПОЗИЦИИ
-  // 1. Убираем всё лишнее из тела хука. Оставляем только один эффект.
 
   useLayoutEffect(() => {
-    // ШАГ 1: Если мы переключили чат или данные еще грузятся — выключаем видимость
-    // Это предотвращает вспышку старого контента
-    if (isLoading) {
-      setIsReady(false);
-      return;
-    }
+    if (isLoading || messages.length === 0 || !scrollRef.current) return
+    if (lastRestoredKey.current === contextKey && isReady) return
 
-    // ШАГ 2: Если данные загружены и DOM-узел готов
-    if (scrollRef.current) {
-      const savedPos = scrollPositions[contextKey];
-      const wasStick = isStickToBottomMap[contextKey];
+    const container = scrollRef.current
+    const savedPos = scrollPositions[contextKey]
 
-      // Выставляем скролл (синхронно, до отрисовки)
-      if (wasStick === true || savedPos === undefined) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        isStickToBottomMap[contextKey] = true;
-      } else {
-        scrollRef.current.scrollTop = savedPos;
-      }
+    container.style.scrollBehavior = 'auto'
+    // В column-reverse 0 — это низ. Если позиции нет, браузер сам оставит в 0, 
+    // но мы форсируем для надежности.
+    container.scrollTop = savedPos !== undefined ? savedPos : 0
 
-      // ШАГ 3: Теперь, когда скролл на месте, "включаем" чат
-      setIsReady(true);
-    }
-  }, [contextKey, isLoading, messages.length]);
-  // messages.length важен, чтобы скролл пересчитался, когда сообщения реально отрисовались
+    lastRestoredKey.current = contextKey
+    setIsReady(true)
+  }, [contextKey, isLoading, messages.length])
 
+  // 3.
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (!isReady) return;
 
-  // 4. ОБРАБОТКА СКРОЛЛА
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-    const fromBottom = scrollHeight - scrollTop - clientHeight
-    const isBottom = fromBottom < 80;
+    const { scrollTop } = e.currentTarget;
+    const absScroll = Math.abs(scrollTop);
 
+    // 1. Сохраняем позицию
     scrollPositions[contextKey] = scrollTop;
-    isStickToBottomMap[contextKey] = isBottom;
 
-    // Скрываем кнопку, если мы внизу
-    setShowScrollButton(!isBottom && fromBottom > 200);
+    // 2. Кнопка исчезает только когда мы совсем близко к низу (например, 80px)
+    // А появляется, если мы ушли выше чем на 200px
+    setShowScrollButton(absScroll > 100);
 
-    // Логика прочтения
-    if (isBottom) {
-      const unreadFromPartner = messages.filter(m => m.senderId === partnerId && !m.isRead)
-      if (unreadFromPartner.length > 0) {
-        // Оптимистично красим бабблы
-        queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
-          if (!old) return old
-          return { ...old, pages: old.pages.map(p => ({ ...p, messages: p.messages.map(m => m.senderId === partnerId ? { ...m, isRead: true } : m) })) }
-        })
-        // Обнуляем счетчик в Navbar и Dialogs (локально до Pusher)
-        queryClient.setQueryData<{ count: number }>(["unread-count"], (old) => ({ ...old, count: Math.max(0, (old?.count || 0) - unreadFromPartner.length) }))
-        queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => old?.map(d => (orderId ? d.lastMessage?.orderId === orderId : d.partner.id === partnerId) ? { ...d, unreadCount: 0 } : d))
+  }, [contextKey, isReady]);
 
-        markMessagesAsRead(partnerId, orderId)
-      }
+  // 1. Создаем единую функцию прочтения
+  const handleRead = useCallback(() => {
+    if (!isReady) return;
+
+    const hasUnread = messages.some(m => m.senderId === partnerId && !m.isRead);
+
+    // В режиме column-reverse низ — это scrollTop: 0. 
+    const container = scrollRef.current;
+    const isAtBottom = container ? Math.abs(container.scrollTop) < 100 : false;
+
+    // Условие: есть что читать + мы внизу + окно активно
+    if (hasUnread && isAtBottom && document.hasFocus()) {
+      console.log("Прочтение сработало!");
+      markMessagesAsRead(partnerId, orderId);
+
+      // Оптимистично чистим счетчики в боковой панели
+      queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) =>
+        old?.map(d => (orderId ? d.lastMessage?.orderId === orderId : d.partner.id === partnerId)
+          ? { ...d, unreadCount: 0 }
+          : d
+        )
+      );
+
+      // Оптимистично красим бабблы в самом чате
+      queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page => ({
+            ...page,
+            messages: page.messages.map(m => m.senderId === partnerId ? { ...m, isRead: true } : m)
+          }))
+        };
+      });
     }
-  }
+  }, [messages, partnerId, orderId, isReady, queryClient, queryKey]);
 
-  // 5. ОТПРАВКА
+  // 2. Добавляем "добивку" при возвращении на вкладку
+  useEffect(() => {
+    const onFocus = () => handleRead();
+    window.addEventListener("focus", onFocus);
+    // Вызываем один раз при монтировании/смене чата на случай, если мы уже внизу
+    handleRead();
+
+    return () => window.removeEventListener("focus", onFocus);
+  }, [handleRead]);
+
+
+
+  // 4. ПОЛНАЯ МУТАЦИЯ ОТПРАВКИ
   const mutation = useMutation({
     mutationFn: (text: string) => sendMessage({ recipientId: partnerId, text, orderId }),
     onMutate: async (newText) => {
-      await queryClient.cancelQueries({ queryKey });
+      await queryClient.cancelQueries({ queryKey })
+
       const optimisticMsg: MessageWithSender = {
-        id: `temp-${Date.now()}`, text: newText, senderId: currentUserId, recipientId: partnerId, orderId: orderId || null,
-        createdAt: new Date(), updatedAt: new Date(), isRead: false, isOptimistic: true,
+        id: `temp-${Date.now()}`,
+        text: newText,
+        senderId: currentUserId,
+        recipientId: partnerId,
+        orderId: orderId || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isRead: false,
+        isOptimistic: true,
         sender: { id: currentUserId, name: "Вы", image: null }
-      };
+      }
 
+      // Обновляем сообщения
       queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
-        if (!old || !old.pages.length) return { pages: [{ messages: [optimisticMsg], nextCursor: null }], pageParams: [undefined] };
-        return { ...old, pages: old.pages.map((p, i) => i === 0 ? { ...p, messages: [...p.messages, optimisticMsg] } : p) };
-      });
+        if (!old) return { pages: [{ messages: [optimisticMsg], nextCursor: null }], pageParams: [undefined] }
+        return {
+          ...old,
+          pages: old.pages.map((p, i) => i === 0 ? { ...p, messages: [optimisticMsg, ...p.messages] } : p)
+        }
+      })
 
-      setInput("");
-      isStickToBottomMap[contextKey] = true;
-      requestAnimationFrame(() => scrollToBottom("smooth"));
+    //  setInput("")
+      scrollPositions[contextKey] = 0
+      if (scrollRef.current) scrollRef.current.scrollTop = 0
     },
-    onSuccess: (response) => {
-      if (!response.data) return;
-      const realMsg = response.data;
-      queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
-        if (!old) return old;
-        return { ...old, pages: old.pages.map(page => ({ ...page, messages: page.messages.map(m => (m.isOptimistic && m.text === realMsg.text) ? realMsg : m) })) };
-      });
-      queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => {
-        if (!old) return old;
-        return old.map(d => (orderId ? d.lastMessage?.orderId === orderId : d.partner.id === partnerId) ? { ...d, lastMessage: realMsg } : d);
-      });
+    onSuccess: (res) => {
+      if (res.data) {
+        const realMsg = res.data
+        // Заменяем оптимистичное сообщение реальным
+        queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map(page => ({
+              ...page,
+              messages: page.messages.map(m => (m.isOptimistic && m.text === realMsg.text) ? realMsg : m)
+            }))
+          }
+        })
+        // Обновляем последний месседж в списке диалогов
+        queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => {
+          if (!old) return old
+          return old.map(d => (orderId ? d.lastMessage?.orderId === orderId : d.partner.id === partnerId) ? { ...d, lastMessage: realMsg } : d)
+        })
+      }
     }
-  });
+  })
 
-  // 6. УМНЫЙ ЯКОРЬ (БЕЗ РУЧНОГО СЧЕТЧИКА)
-  useEffect(() => {
-    const lastMsg = messages[messages.length - 1]
-    if (!lastMsg?.id || !isReady) return
-
-    const isMe = lastMsg.senderId === currentUserId
-    const stickToBottom = isStickToBottomMap[contextKey]
-
-    if (isMe || stickToBottom) {
-      requestAnimationFrame(() => scrollToBottom("smooth"))
-    }
-  }, [messages[messages.length - 1]?.id, isReady, contextKey])
+  // 5. ОСТАЛЬНОЕ
+  const handleSendMessage = () => { if (input.trim() && !mutation.isPending) mutation.mutate(input) }
 
   const handleInputChange = (val: string) => {
     setInput(val)
-    const now = Date.now()
-    if (now - lastTypingSentRef.current > 3000) {
-      lastTypingSentRef.current = now
+    if (Date.now() - lastTypingSentRef.current > 3000) {
+      lastTypingSentRef.current = Date.now()
       sendTypingStatus(partnerId, contextKey)
     }
   }
 
-  const hasClientStarted = useMemo(() => {
-    if (!orderId) return true
-    return messages.some(m => m.senderId !== currentUserId || m.orderId === orderId)
-  }, [messages, orderId, currentUserId])
+
+  const topAnchorRef = useCallback((node: HTMLDivElement | null) => {
+    if (!hasNextPage || isFetchingNextPage) return
+    if (intObserver.current) intObserver.current.disconnect()
+    intObserver.current = new IntersectionObserver(entries => {
+      if (entries[0]?.isIntersecting) fetchNextPage()
+    }, { threshold: 0.1 })
+    if (node) intObserver.current.observe(node)
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  const scrollToBottom = () => { if (scrollRef.current) scrollRef.current.scrollTo({ top: 0, behavior: "smooth" }) }
+
+  const { data: typingData } = useQuery({ queryKey: ["typing", contextKey], queryFn: () => ({ isTyping: false }), initialData: { isTyping: false }, staleTime: Infinity })
+  const allDialogs = queryClient.getQueryData<ChatDialog[]>(["dialogs"])
+  const unreadCount = allDialogs?.find(d => orderId ? d.lastMessage?.orderId === orderId : d.partner.id === partnerId)?.unreadCount || 0
 
   return {
-    messages, input, setInput, isTyping: typingData?.isTyping, unreadCount,
-    showScrollButton, isReady, setIsReady, scrollRef, handleScroll,
-    handleInputChange, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading,
-    handleSendMessage: () => { if (input.trim() && !mutation.isPending) mutation.mutate(input) },
-    mutation, scrollToBottom, hasClientStarted, contextKey
+    messages, input, setInput, isTyping: typingData?.isTyping,
+    unreadCount, showScrollButton, isReady, isLoading, isFetchingNextPage, hasNextPage,
+    scrollRef, handleScroll, handleInputChange, handleSendMessage, topAnchorRef, scrollToBottom, mutation, handleRead,
   }
 }

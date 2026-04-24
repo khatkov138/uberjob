@@ -79,7 +79,7 @@ export async function getMessages({
     cursor?: string,
     limit?: number,
 }): Promise<InfiniteMessagesResponse> {
-
+     //  await delay(2000)
     const session = await getServerSession()
     if (!session?.user?.id) return { messages: [], nextCursor: null }
 

@@ -3,6 +3,7 @@
 import * as React from "react"
 import TextareaAutosize from 'react-textarea-autosize'
 import { Send, ShieldAlert, Loader2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface ChatInputProps {
     value: string
@@ -29,32 +30,32 @@ export function ChatInput({ value, onChange, onSend, isPending, disabled }: Chat
 
     return (
         <footer className="p-6 md:p-8 bg-white border-t border-slate-100 shrink-0">
-            <div className="flex gap-4 items-end bg-slate-50 p-2 rounded-[2.5rem] border-2 border-transparent focus-within:border-blue-600 focus-within:bg-white transition-all duration-300 shadow-inner">
-                <TextareaAutosize
-                    maxRows={5}
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            if (value.trim() && !isPending) onSend()
-                        }
-                    }}
-                    placeholder="НАПИШИТЕ СООБЩЕНИЕ..."
-                    className="flex-1 min-h-[48px] py-4 px-8 bg-transparent outline-none font-black italic text-[11px] tracking-widest text-slate-900 placeholder:text-slate-300 uppercase resize-none scroll-smooth"
-                />
+            <div className="p-4 bg-white border-t border-slate-100">
+                <div className="relative flex items-end gap-2 max-w-4xl mx-auto min-h-[44px]">
+                    {/* min-h-[44px] резервирует высоту для одной строки заранее */}
 
-                <button
-                    onClick={onSend}
-                    disabled={!value.trim() || isPending}
-                    className="w-14 h-14 bg-slate-900 hover:bg-blue-600 disabled:bg-slate-200 text-white rounded-[1.8rem] flex items-center justify-center transition-all shrink-0 active:scale-95 shadow-xl mb-0.5"
-                >
-                    {isPending ? (
-                        <Loader2 className="animate-spin" size={20} />
-                    ) : (
-                        <Send size={20} className="ml-1" />
-                    )}
-                </button>
+                    <textarea
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                        placeholder="Напишите сообщение..."
+                        rows={1}
+                        className={cn(
+                            "flex-1 w-full bg-slate-50 border-none rounded-2xl px-4 py-3",
+                            "text-sm resize-none focus:ring-0 max-h-32",
+                            "min-h-[44px] leading-[20px]", // Жестко задаем высоту строки и поля
+                            "transition-none" // Убираем анимации на старт, чтобы не дергалось
+                        )}
+                        style={{ height: '44px' }} // Принудительно ставим высоту для первого кадра
+                    />
+
+                    <button
+                        onClick={onSend}
+                        disabled={disabled || !value.trim()}
+                        className="mb-1 p-2 bg-blue-600 text-white rounded-xl shrink-0 hover:bg-blue-700 disabled:opacity-50 transition-all"
+                    >
+                        <Send size={18} />
+                    </button>
+                </div>
             </div>
         </footer>
     )

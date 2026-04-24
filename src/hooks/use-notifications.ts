@@ -24,6 +24,7 @@ export function useNotifications(userId: string | undefined) {
       const { type, contextKey, data } = payload
       if (!contextKey) return
 
+      // 1. СТАТУС ПЕЧАТИ
       if (type === "USER_TYPING") {
         if (typingTimeouts[contextKey]) clearTimeout(typingTimeouts[contextKey]);
         queryClient.setQueryData(["typing", contextKey], { isTyping: true, userId: data.userId });
@@ -32,6 +33,7 @@ export function useNotifications(userId: string | undefined) {
         }, 4000);
       }
 
+      // 2. НОВОЕ СООБЩЕНИЕ
       if (type === "NEW_MESSAGE") {
         const { message: msg, orderId } = data
         const isMe = msg.senderId === userId
@@ -40,26 +42,37 @@ export function useNotifications(userId: string | undefined) {
         const activeUserId = searchParams.get("userId")
         const activeOrderId = searchParams.get("orderId")
 
-        // ФИКС: Вкладка "в чате" только если она в фокусе
+        // Вкладка считается "в чате", только если URL совпадает И окно активно
         const isChatRoute = orderId ? activeOrderId === orderId : activeUserId === (isMe ? msg.recipientId : msg.senderId);
         const isCurrentChat = isChatRoute && document.hasFocus();
 
         queryClient.setQueryData(["typing", contextKey], { isTyping: false });
 
-        // А) Сообщения
+        // А) Обновление бабблов (Infinite Query)
         queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
           if (!old) return isChatRoute ? (queryClient.invalidateQueries({ queryKey }), old) : old
+
           if (old.pages.flatMap(p => p.messages).some(m => m.id === msg.id)) return old
+
+          // Создаем копию сообщения для кэша
+          const newMsg = { ...msg };
+
+          // Если чат открыт прямо сейчас и окно в фокусе, 
+          // мы визуально помечаем сообщение как прочитанное сразу
+          if (isCurrentChat) {
+            newMsg.isRead = true;
+          }
+
           return {
             ...old,
             pages: old.pages.map((page, i) => i !== 0 ? page : {
               ...page,
-              messages: [msg, ...page.messages.filter(m => !(m.isOptimistic && m.text === msg.text))]
+              messages: [newMsg, ...page.messages.filter(m => !(m.isOptimistic && m.text === msg.text))]
             })
           }
         })
 
-        // Б) Список диалогов
+        // Б) Обновление списка диалогов (Sidebar)
         let shouldIncrementNavbar = false
         queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => {
           if (!old) return old
@@ -69,8 +82,21 @@ export function useNotifications(userId: string | undefined) {
 
           if (index !== -1) {
             const existing = dialogs[index]
+
+            // Если пришло подтверждение нашего оптимистичного сообщения
+            const isOptimisticConfirm = isMe && existing.lastMessage?.isOptimistic && existing.lastMessage?.text === msg.text;
+
+            // Если сообщение уже обработано (те же ID)
             if (existing.lastMessage?.id === msg.id) return old
 
+            if (isOptimisticConfirm) {
+              // Просто тихо обновляем последнее сообщение без перемещений и счетчиков
+              const updated = [...dialogs]
+              updated[index] = { ...existing, lastMessage: msg }
+              return updated
+            }
+
+            // РЕАЛЬНО НОВОЕ СООБЩЕНИЕ
             const [moved] = dialogs.splice(index, 1)
 
             let newUnreadCount = moved.unreadCount
@@ -83,7 +109,10 @@ export function useNotifications(userId: string | undefined) {
 
             return [{ ...moved, lastMessage: msg, unreadCount: newUnreadCount }, ...dialogs]
           }
-          queryClient.invalidateQueries({ queryKey: ["dialogs"] }); return old
+
+          // Если диалога нет (новый контакт) - рефетчим список
+          queryClient.invalidateQueries({ queryKey: ["dialogs"] });
+          return old
         })
 
         if (shouldIncrementNavbar) {
@@ -91,21 +120,29 @@ export function useNotifications(userId: string | undefined) {
         }
       }
 
+      // 3. ПРОЧТЕНИЕ
       if (type === "MESSAGES_READ") {
         const queryKey = getMessagesQueryKey(contextKey)
         const isReadByMe = data.readerId === userId
+
         queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
           if (!old) return old
           return { ...old, pages: old.pages.map(p => ({ ...p, messages: p.messages.map(m => (isReadByMe ? m.senderId !== userId : m.senderId === userId) ? { ...m, isRead: true } : m) })) }
         })
+
         queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => old?.map(d => {
           const match = d.lastMessage?.orderId ? `order_${d.lastMessage.orderId}` === contextKey : getContextKey(null, userId, d.partner.id) === contextKey
           return match ? { ...d, unreadCount: 0 } : d
         }))
+
         if (isReadByMe) queryClient.invalidateQueries({ queryKey: ["unread-count"] })
       }
     })
 
-    return () => { channel.unbind("events"); pusher.unsubscribe(channelName); Object.values(typingTimeouts).forEach(clearTimeout) }
+    return () => {
+      channel.unbind("events")
+      pusher.unsubscribe(channelName)
+      Object.values(typingTimeouts).forEach(clearTimeout)
+    }
   }, [userId, queryClient, searchParams])
 }

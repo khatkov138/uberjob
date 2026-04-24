@@ -3,15 +3,26 @@
 @import "shadcn/tailwind.css";
 
 @theme {
+
   /* Добавляем ключевые кадры анимации */
   @keyframes marquee {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
+    from {
+      transform: translateX(0);
+    }
+
+    to {
+      transform: translateX(-50%);
+    }
   }
 
   @keyframes shimmer {
-    from { transform: translateX(-100%); }
-    to { transform: translateX(100%); }
+    from {
+      transform: translateX(-100%);
+    }
+
+    to {
+      transform: translateX(100%);
+    }
   }
 
   /* Регистрируем анимации как утилиты Tailwind */
@@ -138,33 +149,45 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   html {
     @apply font-sans;
   }
 }
 
 
+
 .chat-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
+
 .chat-scrollbar::-webkit-scrollbar-track {
   background: transparent;
-  margin: 10px;
 }
+
 .chat-scrollbar::-webkit-scrollbar-thumb {
   background: #e2e8f0;
   border-radius: 10px;
-  transition: background 0.3s ease;
-}
-.chat-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #2563eb;
 }
 
-/* Запрет якорения на лоадере */
-.anchor-none {
+.chat-scrollbar {
+  /* Разрешаем контейнеру анкоринг, но внутри мы его переопределили */
+  overflow-anchor: auto !important; 
+}
+
+.message-bubble-wrapper {
+  /* По умолчанию разрешаем якорение */
+  overflow-anchor: auto;
+}
+
+/* 
+  Самое первое сообщение в DOM (визуально самое нижнее в reverse) 
+  не должно быть якорем, иначе при вставке всё прыгнет.
+*/
+.message-bubble-wrapper:first-of-type {
   overflow-anchor: none !important;
 }
-

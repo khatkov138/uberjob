@@ -2,72 +2,52 @@
 
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import { Check, CheckCheck, Clock } from "lucide-react"
 import { MessageWithSender } from "@/lib/types/chat"
+import { Check, CheckCheck, Clock } from "lucide-react"
 
 interface MessageBubbleProps {
-    msg: MessageWithSender
-    isMe: boolean
-    isFirst: boolean // Начало группы (нужен большой отступ и стандартный угол)
-    isLast: boolean  // Конец группы (нужно время и галочки)
+  msg: MessageWithSender
+  isMe: boolean
+  isFirst: boolean 
+  isLast: boolean  
 }
 
 export function MessageBubble({ msg, isMe, isFirst, isLast }: MessageBubbleProps) {
-    return (
-        <div
-            className={cn(
-                "flex flex-col max-w-[85%] md:max-w-[70%] transition-all duration-300",
-                isMe ? "ml-auto items-end" : "items-start",
-                isFirst ? "mt-6" : "mt-0.5" // Группируем сообщения плотнее внутри пачки
-            )}
-        >
-            <div
-                className={cn(
-                    "px-5 py-3 text-[13px] font-bold italic tracking-tight shadow-sm w-fit break-words transition-all duration-500",
-                    isMe
-                        ? cn(
-                            "bg-blue-600 text-white rounded-[2rem] shadow-lg shadow-blue-50/50",
-                            // Если сообщение в середине или в начале группы — сглаживаем углы со стороны хвоста
-                            !isFirst && "rounded-tr-lg",
-                            !isLast && "rounded-br-lg"
-                        )
-                        : cn(
-                            "bg-white border-2 border-slate-50 text-slate-900 rounded-[2rem]",
-                            !isFirst && "rounded-tl-lg",
-                            !isLast && "rounded-bl-lg",
-                            // Подсвечиваем непрочитанные входящие (опционально)
-                            !msg.isRead && "border-blue-50 bg-slate-50/50"
-                        ),
-                    // Стили для оптимистичного (отправляемого) сообщения
-                    msg.isOptimistic && "opacity-70 scale-[0.98] grayscale-[0.5]"
-                )}
-            >
-                {msg.text}
+  const isUnreadIncoming = !isMe && !msg.isRead;
+
+  return (
+    <div className={cn(
+      "flex flex-col w-full px-4 antialiased",
+      isMe ? "items-end" : "items-start",
+      "pt-2" 
+    )}>
+      <div className={cn(
+        "px-4 py-2.5 text-[13px] font-bold italic tracking-tight shadow-sm w-fit break-words border-2 relative min-w-[80px]",
+        "transition-all duration-300",
+        // Базовая геометрия
+        "rounded-[1.4rem]",
+        !isFirst && (isMe ? "rounded-tr-md" : "rounded-tl-md"),
+        !isLast && (isMe ? "rounded-br-md" : "rounded-bl-md"),
+        
+        // Цветовая логика
+        isMe 
+          ? "bg-blue-600 border-blue-600 text-white" 
+          : cn(
+              "border-white text-slate-900",
+              isUnreadIncoming ? "bg-slate-100 border-slate-200 text-slate-500" : "bg-white"
+            )
+      )}>
+        {msg.text}
+        
+        <div className="flex items-center justify-end gap-1 mt-1 opacity-40 text-[7px] font-black uppercase tracking-tighter">
+          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {isMe && (
+            <div className="w-[10px]">
+              {msg.isOptimistic ? <Clock size={8} /> : msg.isRead ? <CheckCheck size={10} /> : <Check size={10} />}
             </div>
-
-            {/* Индикаторы времени и статуса показываем только под ПОСЛЕДНИМ сообщением в группе */}
-            {isLast && (
-                <div className="flex items-center gap-1.5 mt-1.5 px-3 opacity-30 text-[8px] font-black uppercase italic tracking-tighter">
-                    <span>
-                        {new Date(msg.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                        })}
-                    </span>
-
-                    {isMe && (
-                        <div className="flex items-center">
-                            {msg.isOptimistic ? (
-                                <Clock size={9} className="animate-pulse" />
-                            ) : msg.isRead ? (
-                                <CheckCheck size={11} className="text-blue-600" />
-                            ) : (
-                                <Check size={11} />
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
+          )}
         </div>
-    )
+      </div>
+    </div>
+  )
 }
