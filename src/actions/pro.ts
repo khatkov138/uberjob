@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma"
 
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "@/lib/get-session"
-import { ActiveOrder } from "@/lib/types"
+import { ActiveOrder } from "@/lib/types/types"
 
 
 

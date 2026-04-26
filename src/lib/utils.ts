@@ -1,11 +1,28 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { ActionResponse } from "./server-utils";
+
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 export const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+export async function handleAction<T>(promise: Promise<ActionResponse<T>>): Promise<T> {
+  const res = await promise;
+  if (!res.success) throw new Error(res.error || "Action failed");
+  return res.data as T;
+}
+/**
+ * Утилита для развертывания ответа экшена в Server Components.
+ * Если экшен упал, возвращает fallbackValue (например, пустой массив).
+ */
+export function unwrap<T>(res: ActionResponse<T>, fallback: T): T {
+  return res.success ? (res.data as T) : fallback;
+}
+
+
 
 
 /**
@@ -20,12 +37,12 @@ export function getDistance(
   const R = 6371; // Радиус Земли в километрах
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
-  
+
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  
+
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;
 
@@ -42,12 +59,12 @@ function toRad(value: number): number {
 // lib/utils.ts
 export const getContextKey = (orderId?: string | null, userId1?: string, userId2?: string) => {
   if (orderId) return `order_${orderId}`;
-  
+
   if (userId1 && userId2) {
     const sortedIds = [userId1, userId2].sort().join("_");
     return `direct_${sortedIds}`;
   }
-  
+
   return "global";
 };
 

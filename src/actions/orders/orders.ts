@@ -6,32 +6,14 @@ import { revalidatePath } from "next/cache"
 
 import { getServerSession } from "@/lib/get-session"
 
+
+import { OrderStatus, Prisma } from "@prisma/client"
 import { getDistance } from "@/lib/utils"
-import { FeedOrder } from "@/lib/types"
-import { OrderStatus } from "@prisma/client"
+import { createAuthAction } from "@/lib/server-utils"
 
 
 
 
-// Получить заказы, которые Я ВЗЯЛ В РАБОТУ (как мастер)
-export async function getProWorkOrders() {
-  const session = await getServerSession()
-  if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-
-  try {
-    const orders = await prisma.order.findMany({
-      where: {
-        workerId: session.user.id,
-        status: { in: [OrderStatus.ACCEPTED, OrderStatus.IN_PROGRESS, OrderStatus.COMPLETED] }
-      },
-      orderBy: { updatedAt: "desc" },
-      include: { client: { select: { name: true, image: true } } }
-    })
-    return { success: true, data: orders }
-  } catch (e) {
-    return { success: false, error: "Ошибка при загрузке ваших работ" }
-  }
-}
 
 
 export async function completeOrder(orderId: string) {
@@ -172,81 +154,6 @@ export async function confirmOrderCompletion(orderId: string) {
 }
 
 
-export async function getProOrders() {
-  const session = await getServerSession()
-  if (!session?.user) return { success: false, error: "Unauthorized" }
-
-  try {
-    const orders = await prisma.order.findMany({
-      where: {
-        workerId: session.user.id
-      },
-      include: {
-        client: { select: { name: true, image: true } }
-      },
-      orderBy: { updatedAt: 'desc' }
-    })
-    return { success: true, data: orders }
-  } catch (e) {
-    return { success: false, error: "Ошибка загрузки" }
-  }
-}
-
-export async function getOrders(
-  lat?: number,
-  lng?: number,
-  radiusKm: number = 60
-): Promise<FeedOrder[]> { // Теперь возвращаем ЧИСТЫЙ МАССИВ
-  const session = await getServerSession()
-  const userId = session?.user?.id
-
-  if (!userId) return []
-
-  try {
-    const profile = await prisma.profile.findUnique({
-      where: { userId },
-      select: { skills: { select: { categoryId: true } } }
-    })
-
-    const masterCategoryIds = profile?.skills.map(s => s.categoryId) || []
-
-    const allOrders = await prisma.order.findMany({
-      where: { status: "PENDING" },
-      include: {
-        client: { select: { name: true, image: true, _count: { select: { ordersCreated: true } } } },
-        categories: { include: { category: true } },
-        _count: { select: { offers: true } }
-      },
-      orderBy: { createdAt: 'desc' }
-    })
-
-    if (!lat || !lng) return allOrders;
-
-    return allOrders.map(order => {
-      const distance = getDistance(lat, lng, order.lat ?? 0, order.lng ?? 0)
-      const orderCategoryIds = order.categories.map(c => c.categoryId)
-      const isMatch = orderCategoryIds.some(id => masterCategoryIds.includes(id))
-
-      return {
-        ...order,
-        distance,
-        isMatch,
-        client: {
-          name: order.client?.name || "Заказчик",
-          image: order.client?.image,
-          projects: order.client?._count.ordersCreated || 0,
-        },
-        offersCount: order._count?.offers || 0
-      }
-    })
-      .filter(order => order.distance <= radiusKm)
-      .sort((a, b) => (a.isMatch === b.isMatch ? 0 : a.isMatch ? -1 : 1))
-
-  } catch (error) {
-    console.error("FEED_ERROR:", error)
-    return [] // В случае ошибки просто пустая лента
-  }
-}
 
 
 export async function getOrderById(id: string) {
@@ -295,9 +202,78 @@ export async function getOrderById(id: string) {
   }
 }
 
+// 1. Вспомогательная функция для вывода типов Prisma
+async function getRawOrdersQuery() {
+  return await prisma.order.findMany({
+    where: { status: "PENDING" },
+    include: {
+      client: {
+        select: {
+          name: true,
+          image: true,
+          _count: { select: { ordersCreated: true } }
+        }
+      },
+      categories: { include: { category: true } },
+      _count: { select: { offers: true } }
+    },
+    orderBy: { createdAt: 'desc' }
+  })
+}
 
+// 2. Генерируем типы автоматически
+type RawOrder = Prisma.PromiseReturnType<typeof getRawOrdersQuery>[number]
 
+export type FeedOrder = RawOrder & {
+  distance: number | null
+  isMatch: boolean
+  offersCount: number
+}
 
+interface GetOrdersParams {
+  lat?: number
+  lng?: number
+  radius?: number
+}
+
+// 3. Основной экшен
+export async function getOrders({ lat, lng, radius = 60 }: GetOrdersParams) {
+  // Вызываем наш хелпер прямо здесь
+  return createAuthAction(async (userId) => {
+
+    // 1. Загружаем данные
+    const [allOrders, profile] = await Promise.all([
+      getRawOrdersQuery(),
+      prisma.profile.findUnique({
+        where: { userId },
+        select: { skills: { select: { categoryId: true } } }
+      })
+    ])
+
+    const masterCategoryIds = profile?.skills.map(s => s.categoryId) || []
+
+    // 2. Обрабатываем и возвращаем данные
+    return allOrders
+      .map((order): FeedOrder => {
+        const distance = lat && lng && order.lat && order.lng
+          ? getDistance(lat, lng, order.lat, order.lng)
+          : null
+
+        const isMatch = order.categories.some(c =>
+          masterCategoryIds.includes(c.categoryId)
+        )
+
+        return {
+          ...order,
+          distance,
+          isMatch,
+          offersCount: order._count?.offers || 0
+        }
+      })
+      .filter(order => !lat || !lng || (order.distance ?? 0) <= radius)
+      .sort((a, b) => (a.isMatch === b.isMatch ? 0 : a.isMatch ? -1 : 1))
+  })
+}
 
 
 

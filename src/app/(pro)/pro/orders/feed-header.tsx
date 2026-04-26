@@ -5,14 +5,15 @@ import { MapPin, ChevronDown, Plus, X, Settings2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useLocationStore } from "@/store/use-location-store"
 import { CategorySearchModal } from "./category-search-modal"
+import { LocationModal } from "@/components/geo/location-modal"
 
 // Принимаем массив объектов [{id, name}]
-export function FeedHeader({ 
+export function FeedHeader({
   userSkills = [], // Массив объектов из профиля
   onAddSkill,      // Функция (id) => void
   onRemoveSkill,   // Функция (id) => void
-  filterMode, 
-  setFilterMode 
+  filterMode,
+  setFilterMode
 }: any) {
   const { city, radius, setRadius, openModal } = useLocationStore()
   const [isSearchOpen, setIsSearchOpen] = React.useState(false)
@@ -64,16 +65,16 @@ export function FeedHeader({
               <span className="text-[10px] font-black uppercase tracking-widest italic">
                 {skill.category?.name || "..."}
               </span>
-              <button 
-                onClick={() => onRemoveSkill(skill.categoryId)} 
+              <button
+                onClick={() => onRemoveSkill(skill.categoryId)}
                 className="p-1 hover:bg-white/20 rounded-lg transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
-          
-          <button 
+
+          <button
             onClick={() => setIsSearchOpen(true)}
             className="flex items-center gap-2 border-2 border-dashed border-slate-200 px-4 py-2 rounded-xl text-slate-400 hover:border-blue-400 hover:text-blue-600 transition-all active:scale-95"
           >
@@ -83,7 +84,8 @@ export function FeedHeader({
         </div>
       </div>
 
-      <CategorySearchModal 
+      <LocationModal />
+      <CategorySearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         userCategoryIds={userCategoryIds}
@@ -92,6 +94,7 @@ export function FeedHeader({
           // setIsSearchOpen(false) // Опционально: закрывать ли после добавления
         }}
       />
+
     </div>
   )
 }

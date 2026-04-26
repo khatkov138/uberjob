@@ -1,12 +1,8 @@
 import { Category, Order, Profile } from "@prisma/client";
 
 
-export type ActionResponse<T = any> = {
-  success: boolean;
-  data?: T;
-  error?: string;
-  code?: string; // Например, 'AUTH_REQUIRED'
-}
+
+/*
 
 export interface OrderWithDetails extends Order {
   client: {
@@ -41,8 +37,4 @@ export type FullProfile = Profile & {
 } | null;
 
 // Тип для заказа (упростим или используй свой OrderWithDetails)
-export interface FeedOrder extends Order {
-  isMatch?: boolean;
-  categories: { category: Category }[];
-  client: { name: string; image: string | null };
-}
+*/

@@ -2,7 +2,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Info, Wallet } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { ActiveOrder } from "@/lib/types"
+import { ActiveOrder } from "@/lib/types/types"
 
 interface OrderStatusCardProps {
   order: ActiveOrder

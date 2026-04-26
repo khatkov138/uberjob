@@ -8,7 +8,7 @@ import { OfferForm } from "./offer-form"
 import { cn } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
 import { getOrderById } from "@/actions/orders/orders"
-import { OrderWithDetails } from "@/lib/types"
+import { OrderWithDetails } from "@/lib/types/types"
 
 interface OrderDetailsUIProps {
   order: OrderWithDetails
