@@ -1,7 +1,7 @@
 import { cache } from "react"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
-import { UserRole } from "../../prisma/generated"
+import { UserRole } from "@prisma/client"
 
 // По умолчанию "SERVER" - это и страницы, и экшены. Они делят один кэш.
 export const getServerSession = cache(async (source: "SERVER" | "API" = "SERVER") => {

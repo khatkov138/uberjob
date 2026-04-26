@@ -2,7 +2,8 @@ import { inferAdditionalFields } from "better-auth/client/plugins"
 import { nextCookies } from 'better-auth/next-js'
 import { createAuthClient } from 'better-auth/react'
 import { auth } from './auth'
-import { UserRole } from "../../prisma/generated"
+import { UserRole } from "@prisma/client"
+
 
 export const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000", 

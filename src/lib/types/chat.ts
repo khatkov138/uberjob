@@ -1,4 +1,4 @@
-import {  Notification as DbNotification, Prisma } from "../../../prisma/generated";
+import { Prisma } from "@prisma/client";
 
 export type MessageWithSender = Prisma.MessageGetPayload<{
   include: {
@@ -26,4 +26,4 @@ export type PusherPayload =
   | { type: "MESSAGES_READ"; contextKey: string; data: { readerId: string } }
 
   | { type: "USER_TYPING"; contextKey: string; data: { userId: string } }
-  | { type: "SYSTEM_NOTIFICATION"; contextKey: string; data: { notification: DbNotification } };
+  | { type: "SYSTEM_NOTIFICATION"; contextKey: string; data: { notification: Notification } };

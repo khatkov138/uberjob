@@ -1,5 +1,4 @@
-import { Category, Order, Prisma, Profile } from "../../prisma/generated/client";
-
+import { Category, Order, Profile } from "@prisma/client";
 
 
 export type ActionResponse<T = any> = {

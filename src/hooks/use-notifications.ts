@@ -59,7 +59,7 @@ export function useNotifications(userId: string | undefined) {
 
           // Если чат открыт прямо сейчас и окно в фокусе, 
           // мы визуально помечаем сообщение как прочитанное сразу
-          if (isCurrentChat) {
+          if (isCurrentChat ) {
             newMsg.isRead = true;
           }
 

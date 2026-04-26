@@ -4,7 +4,7 @@ import { getServerSession } from "@/lib/get-session"
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { CreateOrderValues } from "@/lib/validation"
-import { OrderStatus } from "../../../prisma/generated"
+import { OrderStatus } from "@prisma/client"
 
 async function analyzeTask(description: string) {
   try {

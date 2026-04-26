@@ -5,13 +5,20 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
+import { MyOffersWithData } from "@/actions/offers"
 
-export function MyOffersList({ initialOffers }: any) {
+interface MyOffersListProps {
+  // Мы ожидаем массив. Если Action может вернуть null, добавляем проверку.
+  initialOffers: MyOffersWithData
+}
+
+export function MyOffersList({ initialOffers }: MyOffersListProps) {
+  // Защита: если пришел null или пустой массив
   if (!initialOffers || initialOffers.length === 0) {
     return (
       <div className="py-32 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
-        <p className="text-xl font-black uppercase italic text-slate-300 text-slate-500">У вас пока нет активных откликов</p>
-        <Link href="/pro/feed" className="inline-block mt-6 text-blue-600 font-black uppercase text-xs border-b-2 border-blue-100 pb-1">
+        <p className="text-xl font-black uppercase italic text-slate-300">У вас пока нет активных откликов</p>
+        <Link href="/pro/orders" className="inline-block mt-6 text-blue-600 font-black uppercase text-xs border-b-2 border-blue-100 pb-1">
           Перейти в ленту заказов
         </Link>
       </div>
@@ -20,32 +27,36 @@ export function MyOffersList({ initialOffers }: any) {
 
   return (
     <div className="grid gap-6">
-      {initialOffers.map((offer: any) => (
+      {initialOffers.map((offer) => ( // Убрал any, теперь тут работает автодополнение
         <div key={offer.id} className="group relative">
           <div className={cn(
             "bg-white rounded-[2.5rem] border-2 transition-all duration-500 p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-8",
             "hover:shadow-[0_25px_60px_rgba(0,0,0,0.06)]",
             offer.status === 'ACCEPTED' ? "border-emerald-500/20 bg-emerald-50/10" : "border-slate-100"
           )}>
-            
+
             {/* ИНФО О ЗАКАЗЕ */}
             <div className="flex-1 space-y-5 w-full">
               <div className="flex items-center gap-3">
-                <span className="text-[9px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">
-                  #{offer.order.categories[0]}
-                </span>
+                <div className="flex gap-1">
+                  {offer.order.categories.map((item) => (
+                    <span key={item.category.id} className="text-[9px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">
+                      {item.category.name}
+                    </span>
+                  ))}
+                </div>
                 <span className="text-[9px] font-black uppercase text-slate-300">
                   REF: {offer.id.slice(-6).toUpperCase()}
                 </span>
               </div>
-              
+
               <div className="space-y-1">
                 <Link href={`/pro/orders/${offer.order.id}`}>
                   <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter text-slate-900 group-hover:text-blue-600 transition-colors leading-[0.9]">
                     {offer.order.title}
                   </h3>
                 </Link>
-                
+
                 {/* БЛОК ЗАКАЗЧИКА */}
                 <div className="flex items-center gap-2 pt-1">
                   <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
@@ -80,7 +91,7 @@ export function MyOffersList({ initialOffers }: any) {
               <div className="space-y-1">
                 <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">Ваша цена</p>
                 <p className="text-4xl font-black italic text-slate-900 leading-none tracking-tighter">
-                  {offer.price / 100} <span className="text-lg uppercase text-slate-300">₽</span>
+                  {offer.price.toLocaleString()} <span className="text-lg uppercase text-slate-300">₽</span>
                 </p>
               </div>
 
@@ -107,8 +118,8 @@ export function MyOffersList({ initialOffers }: any) {
             </div>
 
             {/* ПЕРЕХОД */}
-            <Link 
-              href={`/pro/feed/orders/${offer.order.id}`}
+            <Link
+              href={`/pro/orders/${offer.order.id}`}
               className="absolute top-1/2 -right-4 -translate-y-1/2 w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:right-6 transition-all duration-500 shadow-xl z-10"
             >
               <ChevronRight className="w-6 h-6" />

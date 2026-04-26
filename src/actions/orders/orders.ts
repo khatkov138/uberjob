@@ -5,9 +5,10 @@ import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 
 import { getServerSession } from "@/lib/get-session"
-import { OrderStatus } from "../../../prisma/generated"
+
 import { getDistance } from "@/lib/utils"
 import { FeedOrder } from "@/lib/types"
+import { OrderStatus } from "@prisma/client"
 
 
 

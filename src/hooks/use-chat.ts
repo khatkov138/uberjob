@@ -5,6 +5,7 @@ import { useInfiniteQuery, useQueryClient, useMutation, useQuery, InfiniteData }
 import { getMessages, markMessagesAsRead, sendMessage, sendTypingStatus } from "@/actions/chat/message"
 import { getContextKey, getMessagesQueryKey } from "@/lib/utils"
 import { ChatDialog, InfiniteMessagesResponse, MessageWithSender } from "@/lib/types/chat"
+import { toast } from "sonner"
 
 const scrollPositions: Record<string, number> = {};
 
@@ -122,9 +123,23 @@ export function useChat(partnerId: string, orderId: string | undefined, currentU
 
   // 4. ПОЛНАЯ МУТАЦИЯ ОТПРАВКИ
   const mutation = useMutation({
-    mutationFn: (text: string) => sendMessage({ recipientId: partnerId, text, orderId }),
+    // 1. mutationFn: обрабатываем ответ от Server Action
+    mutationFn: async (text: string) => {
+      const res = await sendMessage({ recipientId: partnerId, text, orderId });
+
+      // Type Guard: если не успех или нет данных, кидаем ошибку в onError
+      if (!res.success || !res.data) {
+        throw new Error(typeof res.error === 'string' ? res.error : "Ошибка отправки");
+      }
+
+      return res.data; // Здесь возвращается чистый MessageWithSender
+    },
+
+    // 2. onMutate: мгновенно добавляем сообщение в интерфейс
     onMutate: async (newText) => {
-      await queryClient.cancelQueries({ queryKey })
+      setInput("");
+
+      await queryClient.cancelQueries({ queryKey });
 
       const optimisticMsg: MessageWithSender = {
         id: `temp-${Date.now()}`,
@@ -137,43 +152,69 @@ export function useChat(partnerId: string, orderId: string | undefined, currentU
         isRead: false,
         isOptimistic: true,
         sender: { id: currentUserId, name: "Вы", image: null }
-      }
+      };
 
-      // Обновляем сообщения
+      // Сохраняем предыдущие данные для отката при ошибке
+      const previousMessages = queryClient.getQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey);
+
       queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
-        if (!old) return { pages: [{ messages: [optimisticMsg], nextCursor: null }], pageParams: [undefined] }
+        if (!old) return { pages: [{ messages: [optimisticMsg], nextCursor: null }], pageParams: [undefined] };
         return {
           ...old,
-          pages: old.pages.map((p, i) => i === 0 ? { ...p, messages: [optimisticMsg, ...p.messages] } : p)
-        }
-      })
+          pages: old.pages.map((p, i) =>
+            i === 0 ? { ...p, messages: [optimisticMsg, ...p.messages] } : p
+          )
+        };
+      });
 
-    //  setInput("")
-      scrollPositions[contextKey] = 0
-      if (scrollRef.current) scrollRef.current.scrollTop = 0
+      // Прокрутка вниз
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+
+      return { previousMessages };
     },
-    onSuccess: (res) => {
-      if (res.data) {
-        const realMsg = res.data
-        // Заменяем оптимистичное сообщение реальным
-        queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
-          if (!old) return old
-          return {
-            ...old,
-            pages: old.pages.map(page => ({
-              ...page,
-              messages: page.messages.map(m => (m.isOptimistic && m.text === realMsg.text) ? realMsg : m)
-            }))
-          }
-        })
-        // Обновляем последний месседж в списке диалогов
-        queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => {
-          if (!old) return old
-          return old.map(d => (orderId ? d.lastMessage?.orderId === orderId : d.partner.id === partnerId) ? { ...d, lastMessage: realMsg } : d)
-        })
+
+    // 3. onSuccess: заменяем "темп" на реальный объект из БД
+    onSuccess: (realMsg) => {
+
+      // realMsg уже не null благодаря проверке в mutationFn
+      queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page => ({
+            ...page,
+            messages: page.messages.map(m =>
+              (m.isOptimistic && m.text === realMsg.text) ? realMsg : m
+            )
+          }))
+        };
+      });
+
+      // Обновляем список диалогов (последнее сообщение)
+      queryClient.setQueryData<ChatDialog[]>(["dialogs"], (old) => {
+        if (!old) return old;
+        return old.map(d =>
+          (orderId ? d.lastMessage?.orderId === orderId : d.partner.id === partnerId)
+            ? { ...d, lastMessage: realMsg }
+            : d
+        );
+      });
+    },
+
+    // 4. onError: если сервер отклонил (спам, мат, ошибка БД)
+    onError: (err, newText, context) => {
+      setInput(newText)
+      toast.error(err.message);
+
+      // Откатываем кэш к состоянию до отправки
+      if (context?.previousMessages) {
+        queryClient.setQueryData(queryKey, context.previousMessages);
       }
-    }
-  })
+    },
+
+
+  });
+
 
   // 5. ОСТАЛЬНОЕ
   const handleSendMessage = () => { if (input.trim() && !mutation.isPending) mutation.mutate(input) }

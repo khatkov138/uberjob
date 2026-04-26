@@ -14,13 +14,22 @@ interface ChatInputProps {
 }
 
 export function ChatInput({ value, onChange, onSend, isPending, disabled }: ChatInputProps) {
-    // Состояние для мастеров в новых заказах
+    // Обработка отправки через Ctrl+Enter или Enter (без Shift)
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            if (value.trim() && !isPending && !disabled) {
+                onSend();
+            }
+        }
+    }
+
     if (disabled) {
         return (
-            <footer className="p-6 md:p-8 bg-white border-t border-slate-100 shrink-0">
-                <div className="bg-amber-50 border-2 border-amber-100 p-6 rounded-[2.5rem] flex items-center gap-4 animate-in slide-in-from-bottom-2">
-                    <ShieldAlert className="text-amber-600 shrink-0" size={24} />
-                    <p className="text-[10px] font-black uppercase text-amber-700 italic tracking-widest leading-tight">
+            <footer className="p-4 md:p-6 bg-white border-t border-slate-100 shrink-0">
+                <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-1">
+                    <ShieldAlert className="text-amber-600 shrink-0" size={20} />
+                    <p className="text-xs font-medium text-amber-800 leading-tight">
                         Безопасность: Мастер может ответить только после вашего первого сообщения.
                     </p>
                 </div>
@@ -29,33 +38,50 @@ export function ChatInput({ value, onChange, onSend, isPending, disabled }: Chat
     }
 
     return (
-        <footer className="p-6 md:p-8 bg-white border-t border-slate-100 shrink-0">
-            <div className="p-4 bg-white border-t border-slate-100">
-                <div className="relative flex items-end gap-2 max-w-4xl mx-auto min-h-[44px]">
-                    {/* min-h-[44px] резервирует высоту для одной строки заранее */}
+        <footer className="p-4 md:p-6 bg-white border-t border-slate-100 shrink-0">
+            <div className="max-w-4xl mx-auto">
+                <div className="relative flex items-end gap-3 bg-slate-50 rounded-[1.5rem] p-2 border border-slate-200 focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400/20 transition-all">
 
-                    <textarea
+                    <TextareaAutosize
+                        cacheMeasurements // Важно: ускоряет повторные рендеры
                         value={value}
                         onChange={(e) => onChange(e.target.value)}
+                        onKeyDown={handleKeyDown}
                         placeholder="Напишите сообщение..."
-                        rows={1}
+                        minRows={1}
+                        maxRows={5}
                         className={cn(
-                            "flex-1 w-full bg-slate-50 border-none rounded-2xl px-4 py-3",
-                            "text-sm resize-none focus:ring-0 max-h-32",
-                            "min-h-[44px] leading-[20px]", // Жестко задаем высоту строки и поля
-                            "transition-none" // Убираем анимации на старт, чтобы не дергалось
+                            // Добавляем h-[40px], чтобы браузер зарезервировал место ДО загрузки JS
+                            "flex-1 w-full bg-transparent border-none rounded-xl px-3 h-[40px]",
+                            "text-sm resize-none focus:outline-none focus:ring-0",
+                            "py-[10px] leading-[20px] overflow-hidden"
                         )}
-                        style={{ height: '44px' }} // Принудительно ставим высоту для первого кадра
                     />
 
                     <button
                         onClick={onSend}
-                        disabled={disabled || !value.trim()}
-                        className="mb-1 p-2 bg-blue-600 text-white rounded-xl shrink-0 hover:bg-blue-700 disabled:opacity-50 transition-all"
+                        disabled={!value.trim() || isPending}
+                        className={cn(
+                            "flex items-center justify-center shrink-0 transition-all duration-200",
+                            "h-10 w-10 md:h-12 md:w-12 rounded-2xl", // Увеличенный размер
+                            "bg-blue-600 text-white shadow-lg shadow-blue-600/20",
+                            "hover:bg-blue-700 active:scale-95",
+                            "disabled:bg-slate-300 disabled:shadow-none disabled:scale-100"
+                        )}
                     >
-                        <Send size={18} />
+                        {isPending ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                            <Send className={cn(
+                                "h-5 w-5 transition-transform",
+                                value.trim() ? "translate-x-0.5 -translate-y-0.5" : ""
+                            )} />
+                        )}
                     </button>
                 </div>
+                <p className="text-[10px] text-center text-slate-400 mt-2">
+                    Нажмите Enter для отправки
+                </p>
             </div>
         </footer>
     )

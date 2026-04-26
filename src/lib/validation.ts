@@ -36,3 +36,13 @@ export const updateProfileSchema = z.object({
 });
 
 export type UpdateProfileValues = z.infer<typeof updateProfileSchema>;
+
+
+export const sendMessageSchema = z.object({
+  // Заменяем .uuid() на просто .min(1)
+  recipientId: z.string().min(1, "ID получателя обязателен"),
+  orderId: z.uuid().optional().nullable().or(z.literal("")),
+  text: z.string().min(1).max(1000).trim().transform(val => val.replace(/\s+/g, ' '))
+});
+
+export type SendMessageValues = z.infer<typeof sendMessageSchema>;

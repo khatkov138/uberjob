@@ -4,9 +4,10 @@ import prisma from "@/lib/prisma"
 import { getServerSession } from "@/lib/get-session"
 import { revalidatePath } from "next/cache"
 import Pusher from "pusher";
-import { Message, User } from "../../../prisma/generated";
+
 import { delay, getContextKey } from "@/lib/utils";
 import { ChatDialog, InfiniteMessagesResponse, MessageWithSender, PusherPayload } from "@/lib/types/chat";
+import { sendMessageSchema, SendMessageValues } from "@/lib/validation";
 /**
  * 1. ОТПРАВКА СООБЩЕНИЯ
  * Универсальная функция: привязывает заказ, если передан orderId
@@ -19,50 +20,73 @@ const pusher = new Pusher({
     useTLS: true,
 });
 
-export async function sendMessage({ recipientId, text, orderId }: { recipientId: string, text: string, orderId?: string }) {
-    const session = await getServerSession();
-    if (!session?.user?.id) return { success: false };
 
-    // 1. Создаем сообщение в БД
-    const newMessage = await prisma.message.create({
-        data: {
-            text,
-            senderId: session.user.id,
-            recipientId,
-            orderId: orderId || null,
-        },
-        include: {
-            sender: {
-                select: { id: true, name: true, image: true }
-            }
+export async function sendMessage(values: SendMessageValues) {
+    
+    try {
+        const session = await getServerSession();
+        if (!session?.user?.id) {
+            return { success: false, data: null, error: "Unauthorized" };
         }
-    });
 
-    // 2. Генерируем универсальный ключ контекста для фронтенда
-    const contextKey = getContextKey(orderId, session.user.id, recipientId);
-
-    // 3. Формируем единый Payload по новому типу PusherPayload
-    const payload: PusherPayload = {
-        type: "NEW_MESSAGE",
-        contextKey: contextKey,
-        data: {
-            message: newMessage,
-            orderId: orderId || null,
-            senderId: session.user.id,
+        const validation = sendMessageSchema.safeParse(values);
+        if (!validation.success) {
+            // Превращаем массив ошибок Zod в одну строку
+            return { success: false, data: null, error: validation.error.message };
         }
-    };
 
-    // 4. Отправляем всего в два персональных канала
-    // Это обновит и чат, и список диалогов, и счетчики у обоих участников
-    await Promise.all([
-        // Получателю
-        pusher.trigger(`user-${recipientId}`, "events", payload),
-        // Себе (для синхронизации вкладок)
-        pusher.trigger(`user-${session.user.id}`, "events", payload)
-    ]);
-    //await prisma.message.deleteMany({})
+        const { recipientId, text, orderId } = validation.data;
 
-    return { success: true, data: newMessage };
+        if (recipientId === session.user.id) {
+            return { success: false, data: null, error: "Cannot message yourself" };
+        }
+
+        const lastMessage = await prisma.message.findFirst({
+            where: { senderId: session.user.id },
+            orderBy: { createdAt: "desc" },
+            select: { createdAt: true },
+        });
+
+        if (lastMessage && Date.now() - lastMessage.createdAt.getTime() < 500) {
+            return { success: false, data: null, error: "Slow down! Too many messages." };
+        }
+
+        const newMessage = await prisma.message.create({
+            data: {
+                text,
+                senderId: session.user.id,
+                recipientId,
+                orderId: orderId || null,
+            },
+            include: {
+                sender: { select: { id: true, name: true, image: true } },
+            },
+        });
+
+        const contextKey = getContextKey(orderId || undefined, session.user.id, recipientId);
+
+        const payload: PusherPayload = {
+            type: "NEW_MESSAGE",
+            contextKey: contextKey,
+            data: {
+                message: newMessage,
+                orderId: orderId || null,
+                senderId: session.user.id,
+            },
+        };
+
+        await Promise.all([
+            pusher.trigger(`user-${recipientId}`, "events", payload),
+            pusher.trigger(`user-${session.user.id}`, "events", payload),
+        ]);
+
+        // Возвращаем строго по структуре
+        return { success: true, data: newMessage as MessageWithSender, error: null };
+
+    } catch (error) {
+        console.error(error);
+        return { success: false, data: null, error: "Internal server error" };
+    }
 }
 
 
@@ -79,7 +103,7 @@ export async function getMessages({
     cursor?: string,
     limit?: number,
 }): Promise<InfiniteMessagesResponse> {
-     //  await delay(2000)
+    //  await delay(2000)
     const session = await getServerSession()
     if (!session?.user?.id) return { messages: [], nextCursor: null }
 

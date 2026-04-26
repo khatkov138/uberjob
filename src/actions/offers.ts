@@ -2,6 +2,7 @@
 
 import { getServerSession } from "@/lib/get-session"
 import prisma from "@/lib/prisma"
+import { Prisma } from "@prisma/client"
 
 
 
@@ -19,7 +20,7 @@ export async function createOffer(data: { orderId: string, price: number, messag
 
     if (!order) return { success: false, error: "Заказ не найден" }
     //if (order.clientId === userId) return { success: false, error: "Нельзя откликаться на свой заказ" }
-    
+
     // Принимаем отклики только на новые заказы
     if (order.status !== "PENDING" && order.status !== "SEARCHING") {
       return { success: false, error: "Заказ уже в работе или закрыт" }
@@ -65,8 +66,8 @@ export async function createOffer(data: { orderId: string, price: number, messag
       })
     })
 
-  
-    
+
+
     return { success: true }
   } catch (error) {
     console.error("OFFER_ERROR:", error)
@@ -75,41 +76,36 @@ export async function createOffer(data: { orderId: string, price: number, messag
 }
 
 
+// 1. Описываем функцию ЗАПРОСА (только данные)
+const getMyOffersData = async (userId: string) => {
+  return await prisma.offer.findMany({
+    where: { workerId: userId },
+    include: {
+      order: {
+        include: {
+          client: { select: { name: true, image: true } },
+          categories: { include: { category: true } }
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  })
+}
 
+// 2. ЭКСПОРТИРУЕМ ТИП данных (для компонента)
+export type MyOffersWithData = Prisma.PromiseReturnType<typeof getMyOffersData>
 
+// 3. ЭКСПОРТИРУЕМ ЭКШЕН (для страницы)
 export async function getMyOffers() {
   const session = await getServerSession()
-  const userId = session?.user?.id
-
-  if (!userId) return { success: false, error: "Unauthorized" }
+  if (!session?.user?.id) {
+    return { success: false, error: "Unauthorized", data: [] as MyOffersWithData }
+  }
 
   try {
-    const offers = await prisma.offer.findMany({
-      where: { workerId: userId },
-      include: {
-        order: {
-          select: {
-            id: true,
-            title: true,
-            address: true,
-            status: true,
-            categories: true,
-            // Добавляем выборку клиента для конкретного заказа
-            client: {
-              select: {
-                name: true,
-                image: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    })
-
-    return { success: true, data: offers }
-  } catch (error) {
-    console.error("MY_OFFERS_ERROR:", error)
-    return { success: false, error: "Ошибка загрузки данных" }
+    const data = await getMyOffersData(session.user.id)
+    return { success: true, data, error: null }
+  } catch (e) {
+    return { success: false, error: "Database error", data: [] as MyOffersWithData }
   }
 }

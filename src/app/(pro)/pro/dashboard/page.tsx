@@ -38,7 +38,7 @@ export default async function ProDashboardPage() {
           <div className="w-1 h-1 bg-blue-600 rounded-full animate-pulse" />
         </div>
         <h1 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter text-slate-900 leading-none">
-          Привет, <span className="text-blue-600">{session?.user?.name?.split(' ')[0]}</span>
+          Привет, <span className="text-blue-600">{session?.user?.name ? session.user.name.split(' ')[0] : 'Партнер'}</span>
         </h1>
       </header>
 
@@ -82,7 +82,7 @@ export default async function ProDashboardPage() {
             </Link>
 
             {/* СООБЩЕНИЯ */}
-            <Link href="/messages" className="group">
+            <Link href="/chat" className="group">
               <div className="h-full bg-slate-50 border border-slate-100 rounded-[2rem] p-8 text-slate-900 flex flex-col justify-between min-h-[200px] transition-all hover:-translate-y-1 hover:bg-white hover:shadow-xl">
                 <div className="flex justify-between items-start">
                   <div className="p-3 bg-white border border-slate-100 rounded-2xl shadow-sm text-blue-600">
