@@ -21,7 +21,7 @@ interface OrdersPageClientProps {
 }
 
 export default function OrdersPageClient({ initialOrders, initialProfile }: OrdersPageClientProps) {
-    const queryClient = useQueryClient()
+    
     const { data: session } = authClient.useSession()
     const { lat, lng, radius } = useLocationStore()
     const [filterMode, setFilterMode] = React.useState<"ALL" | "MY">("ALL")
@@ -43,23 +43,7 @@ export default function OrdersPageClient({ initialOrders, initialProfile }: Orde
         enabled: !!session?.user?.id,
     })
 
-    // --- МУТАЦИИ (Снова красивые стрелки) ---
-
-    const { mutate: handleAddSkill } = useMutation({
-        mutationFn: (categoryId: string) => handleAction(addSkill(categoryId)),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["user-profile"] })
-            queryClient.invalidateQueries({ queryKey: ["orders"] })
-        },
-    })
-
-    const { mutate: handleRemoveSkill } = useMutation({
-        mutationFn: (skillId: string) => handleAction(removeSkill(skillId)),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["user-profile"] })
-            queryClient.invalidateQueries({ queryKey: ["orders"] })
-        },
-    })
+   
 
     // --- ЛОГИКА ---
 
@@ -72,8 +56,7 @@ export default function OrdersPageClient({ initialOrders, initialProfile }: Orde
             <div className="space-y-10">
                 <FeedHeader
                     userSkills={profile?.skills || []}
-                    onAddSkill={handleAddSkill}
-                    onRemoveSkill={handleRemoveSkill}
+                  
                     filterMode={filterMode}
                     setFilterMode={setFilterMode}
                 />

@@ -2,16 +2,17 @@
 
 import * as React from "react"
 import { MapPin, ChevronDown, Plus, X, Settings2 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, handleAction } from "@/lib/utils"
 import { useLocationStore } from "@/store/use-location-store"
 import { CategorySearchModal } from "./category-search-modal"
 import { LocationModal } from "@/components/geo/location-modal"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { addSkill, removeSkill } from "@/actions/profile"
 
 // Принимаем массив объектов [{id, name}]
 export function FeedHeader({
   userSkills = [], // Массив объектов из профиля
-  onAddSkill,      // Функция (id) => void
-  onRemoveSkill,   // Функция (id) => void
+
   filterMode,
   setFilterMode
 }: any) {
@@ -20,6 +21,24 @@ export function FeedHeader({
 
   // Вытаскиваем только ID для модалки, чтобы она знала, что уже выбрано
   const userCategoryIds = userSkills.map((s: any) => s.categoryId)
+
+  const queryClient = useQueryClient()
+
+  const { mutate: handleAddSkill } = useMutation({
+    mutationFn: (categoryId: string) => handleAction(addSkill(categoryId)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] })
+      queryClient.invalidateQueries({ queryKey: ["orders"] })
+    },
+  })
+
+  const { mutate: handleRemoveSkill } = useMutation({
+    mutationFn: (skillId: string) => handleAction(removeSkill(skillId)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] })
+      queryClient.invalidateQueries({ queryKey: ["orders"] })
+    },
+  })
 
   return (
     <div className="space-y-6">
@@ -66,7 +85,7 @@ export function FeedHeader({
                 {skill.category?.name || "..."}
               </span>
               <button
-                onClick={() => onRemoveSkill(skill.categoryId)}
+                onClick={() => handleRemoveSkill(skill.categoryId)}
                 className="p-1 hover:bg-white/20 rounded-lg transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
@@ -90,7 +109,7 @@ export function FeedHeader({
         onClose={() => setIsSearchOpen(false)}
         userCategoryIds={userCategoryIds}
         onAdd={(id) => {
-          onAddSkill(id)
+          handleAddSkill(id)
           // setIsSearchOpen(false) // Опционально: закрывать ли после добавления
         }}
       />

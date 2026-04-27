@@ -3,7 +3,7 @@
 import { useState, useRef, useMemo, useEffect, useLayoutEffect, useCallback } from "react"
 import { useInfiniteQuery, useQueryClient, useMutation, useQuery, InfiniteData } from "@tanstack/react-query"
 import { getMessages, markMessagesAsRead, sendMessage, sendTypingStatus } from "@/actions/chat/message"
-import { getContextKey, getMessagesQueryKey } from "@/lib/utils"
+import { getContextKey, getMessagesQueryKey, handleAction } from "@/lib/utils"
 import { ChatDialog, InfiniteMessagesResponse, MessageWithSender } from "@/lib/types/chat"
 import { toast } from "sonner"
 
@@ -124,16 +124,7 @@ export function useChat(partnerId: string, orderId: string | undefined, currentU
   // 4. ПОЛНАЯ МУТАЦИЯ ОТПРАВКИ
   const mutation = useMutation({
     // 1. mutationFn: обрабатываем ответ от Server Action
-    mutationFn: async (text: string) => {
-      const res = await sendMessage({ recipientId: partnerId, text, orderId });
-
-      // Type Guard: если не успех или нет данных, кидаем ошибку в onError
-      if (!res.success || !res.data) {
-        throw new Error(typeof res.error === 'string' ? res.error : "Ошибка отправки");
-      }
-
-      return res.data; // Здесь возвращается чистый MessageWithSender
-    },
+    mutationFn: async (text: string) => handleAction(sendMessage({ recipientId: partnerId, text, orderId })),
 
     // 2. onMutate: мгновенно добавляем сообщение в интерфейс
     onMutate: async (newText) => {

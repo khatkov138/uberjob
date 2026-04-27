@@ -8,6 +8,7 @@ import Pusher from "pusher";
 import { delay, getContextKey } from "@/lib/utils";
 import { ChatDialog, InfiniteMessagesResponse, MessageWithSender, PusherPayload } from "@/lib/types/chat";
 import { sendMessageSchema, SendMessageValues } from "@/lib/validation";
+import { ActionResponse, createAuthAction } from "@/lib/server-utils";
 /**
  * 1. ОТПРАВКА СООБЩЕНИЯ
  * Универсальная функция: привязывает заказ, если передан orderId
@@ -21,40 +22,37 @@ const pusher = new Pusher({
 });
 
 
-export async function sendMessage(values: SendMessageValues) {
-    
-    try {
-        const session = await getServerSession();
-        if (!session?.user?.id) {
-            return { success: false, data: null, error: "Unauthorized" };
-        }
-
+export async function sendMessage(values: SendMessageValues): Promise<ActionResponse<MessageWithSender>> {
+    // Важно возвращать результат вызова обертки
+    return createAuthAction(async (userId) => {
+        // 1. Валидация
         const validation = sendMessageSchema.safeParse(values);
         if (!validation.success) {
-            // Превращаем массив ошибок Zod в одну строку
-            return { success: false, data: null, error: validation.error.message };
+            throw new Error(validation.error.message); // createAuthAction поймает это и вернет success: false
         }
 
         const { recipientId, text, orderId } = validation.data;
 
-        if (recipientId === session.user.id) {
-            return { success: false, data: null, error: "Cannot message yourself" };
+        if (recipientId === userId) {
+            throw new Error("Cannot message yourself");
         }
 
+        // 2. Спам-фильтр
         const lastMessage = await prisma.message.findFirst({
-            where: { senderId: session.user.id },
+            where: { senderId: userId },
             orderBy: { createdAt: "desc" },
             select: { createdAt: true },
         });
 
         if (lastMessage && Date.now() - lastMessage.createdAt.getTime() < 500) {
-            return { success: false, data: null, error: "Slow down! Too many messages." };
+            throw new Error("Slow down! Too many messages.");
         }
 
+        // 3. Создание
         const newMessage = await prisma.message.create({
             data: {
                 text,
-                senderId: session.user.id,
+                senderId: userId,
                 recipientId,
                 orderId: orderId || null,
             },
@@ -63,30 +61,22 @@ export async function sendMessage(values: SendMessageValues) {
             },
         });
 
-        const contextKey = getContextKey(orderId || undefined, session.user.id, recipientId);
-
-        const payload: PusherPayload = {
+        // 4. Pusher (оставляем как было)
+        const contextKey = getContextKey(orderId || undefined, userId, recipientId);
+        const payload = {
             type: "NEW_MESSAGE",
-            contextKey: contextKey,
-            data: {
-                message: newMessage,
-                orderId: orderId || null,
-                senderId: session.user.id,
-            },
+            contextKey,
+            data: { message: newMessage, orderId: orderId || null, senderId: userId },
         };
 
         await Promise.all([
             pusher.trigger(`user-${recipientId}`, "events", payload),
-            pusher.trigger(`user-${session.user.id}`, "events", payload),
+            pusher.trigger(`user-${userId}`, "events", payload),
         ]);
 
-        // Возвращаем строго по структуре
-        return { success: true, data: newMessage as MessageWithSender, error: null };
-
-    } catch (error) {
-        console.error(error);
-        return { success: false, data: null, error: "Internal server error" };
-    }
+        // Возвращаем данные. Обертка сама сделает их { success: true, data: newMessage }
+        return newMessage;
+    });
 }
 
 

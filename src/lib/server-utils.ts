@@ -2,11 +2,10 @@
 "use server"
 import { getServerSession } from "./get-session";
 
-export type ActionResponse<T> =
+export type ActionResponse<T> = 
 
-    | { success: true; data: T; error: null }
-    | { success: false; data: null; error: string };
-
+  | { success: true; data: T; error: null }
+  | { success: false; data: null; error: string };
 
 /**
  * Для публичных действий (без проверки сессии)

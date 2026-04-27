@@ -12,7 +12,7 @@ import { AddressInput } from "@/components/geo/address-input"
 import { createOrderSchema, type CreateOrderValues } from "@/lib/validation"
 
 import { useClientLocationStore } from "@/store/use-client-location-store"
-import { cn } from "@/lib/utils"
+import { cn, handleAction } from "@/lib/utils"
 import { createOrder } from "@/actions/orders/create"
 
 export function CreateOrderForm() {
@@ -35,22 +35,30 @@ export function CreateOrderForm() {
     const description = form.watch("description")
 
     const mutation = useMutation({
-        mutationFn: (data: CreateOrderValues) => createOrder(data),
-        onSuccess: (res) => {
-            if (res.success) {
-                toast.success("ЗАДАЧА ЗАПУЩЕНА")
-                router.push(`/client/my-orders`)
-            } else {
-                toast.error(res.error || "Ошибка публикации")
-            }
+        // handleAction вернет { id: string }, если всё ок, 
+        // либо кинет throw, который уйдет в onError
+        mutationFn: (data: CreateOrderValues) => handleAction(createOrder(data)),
+
+        onSuccess: (data) => {
+            // Нам больше не нужны if (res.success), данные уже чистые
+            toast.success("ЗАДАЧА ЗАПУЩЕНА")
+
+            // В экшене мы возвращали { id: result.id }
+            router.push(`/client/my-orders/${data.id}`)
+        },
+
+        onError: (error: Error) => {
+            // Сюда попадет любой throw из createAuthAction или самого экшена
+            toast.error(error.message || "Ошибка публикации")
         }
     })
+
 
     const onSubmit = (data: CreateOrderValues) => mutation.mutate(data)
 
     return (
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-12">
-            
+
             {/* 1. ВЕРНУЛИ ВЫСОТУ: min-h-[220px] */}
             <div className="relative group cursor-text">
                 <Controller
@@ -72,7 +80,7 @@ export function CreateOrderForm() {
                                     fieldState.invalid ? "text-red-500 placeholder:text-red-200" : "text-slate-900 placeholder:text-slate-100"
                                 )}
                             />
-                            
+
                             {fieldState.error && (
                                 <p className="text-[10px] font-black uppercase text-red-500 mt-4 flex items-center gap-2 italic tracking-widest">
                                     <AlertCircle size={14} /> {fieldState.error.message}
@@ -81,7 +89,7 @@ export function CreateOrderForm() {
                         </>
                     )}
                 />
-                
+
                 {description.length === 0 && !form.formState.errors.description && (
                     <div className="flex items-center gap-2 text-slate-300 mt-4">
                         <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-100 border-t-blue-600 animate-spin" />

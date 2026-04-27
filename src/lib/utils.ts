@@ -11,7 +11,13 @@ export const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, 
 
 export async function handleAction<T>(promise: Promise<ActionResponse<T>>): Promise<T> {
   const res = await promise;
-  if (!res.success) throw new Error(res.error || "Action failed");
+  
+  if (!res.success) {
+    // Если success: false, то кидаем ошибку. Текст ошибки берем из экшена.
+    throw new Error(res.error || "Action failed");
+  }
+  
+  // Возвращаем данные как есть. Если там null — значит так и задумано (например, при удалении).
   return res.data as T;
 }
 /**
