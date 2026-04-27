@@ -2,10 +2,13 @@
 
 import { useState, useRef, useMemo, useEffect, useLayoutEffect, useCallback } from "react"
 import { useInfiniteQuery, useQueryClient, useMutation, useQuery, InfiniteData } from "@tanstack/react-query"
-import { getMessages, markMessagesAsRead, sendMessage, sendTypingStatus } from "@/actions/chat/message"
+
 import { getContextKey, getMessagesQueryKey, handleAction } from "@/lib/utils"
 import { ChatDialog, InfiniteMessagesResponse, MessageWithSender } from "@/lib/types/chat"
 import { toast } from "sonner"
+import { getMessages } from "@/actions/message/get"
+import { markMessagesAsRead, sendTypingStatus } from "@/actions/message/manage"
+import { sendMessage } from "@/actions/message/send"
 
 const scrollPositions: Record<string, number> = {};
 
@@ -24,12 +27,25 @@ export function useChat(partnerId: string, orderId: string | undefined, currentU
   const [isReady, setIsReady] = useState(false)
 
   // 1. ЗАГРУЗКА
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery<InfiniteMessagesResponse>({
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
     queryKey,
-    queryFn: ({ pageParam }) => getMessages({ recipientId: partnerId, orderId, cursor: pageParam as string | undefined, limit: 30 }),
-    initialPageParam: undefined,
+    // TS сам выведет тип из возвращаемого значения этой функции
+    queryFn: async ({ pageParam }) => {
+      console.log(pageParam)
+      return await handleAction(
+        getMessages({
+          recipientId: partnerId,
+          orderId,
+          cursor: pageParam as string | undefined,
+          limit: 30
+        })
+      );
+    },
+    // Подсказка для типа pageParam, чтобы не писать типы сверху
+    initialPageParam: undefined as string | undefined,
+    // Теперь lastPage автоматически будет InfiniteMessagesResponse
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-  })
+  });
 
   const messages = useMemo(() => {
     return data?.pages.flatMap((page) => page.messages) || []

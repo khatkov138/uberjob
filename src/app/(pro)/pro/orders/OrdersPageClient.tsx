@@ -6,7 +6,7 @@ import { Loader2, Inbox } from "lucide-react"
 
 import { authClient } from "@/lib/auth-client"
 import { useLocationStore } from "@/store/use-location-store"
-import { getOrders, FeedOrder } from "@/actions/orders/orders"
+
 import { addSkill, getMyProfile, removeSkill, FullProfile } from "@/actions/profile"
 import { handleAction } from "@/lib/utils"
 
@@ -14,6 +14,7 @@ import { Container } from "@/components/shared/container"
 import { LocationModal } from "@/components/geo/location-modal"
 import { FeedHeader } from "./feed-header"
 import { OrderCard } from "./order-card"
+import { FeedOrder, getOrders } from "@/actions/order/get"
 
 interface OrdersPageClientProps {
     initialOrders: FeedOrder[]
@@ -21,7 +22,7 @@ interface OrdersPageClientProps {
 }
 
 export default function OrdersPageClient({ initialOrders, initialProfile }: OrdersPageClientProps) {
-    
+
     const { data: session } = authClient.useSession()
     const { lat, lng, radius } = useLocationStore()
     const [filterMode, setFilterMode] = React.useState<"ALL" | "MY">("ALL")
@@ -43,7 +44,7 @@ export default function OrdersPageClient({ initialOrders, initialProfile }: Orde
         enabled: !!session?.user?.id,
     })
 
-   
+
 
     // --- ЛОГИКА ---
 
@@ -56,7 +57,7 @@ export default function OrdersPageClient({ initialOrders, initialProfile }: Orde
             <div className="space-y-10">
                 <FeedHeader
                     userSkills={profile?.skills || []}
-                  
+
                     filterMode={filterMode}
                     setFilterMode={setFilterMode}
                 />

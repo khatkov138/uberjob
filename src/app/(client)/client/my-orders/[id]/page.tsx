@@ -1,6 +1,6 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -8,22 +8,44 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Loader2, MapPin, Clock, Star, CheckCircle, MessageCircle } from "lucide-react"
 import { toast } from "sonner"
-import { use } from "react"
+import React, { use } from "react"
 import { ReviewForm } from "./review-form"
 
-import { cn } from "@/lib/utils"
-import { confirmOrderCompletion, getOrderDetails } from "@/actions/orders/orders"
+import { cn, handleAction } from "@/lib/utils"
+import { getOrderDetails, OrderDetails } from "@/actions/order/get"
+import { confirmOrderCompletion } from "@/actions/order/manage"
 
 export default function OrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id: orderId } = use(params)
 
-    const { data: order, isLoading, refetch } = useQuery({
+    
+
+    const { id: orderId } = React.use(params) // Не забудь React.use если это клиентский компонент
+
+    const { data: order, isLoading, refetch } = useQuery<OrderDetails>({
         queryKey: ["order", orderId],
-        queryFn: () => getOrderDetails(orderId),
-        refetchInterval: 5000, // Обновляем раз в 5 сек для "живого" чата без сокетов
+        // Теперь handleAction вернет чистый объект OrderDetails или кинет ошибку
+        queryFn: () => handleAction(getOrderDetails(orderId)),
+        refetchInterval: 5000,
+    })
+
+
+
+    const confirmMutation = useMutation({
+        mutationFn: (id: string) => handleAction(confirmOrderCompletion(id)),
+        onSuccess: () => {
+            toast.success("ЗАДАЧА ЗАВЕРШЕНА")
+            // Обновляем данные заказа в кэше
+            refetch()
+        },
+        onError: (error: Error) => {
+            toast.error(error.message)
+        }
     })
 
     if (isLoading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin" /></div>
+
+    // Если произошла ошибка или заказ не найден, handleAction выкинет throw, 
+    // и ты можешь обработать это через isError или error
     if (!order) return <div className="text-center mt-20 font-bold">Заказ не найден</div>
 
     const isCompleted = order.status === "COMPLETED"
@@ -32,7 +54,7 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
     const steps = [
         { label: "Поиск", active: true },
         { label: "Выбран", active: order.status !== "PENDING" },
-        { label: "В работе", active: ["IN_PROGRESS", "COMPLETED"].includes(order.status) },
+        { label: "В работе", active: ["IN_PROGRESS", "COMPLETED"].includes(order.status as string) },
         { label: "Готово", active: order.status === "COMPLETED" },
     ]
 
@@ -149,16 +171,15 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
                                 </p>
                                 <Button
                                     className="w-full h-12 font-bold rounded-xl bg-blue-600 hover:bg-blue-500"
-                                    disabled={!hasWorker}
-                                    onClick={async () => {
-                                        const res = await confirmOrderCompletion(order.id);
-                                        if (res.success) {
-                                            toast.success("Заказ завершен!");
-                                            refetch();
-                                        }
-                                    }}
+                                    // Блокируем если нет мастера ИЛИ если уже идет процесс подтверждения
+                                    disabled={!hasWorker || confirmMutation.isPending}
+                                    onClick={() => confirmMutation.mutate(order.id)}
                                 >
-                                    Принять работу
+                                    {confirmMutation.isPending ? (
+                                        <Loader2 className="animate-spin w-5 h-5" />
+                                    ) : (
+                                        "ПОДТВЕРДИТЬ ВЫПОЛНЕНИЕ"
+                                    )}
                                 </Button>
                             </div>
                         )}

@@ -13,7 +13,7 @@ import { createOrderSchema, type CreateOrderValues } from "@/lib/validation"
 
 import { useClientLocationStore } from "@/store/use-client-location-store"
 import { cn, handleAction } from "@/lib/utils"
-import { createOrder } from "@/actions/orders/create"
+import { createOrder } from "@/actions/order/create"
 
 export function CreateOrderForm() {
     const router = useRouter()

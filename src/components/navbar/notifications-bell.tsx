@@ -13,9 +13,10 @@ import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
 
 
-import { markAllAsRead, markAsRead } from "@/actions/notifications"
-import { Notification } from "../../../prisma/generated"
+
 import { authClient } from "@/lib/auth-client"
+import { Notification } from "@prisma/client"
+import { markAllAsRead, markAsRead } from "@/actions/notification/manage"
 
 export function NotificationsBell() {
   const queryClient = useQueryClient()
@@ -31,7 +32,7 @@ export function NotificationsBell() {
     },
     // ЗАПУСКАЕМ ТОЛЬКО ЕСЛИ ЕСТЬ ЮЗЕР
     enabled: !!session?.user?.id,
-    
+
   })
   const unreadCount = notifications?.filter((n) => !n.isRead).length || 0
 

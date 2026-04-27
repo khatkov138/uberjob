@@ -4,34 +4,37 @@ import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 
 import { authClient } from "@/lib/auth-client"
-import { 
-  Plus, 
-  ShoppingBag, 
-  MessageSquare, 
-  ClipboardList, 
-  Settings, 
-  Zap, 
-  ArrowUpRight, 
-  Loader2 
+import {
+  Plus,
+  ShoppingBag,
+  MessageSquare,
+  ClipboardList,
+  Settings,
+  Zap,
+  ArrowUpRight,
+  Loader2
 } from "lucide-react"
 import Link from "next/link"
-import { cn } from "@/lib/utils"
+import { cn, handleAction } from "@/lib/utils"
 import { Container } from "@/components/shared/container"
-import { getClientOrders } from "@/actions/orders/orders"
+import { ClientOrder, getClientOrders } from "@/actions/order/get"
+
 
 export default function ClientDashboardPage() {
+
   const { data: session } = authClient.useSession()
-  
-  // 1. Загружаем данные заказов клиента
-  const { data, isLoading } = useQuery({
+
+  const { data: orders = [], isLoading } = useQuery<ClientOrder[]>({
     queryKey: ["client-orders"],
-    queryFn: () => getClientOrders(),
+    // Используем handleAction, чтобы получить массив ClientOrder[] без лишних оберток
+    queryFn: async () => await handleAction(getClientOrders()),
   })
 
-  // 2. Рассчитываем статистику
-  const orders = data?.data || []
-  const activeCount = orders.filter((o: any) => o.status !== "COMPLETED" && o.status !== "CANCELLED").length
- 
+  // Теперь TS знает, что "o" имеет тип ClientOrder, и подскажет все поля (status и т.д.)
+  const activeCount = orders.filter(o =>
+    o.status !== "COMPLETED" && o.status !== "CANCELLED"
+  ).length
+
   // Состояние загрузки
   if (isLoading) return (
     <Container className="bg-white flex items-center justify-center min-h-[400px]">
@@ -60,7 +63,7 @@ export default function ClientDashboardPage() {
         <div className="bg-blue-600 rounded-[2.5rem] p-10 md:p-16 text-white relative overflow-hidden shadow-2xl shadow-blue-200 transition-all hover:scale-[1.01] active:scale-95">
           {/* Декоративная иконка на фоне */}
           <Plus className="absolute top-0 right-0 w-64 h-64 -mr-16 -mt-16 opacity-10 group-hover:rotate-12 transition-transform duration-700 pointer-events-none" />
-          
+
           <div className="relative z-10 space-y-6">
             <h2 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter leading-none">
               Опубликовать <br /> новую задачу
@@ -75,7 +78,7 @@ export default function ClientDashboardPage() {
 
       {/* СЕТКА ПЛИТОК */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        
+
         {/* МОИ ЗАКАЗЫ (Широкая плитка) */}
         <Link href="/client/my-orders" className="group md:col-span-2">
           <div className="h-full min-h-[220px] rounded-[2.5rem] p-8 bg-blue-600 text-white transition-all duration-500 flex flex-col justify-between hover:shadow-2xl hover:shadow-blue-200">

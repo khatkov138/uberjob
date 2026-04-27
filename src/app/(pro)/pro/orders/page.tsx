@@ -1,10 +1,11 @@
 // src/app/(pro)/pro/orders/page.tsx
 import * as React from "react"
 import { cookies } from "next/headers"
-import { getOrders } from "@/actions/orders/orders"
+
 import { getMyProfile } from "@/actions/profile"
 import { unwrap } from "@/lib/utils"
 import OrdersPageClient from "./OrdersPageClient"
+import { getOrders } from "@/actions/order/get"
 
 export default async function OrdersPage() {
   const cookieStore = await cookies()
@@ -37,6 +38,7 @@ export default async function OrdersPage() {
     getOrders({ lat, lng, radius }),
     getMyProfile()
   ])
+  
 
   return (
     <OrdersPageClient

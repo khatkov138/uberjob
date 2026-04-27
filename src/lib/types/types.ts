@@ -1,7 +1,11 @@
 import { Category, Order, Profile } from "@prisma/client";
+import { ActionResponse } from "../server-utils";
 
 
-
+export type InferActionResult<T extends (...args: any) => Promise<ActionResponse<any>>> =
+  Awaited<ReturnType<T>> extends { data: infer D }
+  ? (D extends (infer U)[] ? U : D)
+  : never;
 /*
 
 export interface OrderWithDetails extends Order {

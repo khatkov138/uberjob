@@ -3,9 +3,11 @@
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 import { MessageSquare } from "lucide-react"
-import { getUserDialogs } from "@/actions/chat/message"
+
 import { ChatDialog } from "@/lib/types/chat"
 import { DialogItem } from "./dialog-item"
+import { getUserDialogs } from "@/actions/message/get"
+import { handleAction } from "@/lib/utils"
 
 interface DialogListProps {
     currentUserId: string
@@ -23,9 +25,9 @@ export function DialogList({
 }: DialogListProps) {
 
     // Подключаем TanStack Query с начальными данными с сервера
-    const { data: dialogs } = useQuery<ChatDialog[]>({
+    const { data: dialogs } = useQuery({
         queryKey: ["dialogs"],
-        queryFn: () => getUserDialogs(),
+        queryFn: () => handleAction(getUserDialogs()),
         initialData: initialData,
         // Данные считаются свежими 1 минуту, остальное сделает Pusher через useNotifications
         staleTime: 60 * 1000,

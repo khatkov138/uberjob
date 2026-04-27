@@ -46,3 +46,22 @@ export const sendMessageSchema = z.object({
 });
 
 export type SendMessageValues = z.infer<typeof sendMessageSchema>;
+
+export const reviewSchema = z.object({
+  orderId: z.string(),
+  profileId: z.string(),
+  rating: z.number().min(1).max(5),
+  comment: z.string().min(10, "Опишите подробнее (минимум 10 символов)"),
+});
+
+export type ReviewValues = z.infer<typeof reviewSchema>;
+
+
+export const createOfferSchema = z.object({
+  orderId: z.string(),
+  price: z.number().min(1, "Укажите цену"),
+  message: z.string().optional(),
+});
+
+export type CreateOfferValues = z.infer<typeof createOfferSchema>;
+

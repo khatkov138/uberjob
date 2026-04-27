@@ -24,11 +24,14 @@ export async function handleAction<T>(promise: Promise<ActionResponse<T>>): Prom
  * Утилита для развертывания ответа экшена в Server Components.
  * Если экшен упал, возвращает fallbackValue (например, пустой массив).
  */
+
 export function unwrap<T>(res: ActionResponse<T>, fallback: T): T {
-  return res.success ? (res.data as T) : fallback;
+    // Если успех — отдаем данные, если ошибка — отдаем дефолтное значение
+    if (res.success && res.data !== null) {
+        return res.data as T;
+    }
+    return fallback;
 }
-
-
 
 
 /**

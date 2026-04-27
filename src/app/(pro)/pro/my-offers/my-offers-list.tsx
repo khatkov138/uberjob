@@ -5,7 +5,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
-import { MyOffersWithData } from "@/actions/offers"
+import { MyOffersWithData } from "@/actions/offer/offers"
 
 interface MyOffersListProps {
   // Мы ожидаем массив. Если Action может вернуть null, добавляем проверку.

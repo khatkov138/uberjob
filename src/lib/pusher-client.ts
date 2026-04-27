@@ -17,9 +17,9 @@ export const getPusherClient = () => {
       cluster: cluster!,
       forceTLS: true,
       // Это предотвращает лишние попытки подключения, если что-то не так
-      authEndpoint: "/api/pusher/auth", 
+      authEndpoint: "/api/pusher/auth",
     });
-    
+
     console.log("------------------ [PUSHER] CONNECTION STARTED ------------------");
   }
   return pusherClient;
