@@ -18,17 +18,49 @@ export async function completeOrder(orderId: string) {
 }
 
 // КЛИЕНТ: Принять отклик мастера
-export async function acceptOffer(orderId: string, offerId: string, workerId: string) {
+export async function acceptOffer(orderId: string, offerId: string) {
+  // Убрали workerId из аргументов — это безопаснее
   return createAuthAction(async (userId) => {
-    // Важно: проверяем, что заказ принадлежит текущему клиенту
-    const order = await prisma.order.findUnique({ where: { id: orderId, clientId: userId } })
-    if (!order) throw new Error("Заказ не найден или доступ запрещен")
 
-    return await prisma.$transaction([
-      prisma.order.update({ where: { id: orderId }, data: { status: "ACCEPTED", workerId } }),
-      prisma.offer.update({ where: { id: offerId }, data: { status: "ACCEPTED" } }),
-      prisma.offer.updateMany({ where: { orderId, id: { not: offerId } }, data: { status: "REJECTED" } })
-    ])
+    return await prisma.$transaction(async (tx) => {
+      // 1. Проверяем заказ и оффер ОДНИМ запросом
+      const offer = await tx.offer.findFirst({
+        where: {
+          id: offerId,
+          orderId: orderId,
+          order: { clientId: userId } // Проверка владения заказом
+        },
+        select: { workerId: true }
+      })
+
+      if (!offer) throw new Error("Оффер не найден или у вас нет прав")
+
+      // 2. Обновляем статус заказа и назначаем мастера
+      const updatedOrder = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: "ACCEPTED",
+          workerId: offer.workerId // Берем ID из БД, а не с фронта
+        }
+      })
+
+      // 3. Принимаем этот оффер
+      await tx.offer.update({
+        where: { id: offerId },
+        data: { status: "ACCEPTED" }
+      })
+
+      // 4. Отклоняем остальные
+      await tx.offer.updateMany({
+        where: {
+          orderId,
+          id: { not: offerId }
+        },
+        data: { status: "REJECTED" }
+      })
+
+      return updatedOrder
+    })
   })
 }
 
