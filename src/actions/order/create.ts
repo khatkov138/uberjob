@@ -1,27 +1,39 @@
 "use server"
-import { createAuthAction } from "@/lib/server-utils";
-import { CreateOrderValues } from "@/lib/validation";
-import { analyzeTask } from "./lib/analyze";
-import prisma from "@/lib/prisma";
-import { OrderStatus } from "@prisma/client";
 
-export async function createOrder(formData: CreateOrderValues) {
+import prisma from "@/lib/prisma"
+import { OrderStatus } from "@prisma/client"
+import { createAuthAction } from "@/lib/server-utils"
+import { analyzeTask } from "./lib/analyze"
+import { createOrderSchema, type CreateOrderValues } from "@/lib/validation"
+
+/**
+ * ГЛАВНЫЙ ЭКШЕН: Создание заказа ZWORK
+ */
+export async function createOrder(values: CreateOrderValues) {
+  // Обертка для проверки сессии (userId)
   return createAuthAction(async (userId) => {
-    // 1. ИИ определяет категории и заголовок
-    const aiResponse = await analyzeTask(formData.description);
 
-    // ПРЕДОХРАНИТЕЛЬ: Если ИИ вернул пустой массив, создаем дефолтную категорию
-    const rawCategories = (aiResponse.categories && aiResponse.categories.length > 0)
+    // 1. Валидация входных данных через Zod
+    const validated = createOrderSchema.parse(values);
+
+    // 2. ИИ-Классификация (Определяем title, ниши и keywords)
+    // Функция analyzeTask возвращает: { title: string, categories: Array<{name, keywords}> }
+    const aiResponse = await analyzeTask(validated.description);
+
+    // ПРЕДОХРАНИТЕЛЬ: Если ИИ не вернул категории, создаем дефолтную
+    const aiCategories = aiResponse.categories?.length
       ? aiResponse.categories
-      : [{ name: "Другое", keywords: ["общее"] }];
+      : [{ name: "Разное", keywords: [] }];
 
-    // 2. Синхронизируем справочник категорий
+    // 3. Синхронизация категорий (Upsert)
+    // Создаем или получаем ID всех ниш, которые определил ИИ
     const categoryIds = await Promise.all(
-      rawCategories.map(async (cat: any) => {
+      aiCategories.map(async (cat: any) => {
         const dbCategory = await prisma.category.upsert({
           where: { name: cat.name },
           update: {
-            keywords: { set: cat.keywords || [] },
+            // Обновляем ключевые слова для улучшения поиска в будущем
+            keywords: { set: cat.keywords || [] }
           },
           create: {
             name: cat.name,
@@ -33,60 +45,83 @@ export async function createOrder(formData: CreateOrderValues) {
       })
     );
 
-    // 3. Транзакция: Создание заказа и уведомлений
+    // 4. ТРАНЗАКЦИЯ: Создание заказа и системных уведомлений
     const result = await prisma.$transaction(async (tx) => {
+      // Создаем сам заказ
       const newOrder = await tx.order.create({
         data: {
-          // Гарантируем наличие заголовка
-          title: aiResponse.title || formData.description.slice(0, 50),
-          description: formData.description,
-          address: formData.address,
-          price: Math.round(Number(formData.price) * 100),
+          title: aiResponse.title || validated.description.slice(0, 50),
+          description: validated.description,
+          address: validated.address,
+          // Сохраняем цену в копейках/центах
+          price: Math.round(validated.price * 100),
           status: OrderStatus.PENDING,
           clientId: userId,
-          lat: formData.lat,
-          lng: formData.lng,
-          dateType: formData.dateType,
+          lat: validated.lat,
+          lng: validated.lng,
+          dateType: validated.dateType,
+          // Связываем с категориями через промежуточную таблицу
           categories: {
-            // Исправлено: создание связей в промежуточной таблице
             create: categoryIds.map((id) => ({
               categoryId: id,
             })),
           },
         },
+        include: {
+          client: {
+            select: { name: true, image: true }
+          },
+          categories: {
+            include: { category: true }
+          }
+        }
       });
 
-      // 4. Поиск мастеров по навыкам (проверяем наличие профиля)
+      // Ищем профили мастеров, у которых есть эти скиллы (categoryId)
       const matchingWorkers = await tx.profile.findMany({
         where: {
           skills: {
             some: { categoryId: { in: categoryIds } },
           },
-          userId: { not: userId }, // Не уведомляем самого себя
+          userId: { not: userId }, // Не уведомляем автора заказа
         },
         select: { userId: true },
       });
 
-      // 5. Создание уведомлений в БД
+      // Создаем уведомления в БД для ленты уведомлений
       if (matchingWorkers.length > 0) {
         await tx.notification.createMany({
           data: matchingWorkers.map((worker) => ({
             userId: worker.userId,
-            title: `Новый заказ: ${aiResponse.title || "ZWORK"}`,
-            message: `Появилась работа в вашей категории.`,
+            title: `ZWORK: ${newOrder.title}`,
+            message: `Новый заказ в вашей нише!`,
             type: "NEW_ORDER",
             link: `/pro/orders/${newOrder.id}`,
           })),
         });
       }
 
-      return { order: newOrder, workerIds: matchingWorkers.map(w => w.userId) };
+      return { newOrder, workerIds: matchingWorkers.map(w => w.userId) };
     });
 
-    // 6. ТУТ МЕСТО ДЛЯ PUSHER
-    // Логика отправки в реальном времени должна быть здесь, 
-    // чтобы не тормозить транзакцию БД.
-
-    return { id: result.order.id };
+    /*   // 5. REAL-TIME: Пушим заказ в живую ленту через Pusher
+       // Мастера на странице /pro/orders мгновенно увидят карточку
+       try {
+         await pusherServer.trigger("orders-feed", "new-order", {
+           order: {
+             ...result.newOrder,
+             // Форматируем для соответствия типу FeedOrder на фронте
+             offersCount: 0,
+             clientStats: { projects: 1, hireRate: 0 } 
+           },
+           lat: validated.lat,
+           lng: validated.lng
+         });
+       } catch (pusherError) {
+         console.error("PUSHER_TRIGGER_ERROR:", pusherError);
+         // Не кидаем ошибку здесь, чтобы заказ все равно считался созданным
+       }
+   */
+    return { id: result.newOrder.id };
   });
 }

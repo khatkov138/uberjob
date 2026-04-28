@@ -52,7 +52,7 @@ export function OrderCard({ order, isMatched }: OrderCardProps) {
 
               <div className="flex flex-wrap gap-2">
                 {/* ИСПРАВЛЕНО: Обработка новой структуры категорий */}
-                {order.categories.map((catObj: any) => (
+                {order.categories.map((catObj) => (
                   <span
                     key={catObj.categoryId}
                     className={cn(
