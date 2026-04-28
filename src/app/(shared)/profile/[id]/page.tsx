@@ -3,14 +3,19 @@ import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
 import { Star, ShieldCheck, MapPin, MessageSquare, Zap } from "lucide-react"
 
-import { getProfileData } from "@/actions/profile"
+
 import { Container } from "@/components/shared/container"
-import { cn } from "@/lib/utils"
+import { cn, unwrap } from "@/lib/utils"
+import { getProfileData, PublicProfile } from "@/actions/profile/get"
 
 export default async function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
-    
+
     const { id } = await params
-    const data = await getProfileData(id)
+
+    // Сначала вызываем экшен
+    const result = await getProfileData(id)
+
+    const data = unwrap<PublicProfile | null>(result, null)
 
     if (!data) return notFound()
 

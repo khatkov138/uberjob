@@ -1,20 +1,14 @@
-import { getServerSession } from "@/lib/get-session";
+
+
 import prisma from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { withApiAuth } from "@/lib/server-utils";
 
 export async function POST() {
-    const session = await getServerSession();
-    
-    // Если юзер не залогинен, просто выходим
-    if (!session?.user?.id) {
-        return new NextResponse("Unauthorized", { status: 401 });
-    }
-
-    // Обновляем время последней активности
-    await prisma.profile.update({
-        where: { userId: session.user.id },
-        data: { lastSeen: new Date() }
+    return withApiAuth(async (userId) => {
+        return await prisma.profile.update({
+            where: { userId },
+            data: { lastSeen: new Date() },
+            select: { id: true }
+        });
     });
-
-    return NextResponse.json({ success: true });
 }
