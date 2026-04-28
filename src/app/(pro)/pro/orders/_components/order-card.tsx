@@ -1,19 +1,27 @@
 "use client"
 
 import { Card, CardContent } from "@/components/ui/card"
-import { 
-  Sparkles, Clock, MessageSquare, MapPin, 
-  Zap, ChevronRight, Wallet, Banknote 
+import {
+  Sparkles, Clock, MessageSquare, MapPin,
+  Zap, ChevronRight, Wallet, Banknote
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
+import { FeedOrder } from "@/actions/order/get"
 
-export function OrderCard({ order, isMatched }: any) {
-  const isNegotiable = order.price === 0
+
+interface OrderCardProps {
+  order: FeedOrder
+  isMatched: boolean // Добавляем в пропсы
+}
+
+export function OrderCard({ order, isMatched }: OrderCardProps) {
   
-  const timeAgo = order.createdAt 
+  const isNegotiable = order.price === 0
+
+  const timeAgo = order.createdAt
     ? formatDistanceToNow(new Date(order.createdAt), { addSuffix: true, locale: ru })
     : "недавно"
 
@@ -32,7 +40,7 @@ export function OrderCard({ order, isMatched }: any) {
         isMatched ? "border-blue-500/10 shadow-blue-500/5" : "border-slate-100"
       )}>
         <CardContent className="p-6 md:p-7">
-          
+
           {/* 2. ВЕРХ: ТИТУЛ И ЦЕНА */}
           <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-1">
             <div className="space-y-3 flex-1 w-full">
@@ -41,7 +49,7 @@ export function OrderCard({ order, isMatched }: any) {
                   {order.title}
                 </h3>
               </Link>
-              
+
               <div className="flex flex-wrap gap-2">
                 {/* ИСПРАВЛЕНО: Обработка новой структуры категорий */}
                 {order.categories.map((catObj: any) => (
@@ -96,17 +104,17 @@ export function OrderCard({ order, isMatched }: any) {
             </div>
             {/* Добавил отображение дистанции */}
             {order.distance !== undefined && (
-               <div className="px-3 py-1 bg-blue-50 rounded-lg border border-blue-100 text-blue-600 text-[9px] font-black uppercase">
-                 {order.distance} км от вас
-               </div>
+              <div className="px-3 py-1 bg-blue-50 rounded-lg border border-blue-100 text-blue-600 text-[9px] font-black uppercase">
+                {order.distance} км от вас
+              </div>
             )}
-            
-          
+
+
           </div>
 
           {/* 5. НИЖНИЙ БЛОК */}
           <div className="space-y-5 pt-5 border-t border-slate-50">
-            
+
             {/* Этаж 1: Заказчик */}
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3">
@@ -124,14 +132,14 @@ export function OrderCard({ order, isMatched }: any) {
               </div>
 
               <div className="flex gap-6 border-l border-slate-100 pl-6">
-                 <div className="text-center">
-                    <div className="text-[8px] font-black text-slate-300 uppercase leading-none mb-0.5">Проектов</div>
-                    <div className="text-sm font-black text-slate-900">{order.client?.projects || 0}</div>
-                 </div>
-                 <div className="text-center">
-                    <div className="text-[8px] font-black text-slate-300 uppercase leading-none mb-0.5">Наем</div>
-                    <div className="text-sm font-black text-slate-900">{order.client?.hireRate || 0}%</div>
-                 </div>
+                <div className="text-center">
+                  <div className="text-[8px] font-black text-slate-300 uppercase leading-none mb-0.5">Проектов</div>
+                  <div className="text-sm font-black text-slate-900">{order.clientStats.projects}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[8px] font-black text-slate-300 uppercase leading-none mb-0.5">Наем</div>
+                  <div className="text-sm font-black text-slate-900">{order.clientStats.hireRate}%</div>
+                </div>
               </div>
             </div>
 
@@ -142,7 +150,7 @@ export function OrderCard({ order, isMatched }: any) {
                   <Clock className="w-4 h-4 text-slate-200" />
                   <span className="text-[10px] font-black uppercase tracking-widest">{timeAgo}</span>
                 </div>
-                
+
                 <div className="flex items-center gap-1.5 shrink-0">
                   <MessageSquare className="w-4 h-4 text-slate-200" />
                   <span className="text-[10px] font-black uppercase tracking-widest">
@@ -158,11 +166,11 @@ export function OrderCard({ order, isMatched }: any) {
                 </div>
               </div>
 
-              <Link 
+              <Link
                 href={`/pro/orders/${order.id}`}
                 className={cn(
                   "flex items-center justify-center gap-3 px-8 py-3.5 rounded-xl md:rounded-2xl text-[11px] font-black uppercase italic tracking-widest transition-all duration-500 w-full lg:w-auto shrink-0 whitespace-nowrap",
-                  "bg-slate-100 text-slate-400 border border-slate-200", 
+                  "bg-slate-100 text-slate-400 border border-slate-200",
                   "group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 group-hover:shadow-[0_10px_25px_rgba(37,99,235,0.25)] group-hover:-translate-y-0.5 active:scale-[0.98]"
                 )}
               >

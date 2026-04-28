@@ -44,7 +44,7 @@ export function CreateOrderForm() {
             toast.success("ЗАДАЧА ЗАПУЩЕНА")
 
             // В экшене мы возвращали { id: result.id }
-            router.push(`/client/my-orders/${data.id}`)
+            router.push(`/client/orders/${data.id}`)
         },
 
         onError: (error: Error) => {

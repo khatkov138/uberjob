@@ -52,7 +52,7 @@ export default function RootLayout({
           {/* HEADER: Занимает ровно столько, сколько нужно контенту */}
           <header className="flex-none z-50">
             <Navbar />
-            <LivePulseMarquee />
+         {/*   <LivePulseMarquee />*/}
           </header>
 
           {/* 

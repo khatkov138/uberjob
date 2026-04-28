@@ -11,9 +11,10 @@ interface Props {
   onClose: () => void
   userCategoryIds: string[]
   onAdd: (categoryId: string) => void
+  onRemove: (categoryId: string) => void // Добавляем это
 }
 
-export function CategorySearchModal({ isOpen, onClose, userCategoryIds, onAdd }: Props) {
+export function CategorySearchModal({ isOpen, onClose, userCategoryIds, onAdd, onRemove }: Props) {
   const [query, setQuery] = React.useState("")
 
   // Используем handleAction, чтобы получить чистый массив категорий
@@ -34,9 +35,9 @@ export function CategorySearchModal({ isOpen, onClose, userCategoryIds, onAdd }:
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div 
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" 
-        onClick={onClose} 
+      <div
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={onClose}
       />
 
       <div className="relative w-full max-w-lg bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -68,16 +69,16 @@ export function CategorySearchModal({ isOpen, onClose, userCategoryIds, onAdd }:
             ) : filtered.length > 0 ? (
               filtered.map((cat) => {
                 const isSelected = userCategoryIds.includes(cat.id)
-                
+
                 return (
                   <button
                     key={cat.id}
-                    disabled={isSelected}
-                    onClick={() => onAdd(cat.id)}
+                    // УБИРАЕМ disabled={isSelected}, чтобы кнопка нажималась всегда
+                    onClick={() => isSelected ? onRemove(cat.id) : onAdd(cat.id)}
                     className={cn(
                       "w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all active:scale-[0.98] shrink-0",
                       isSelected
-                        ? "bg-blue-50 border-blue-100 opacity-60 cursor-default"
+                        ? "bg-blue-50 border-blue-100 opacity-60" // Твоя оригинальная верстка для выбранного
                         : "bg-white border-slate-100 hover:border-blue-600 hover:bg-blue-50/30"
                     )}
                   >
@@ -90,6 +91,7 @@ export function CategorySearchModal({ isOpen, onClose, userCategoryIds, onAdd }:
                   </button>
                 )
               })
+
             ) : (
               <div className="text-center py-10 space-y-2">
                 <p className="text-slate-400 font-bold italic uppercase text-xs tracking-widest">Ничего не нашли</p>

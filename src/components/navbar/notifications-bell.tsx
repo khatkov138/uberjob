@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { Bell, Loader2 } from "lucide-react"
 import {
   Popover,
@@ -7,12 +8,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { cn } from "@/lib/utils"
+import { cn, handleAction } from "@/lib/utils"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
-
-
 
 import { authClient } from "@/lib/auth-client"
 import { Notification } from "@prisma/client"
@@ -20,54 +19,68 @@ import { markAllAsRead, markAsRead } from "@/actions/notification/manage"
 
 export function NotificationsBell() {
   const queryClient = useQueryClient()
+  const { data: session } = authClient.useSession()
+  
+  const userId = session?.user?.id
+  // Создаем стабильный ключ
+  const queryKey = React.useMemo(() => ["notifications", userId], [userId])
 
-  const { data: session } = authClient.useSession() // Используем наш быстрый хук
-
-  const { data: notifications, isLoading } = useQuery<Notification[]>({
-    queryKey: ["notifications", session?.user?.id], // Добавляем ID в ключ
+  const { data: notifications = [], isLoading } = useQuery<Notification[]>({
+    queryKey,
     queryFn: async () => {
       const res = await fetch("/api/notifications")
       if (!res.ok) throw new Error("Failed to fetch")
       return res.json()
     },
-    // ЗАПУСКАЕМ ТОЛЬКО ЕСЛИ ЕСТЬ ЮЗЕР
-    enabled: !!session?.user?.id,
-
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 5, // 5 минут считаем данные свежими
   })
-  const unreadCount = notifications?.filter((n) => !n.isRead).length || 0
 
+  const unreadCount = notifications.filter((n) => !n.isRead).length
+
+  // Мутация: Прочитать всё
   const markAllMutation = useMutation({
-    mutationFn: markAllAsRead,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] })
-  })
-
-  const markOneMutation = useMutation({
-    mutationFn: markAsRead,
-    onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ["notifications"] })
-      const previousNotifications = queryClient.getQueryData<Notification[]>(["notifications"])
-      if (previousNotifications) {
-        queryClient.setQueryData<Notification[]>(["notifications"],
-          previousNotifications.map(n => n.id === id ? { ...n, isRead: true } : n)
+    mutationFn: () => handleAction(markAllAsRead()),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData<Notification[]>(queryKey)
+      if (previous) {
+        queryClient.setQueryData<Notification[]>(queryKey, 
+          previous.map(n => ({ ...n, isRead: true }))
         )
       }
-      return { previousNotifications }
+      return { previous }
     },
-    onError: (err, id, context) => {
-      if (context?.previousNotifications) {
-        queryClient.setQueryData(["notifications"], context.previousNotifications)
+    onError: (_, __, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKey, context.previous)
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey })
+  })
+
+  // Мутация: Прочитать одно
+  const markOneMutation = useMutation({
+    mutationFn: (id: string) => handleAction(markAsRead(id)),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData<Notification[]>(queryKey)
+      if (previous) {
+        queryClient.setQueryData<Notification[]>(queryKey,
+          previous.map(n => n.id === id ? { ...n, isRead: true } : n)
+        )
       }
+      return { previous }
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["notifications"] })
+    onError: (_, __, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKey, context.previous)
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey })
   })
 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        {/* КНОПКА: Теперь 1 в 1 как чат */}
         <button className="w-11 h-11 flex items-center justify-center rounded-xl text-slate-400 hover:bg-white hover:text-blue-600 transition-all relative group bg-white/50 border border-transparent hover:border-slate-200 shadow-sm outline-none cursor-pointer">
           <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
-
           {unreadCount > 0 && (
             <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-600 rounded-full border-2 border-white shadow-sm animate-in zoom-in" />
           )}
@@ -75,7 +88,6 @@ export function NotificationsBell() {
       </PopoverTrigger>
 
       <PopoverContent className="w-80 p-0 rounded-[1.5rem] border-2 border-slate-100 shadow-2xl mt-4" align="end">
-        {/* ХЕДЕР */}
         <div className="p-4 flex items-center justify-between border-b border-slate-50">
           <h4 className="font-black text-[10px] uppercase tracking-widest text-slate-900">Уведомления</h4>
           {unreadCount > 0 && (
@@ -85,13 +97,12 @@ export function NotificationsBell() {
           )}
         </div>
 
-        {/* СПИСОК */}
         <div className="max-h-[350px] overflow-y-auto no-scrollbar">
           {isLoading ? (
             <div className="p-10 text-center">
               <Loader2 className="w-5 h-5 animate-spin mx-auto text-blue-600" />
             </div>
-          ) : notifications && notifications.length > 0 ? (
+          ) : notifications.length > 0 ? (
             notifications.map((n) => (
               <Link
                 key={n.id}
@@ -124,13 +135,12 @@ export function NotificationsBell() {
           )}
         </div>
 
-        {/* ФУТЕР */}
         {unreadCount > 0 && (
           <div className="p-2 border-t border-slate-50 bg-slate-50/50">
             <button
               onClick={() => markAllMutation.mutate()}
               disabled={markAllMutation.isPending}
-              className="w-full py-2 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-red-600 transition-all active:scale-95"
+              className="w-full py-2 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-red-600 transition-all active:scale-95 disabled:opacity-50"
             >
               {markAllMutation.isPending ? "СИНХРОНИЗАЦИЯ..." : "ОЧИСТИТЬ ВСЁ"}
             </button>

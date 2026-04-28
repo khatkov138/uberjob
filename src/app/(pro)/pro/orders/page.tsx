@@ -1,50 +1,58 @@
 // src/app/(pro)/pro/orders/page.tsx
-import * as React from "react"
 import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 
-
+import { getServerSession } from "@/lib/get-session"
 import { unwrap } from "@/lib/utils"
-import OrdersPageClient from "./OrdersPageClient"
 import { getOrders } from "@/actions/order/get"
 import { getMyProfile } from "@/actions/profile/get"
+import OrdersPageClient from "./OrdersPageClient"
+import { DEFAULT_LOCATION, roundCoord } from "@/lib/location-config"
+
 
 export default async function OrdersPage() {
+  const session = await getServerSession()
+  if (!session) redirect("/login")
+
   const cookieStore = await cookies()
   const locationRaw = cookieStore.get("user-location-storage")?.value
 
-  // Дефолтные значения (Иркутск), если кука еще не создана
-  let lat = 52.2895
-  let lng = 104.2806
-  let radius = 60
+  // Изначально берем всё из общих констант
+  let location = { ...DEFAULT_LOCATION }
+
+
 
   if (locationRaw) {
     try {
-      // Декодируем URI (куки часто кодируются) и парсим JSON
       const parsed = JSON.parse(decodeURIComponent(locationRaw))
-
-      // Извлекаем данные из структуры Zustand (parsed.state)
-      if (parsed.state) {
-        lat = parsed.state.lat ?? lat
-        lng = parsed.state.lng ?? lng
-        radius = parsed.state.radius ?? radius
+      // ВАЖНО: Zustand хранит всё внутри объекта state
+      if (parsed?.state) {
+        location = {
+          city: parsed.state.city ?? DEFAULT_LOCATION.city,
+          // Используем roundCoord И ТУТ, чтобы сервер выдал те же цифры
+          lat: roundCoord(parsed.state.lat ?? DEFAULT_LOCATION.lat),
+          lng: roundCoord(parsed.state.lng ?? DEFAULT_LOCATION.lng),
+          radius: Number(parsed.state.radius ?? DEFAULT_LOCATION.radius)
+        }
       }
-
     } catch (e) {
-      console.error("Ошибка парсинга куки локации на сервере:", e)
+      console.error("Ошибка синхронизации кук на сервере", e)
     }
   }
 
-  // Запускаем запросы параллельно. Теперь сервер сразу знает координаты из кук!
+  // Запрос в базу с гарантированно идентичными координатами
   const [ordersRes, profileRes] = await Promise.all([
-    getOrders({ lat, lng, radius }),
+    getOrders(location),
     getMyProfile()
   ])
-  
 
   return (
     <OrdersPageClient
+      session={session}
       initialOrders={unwrap(ordersRes, [])}
       initialProfile={unwrap(profileRes, null)}
+      serverLocation={location}
     />
   )
 }
+

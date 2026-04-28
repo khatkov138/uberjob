@@ -1,29 +1,27 @@
 "use server"
-
-import { getServerSession } from "@/lib/get-session"
-import prisma from "@/lib/prisma"
-import { revalidatePath } from "next/cache"
-import { CreateOrderValues } from "@/lib/validation"
-import { OrderStatus } from "@prisma/client"
-import { createAuthAction } from "@/lib/server-utils"
-import { analyzeTask } from "./lib/analyze"
-
-
+import { createAuthAction } from "@/lib/server-utils";
+import { CreateOrderValues } from "@/lib/validation";
+import { analyzeTask } from "./lib/analyze";
+import prisma from "@/lib/prisma";
+import { OrderStatus } from "@prisma/client";
 
 export async function createOrder(formData: CreateOrderValues) {
-  // Возвращаем результат вызова обертки — это лечит типы для handleAction
   return createAuthAction(async (userId) => {
-
     // 1. ИИ определяет категории и заголовок
     const aiResponse = await analyzeTask(formData.description);
 
+    // ПРЕДОХРАНИТЕЛЬ: Если ИИ вернул пустой массив, создаем дефолтную категорию
+    const rawCategories = (aiResponse.categories && aiResponse.categories.length > 0)
+      ? aiResponse.categories
+      : [{ name: "Другое", keywords: ["общее"] }];
+
     // 2. Синхронизируем справочник категорий
     const categoryIds = await Promise.all(
-      aiResponse.categories.map(async (cat: any) => {
+      rawCategories.map(async (cat: any) => {
         const dbCategory = await prisma.category.upsert({
           where: { name: cat.name },
           update: {
-            keywords: { set: cat.keywords },
+            keywords: { set: cat.keywords || [] },
           },
           create: {
             name: cat.name,
@@ -39,7 +37,8 @@ export async function createOrder(formData: CreateOrderValues) {
     const result = await prisma.$transaction(async (tx) => {
       const newOrder = await tx.order.create({
         data: {
-          title: aiResponse.title,
+          // Гарантируем наличие заголовка
+          title: aiResponse.title || formData.description.slice(0, 50),
           description: formData.description,
           address: formData.address,
           price: Math.round(Number(formData.price) * 100),
@@ -49,6 +48,7 @@ export async function createOrder(formData: CreateOrderValues) {
           lng: formData.lng,
           dateType: formData.dateType,
           categories: {
+            // Исправлено: создание связей в промежуточной таблице
             create: categoryIds.map((id) => ({
               categoryId: id,
             })),
@@ -56,34 +56,37 @@ export async function createOrder(formData: CreateOrderValues) {
         },
       });
 
-      // 4. Поиск подходящих мастеров
+      // 4. Поиск мастеров по навыкам (проверяем наличие профиля)
       const matchingWorkers = await tx.profile.findMany({
         where: {
           skills: {
             some: { categoryId: { in: categoryIds } },
           },
-          userId: { not: userId },
+          userId: { not: userId }, // Не уведомляем самого себя
         },
         select: { userId: true },
       });
 
-      // 5. Создание уведомлений
+      // 5. Создание уведомлений в БД
       if (matchingWorkers.length > 0) {
         await tx.notification.createMany({
           data: matchingWorkers.map((worker) => ({
             userId: worker.userId,
-            title: `Новый заказ: ${aiResponse.title}`,
-            message: `Подходит под ваши навыки.`,
+            title: `Новый заказ: ${aiResponse.title || "ZWORK"}`,
+            message: `Появилась работа в вашей категории.`,
             type: "NEW_ORDER",
             link: `/pro/orders/${newOrder.id}`,
           })),
         });
       }
 
-      return newOrder;
+      return { order: newOrder, workerIds: matchingWorkers.map(w => w.userId) };
     });
 
-    // Убрали revalidatePath — теперь всё на совести TanStack Query
-    return { id: result.id };
+    // 6. ТУТ МЕСТО ДЛЯ PUSHER
+    // Логика отправки в реальном времени должна быть здесь, 
+    // чтобы не тормозить транзакцию БД.
+
+    return { id: result.order.id };
   });
 }
