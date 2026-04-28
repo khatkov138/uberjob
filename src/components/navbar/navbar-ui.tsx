@@ -75,7 +75,7 @@ export function NavbarUI({ user }: NavbarUIProps) {
                         <div className="animate-in fade-in zoom-in-95 duration-500">
                             {mode === 'CLIENT' ? (
                                 <Link
-                                    href="/client/new-order"
+                                    href="/client/new"
                                     className="w-full h-12 flex items-center justify-center gap-3 bg-blue-600 hover:bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] transition-all shadow-lg shadow-blue-500/10 active:scale-95"
                                 >
                                     <PlusCircle size={18} className="stroke-[3px]" />

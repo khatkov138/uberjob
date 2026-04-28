@@ -2,34 +2,33 @@
 
 import * as React from "react"
 import { X, Search, Plus, Check, Loader2 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, handleAction } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
-import { getAllCategories } from "@/actions/category"
-
-interface Category {
-  id: string
-  name: string
-}
+import { getAllCategories } from "@/actions/category/get"
 
 interface Props {
   isOpen: boolean
   onClose: () => void
-  userCategoryIds: string[] // Изменили со строк на ID
-  onAdd: (categoryId: string) => void // Передаем ID
+  userCategoryIds: string[]
+  onAdd: (categoryId: string) => void
 }
 
 export function CategorySearchModal({ isOpen, onClose, userCategoryIds, onAdd }: Props) {
   const [query, setQuery] = React.useState("")
 
-  const { data: dbCategories, isLoading } = useQuery<Category[]>({
+  // Используем handleAction, чтобы получить чистый массив категорий
+  const { data: dbCategories = [], isLoading } = useQuery({
     queryKey: ["all-categories"],
-    queryFn: () => getAllCategories(),
+    queryFn: async () => await handleAction(getAllCategories()),
     enabled: isOpen,
+    staleTime: 1000 * 60 * 10, // Кешируем справочник на 10 минут
   });
 
-  const filtered = (dbCategories || []).filter((cat) =>
-    cat.name.toLowerCase().includes(query.toLowerCase())
-  );
+  const filtered = React.useMemo(() => {
+    return dbCategories.filter((cat) =>
+      cat.name.toLowerCase().includes(query.toLowerCase())
+    );
+  }, [dbCategories, query]);
 
   if (!isOpen) return null
 
@@ -43,8 +42,8 @@ export function CategorySearchModal({ isOpen, onClose, userCategoryIds, onAdd }:
       <div className="relative w-full max-w-lg bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="p-8 space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black uppercase italic tracking-tighter">Поиск ниши</h2>
-            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+            <h2 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900">Поиск ниши</h2>
+            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-900">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -54,7 +53,7 @@ export function CategorySearchModal({ isOpen, onClose, userCategoryIds, onAdd }:
             <input
               autoFocus
               placeholder="Напр: Электрика, Уборка..."
-              className="w-full h-14 pl-12 pr-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-600 outline-none font-bold transition-all"
+              className="w-full h-14 pl-12 pr-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-600 outline-none font-bold transition-all text-slate-900"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -68,14 +67,13 @@ export function CategorySearchModal({ isOpen, onClose, userCategoryIds, onAdd }:
               </div>
             ) : filtered.length > 0 ? (
               filtered.map((cat) => {
-                // ТЕПЕРЬ СРАВНИВАЕМ ПО ID
                 const isSelected = userCategoryIds.includes(cat.id)
                 
                 return (
                   <button
                     key={cat.id}
                     disabled={isSelected}
-                    onClick={() => onAdd(cat.id)} // Передаем ID
+                    onClick={() => onAdd(cat.id)}
                     className={cn(
                       "w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all active:scale-[0.98] shrink-0",
                       isSelected

@@ -41,17 +41,20 @@ export type UpdateProfileValues = z.infer<typeof updateProfileSchema>;
 export const sendMessageSchema = z.object({
   // Заменяем .uuid() на просто .min(1)
   recipientId: z.string().min(1, "ID получателя обязателен"),
-  orderId: z.uuid().optional().nullable().or(z.literal("")),
+  orderId: z.string().optional().nullable().or(z.literal("")),
   text: z.string().min(1).max(1000).trim().transform(val => val.replace(/\s+/g, ' '))
 });
 
 export type SendMessageValues = z.infer<typeof sendMessageSchema>;
 
 export const reviewSchema = z.object({
-  orderId: z.string(),
-  profileId: z.string(),
-  rating: z.number().min(1).max(5),
-  comment: z.string().min(10, "Опишите подробнее (минимум 10 символов)"),
+  orderId: z.string(), // Оставляем только ID заказа
+  rating: z.number()
+    .min(1, "Поставьте хотя бы одну звезду")
+    .max(5),
+  comment: z.string()
+    .min(10, "Опишите подробнее (минимум 10 символов)")
+    .max(500, "Слишком длинный отзыв"),
 });
 
 export type ReviewValues = z.infer<typeof reviewSchema>;

@@ -56,21 +56,28 @@ export function useChat(partnerId: string, orderId: string | undefined, currentU
     setIsReady(false)
   }
 
-  useLayoutEffect(() => {
-    if (isLoading || messages.length === 0 || !scrollRef.current) return
-    if (lastRestoredKey.current === contextKey && isReady) return
+ useLayoutEffect(() => {
+  // 1. Если всё еще грузимся или нет рефа — ждем
+  if (isLoading || !scrollRef.current) return
+  
+  // 2. Если мы уже готовы и ключ не менялся — выходим
+  if (lastRestoredKey.current === contextKey && isReady) return
 
-    const container = scrollRef.current
-    const savedPos = scrollPositions[contextKey]
+  const container = scrollRef.current
+  const savedPos = scrollPositions[contextKey]
 
+  // 3. Логика скролла: выполняем только если есть сообщения
+  if (messages.length > 0) {
     container.style.scrollBehavior = 'auto'
-    // В column-reverse 0 — это низ. Если позиции нет, браузер сам оставит в 0, 
-    // но мы форсируем для надежности.
     container.scrollTop = savedPos !== undefined ? savedPos : 0
+  }
 
-    lastRestoredKey.current = contextKey
-    setIsReady(true)
-  }, [contextKey, isLoading, messages.length])
+  // 4. ГЛАВНОЕ: ставим готовность в любом случае, даже если сообщений 0
+  lastRestoredKey.current = contextKey
+  setIsReady(true)
+  
+}, [contextKey, isLoading, messages.length]) // Оставляем зависимости
+
 
   // 3.
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {

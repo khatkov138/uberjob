@@ -12,14 +12,15 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn, handleAction } from "@/lib/utils"
 import { leaveReviewAction } from "@/actions/review/create"
 import { reviewSchema, type ReviewValues } from "@/lib/validation"
+import { Review } from "@prisma/client"
 
 interface ReviewFormProps {
   orderId: string
-  profileId: string
-  initialData?: { rating: number; comment: string } | null
+  // Используем Partial, если нам нужны не все поля, 
+  // или просто Pick, если нужны конкретные
+  initialData?: Pick<Review, "rating" | "comment"> | null
 }
-
-export function ReviewForm({ orderId, profileId, initialData }: ReviewFormProps) {
+export function ReviewForm({ orderId, initialData }: ReviewFormProps) {
   const queryClient = useQueryClient()
   const [submitted, setSubmitted] = React.useState(false)
   // Если есть initialData — мы в режиме просмотра, если нет — в режиме редактирования
@@ -29,7 +30,6 @@ export function ReviewForm({ orderId, profileId, initialData }: ReviewFormProps)
     resolver: zodResolver(reviewSchema),
     defaultValues: {
       orderId,
-      profileId,
       rating: initialData?.rating || 5,
       comment: initialData?.comment || "",
     },

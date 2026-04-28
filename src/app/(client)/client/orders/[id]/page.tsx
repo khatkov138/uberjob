@@ -17,11 +17,11 @@ import { confirmOrderCompletion } from "@/actions/order/manage"
 
 export default function OrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
 
-    
+
 
     const { id: orderId } = React.use(params) // Не забудь React.use если это клиентский компонент
 
-    const { data: order, isLoading, refetch } = useQuery<OrderDetails>({
+    const { data: order, isLoading, refetch } = useQuery({
         queryKey: ["order", orderId],
         // Теперь handleAction вернет чистый объект OrderDetails или кинет ошибку
         queryFn: () => handleAction(getOrderDetails(orderId)),
@@ -186,10 +186,9 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ id: str
                     </Card>
 
                     {/* ОТЗЫВ */}
-                    {isCompleted && order.worker?.profile && (
+                    {isCompleted && (
                         <ReviewForm
                             orderId={order.id}
-                            profileId={"order.worker.workerProfile.id"}
                             initialData={order.review}
                         />
                     )}

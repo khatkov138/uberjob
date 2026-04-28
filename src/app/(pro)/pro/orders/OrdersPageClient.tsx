@@ -1,20 +1,18 @@
 "use client"
 
 import * as React from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { Loader2, Inbox } from "lucide-react"
 
 import { authClient } from "@/lib/auth-client"
 import { useLocationStore } from "@/store/use-location-store"
-
-import { addSkill, getMyProfile, removeSkill, FullProfile } from "@/actions/profile"
 import { handleAction } from "@/lib/utils"
 
 import { Container } from "@/components/shared/container"
-import { LocationModal } from "@/components/geo/location-modal"
 import { FeedHeader } from "./feed-header"
 import { OrderCard } from "./order-card"
-import { FeedOrder, getOrders } from "@/actions/order/get"
+import { getOrders, type FeedOrder } from "@/actions/order/get"
+import { getMyProfile, type FullProfile } from "@/actions/profile/get"
 
 interface OrdersPageClientProps {
     initialOrders: FeedOrder[]
@@ -22,42 +20,46 @@ interface OrdersPageClientProps {
 }
 
 export default function OrdersPageClient({ initialOrders, initialProfile }: OrdersPageClientProps) {
-
     const { data: session } = authClient.useSession()
     const { lat, lng, radius } = useLocationStore()
     const [filterMode, setFilterMode] = React.useState<"ALL" | "MY">("ALL")
 
-    // --- ЗАГРУЗКА ДАННЫХ ---
-
+    // --- ЗАГРУЗКА ЛЕНТЫ ---
     const { data: orders = [] } = useQuery({
         queryKey: ["orders", lat, lng, radius, session?.user?.id],
-        queryFn: () => handleAction(getOrders({ lat, lng, radius })),
+        queryFn: async () => await handleAction(getOrders({ lat, lng, radius })),
         initialData: initialOrders,
         enabled: !!lat,
-        staleTime: 0,
+        staleTime: 5000, // Даем 5 сек, чтобы не рефетчить сразу после SSR
     })
 
+    // --- ЗАГРУЗКА ПРОФИЛЯ ---
     const { data: profile } = useQuery({
         queryKey: ["user-profile", session?.user?.id],
-        queryFn: () => handleAction(getMyProfile()),
-        initialData: initialProfile,
+        queryFn: async () => await handleAction(getMyProfile()),
+        initialData: initialProfile ?? undefined,
         enabled: !!session?.user?.id,
     })
 
+    // Безопасное слияние профиля (берем из кеша, если нет — из серверных пропсов)
+    const currentProfile = profile || initialProfile;
 
-
-    // --- ЛОГИКА ---
-
+    // --- ЛОГИКА ФИЛЬТРАЦИИ ---
     const filteredOrders = React.useMemo(() => {
         return filterMode === "MY" ? orders.filter(o => o.isMatch) : orders
     }, [orders, filterMode])
+
+    // Если всё еще грузится сессия и нет начальных данных — показываем лоадер
+    if (!session && !initialProfile && !initialOrders.length) {
+        return <LoadingState />
+    }
 
     return (
         <Container className="bg-slate-50/50 py-10">
             <div className="space-y-10">
                 <FeedHeader
-                    userSkills={profile?.skills || []}
-
+                    // Используем опциональную цепочку, чтобы не упасть без профиля
+                    userSkills={currentProfile?.skills || []}
                     filterMode={filterMode}
                     setFilterMode={setFilterMode}
                 />
@@ -71,13 +73,10 @@ export default function OrdersPageClient({ initialOrders, initialProfile }: Orde
                         <EmptyState isMyFilter={filterMode === "MY"} />
                     )}
                 </div>
-
-
             </div>
         </Container>
     )
 }
-
 // --- ВСПОМОГАТЕЛЬНЫЕ КОМПОНЕНТЫ ---
 
 function LoadingState() {

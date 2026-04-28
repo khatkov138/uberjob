@@ -59,7 +59,7 @@ export default function ClientDashboardPage() {
       </header>
 
       {/* ГЛАВНАЯ КНОПКА СОЗДАНИЯ */}
-      <Link href="/client/new-order" className="group block mb-8">
+      <Link href="/client/new" className="group block mb-8">
         <div className="bg-blue-600 rounded-[2.5rem] p-10 md:p-16 text-white relative overflow-hidden shadow-2xl shadow-blue-200 transition-all hover:scale-[1.01] active:scale-95">
           {/* Декоративная иконка на фоне */}
           <Plus className="absolute top-0 right-0 w-64 h-64 -mr-16 -mt-16 opacity-10 group-hover:rotate-12 transition-transform duration-700 pointer-events-none" />
@@ -80,7 +80,7 @@ export default function ClientDashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
         {/* МОИ ЗАКАЗЫ (Широкая плитка) */}
-        <Link href="/client/my-orders" className="group md:col-span-2">
+        <Link href="/client/orders" className="group md:col-span-2">
           <div className="h-full min-h-[220px] rounded-[2.5rem] p-8 bg-blue-600 text-white transition-all duration-500 flex flex-col justify-between hover:shadow-2xl hover:shadow-blue-200">
             <div className="flex justify-between items-start">
               <div className="p-4 rounded-2xl bg-white/10 transition-transform duration-500 group-hover:scale-110">

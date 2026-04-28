@@ -2,10 +2,11 @@
 import * as React from "react"
 import { cookies } from "next/headers"
 
-import { getMyProfile } from "@/actions/profile"
+
 import { unwrap } from "@/lib/utils"
 import OrdersPageClient from "./OrdersPageClient"
 import { getOrders } from "@/actions/order/get"
+import { getMyProfile } from "@/actions/profile/get"
 
 export default async function OrdersPage() {
   const cookieStore = await cookies()

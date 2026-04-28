@@ -7,7 +7,8 @@ import { useLocationStore } from "@/store/use-location-store"
 import { CategorySearchModal } from "./category-search-modal"
 import { LocationModal } from "@/components/geo/location-modal"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { addSkill, removeSkill } from "@/actions/profile"
+import { addSkill, removeSkill } from "@/actions/profile/manage"
+
 
 // Принимаем массив объектов [{id, name}]
 export function FeedHeader({

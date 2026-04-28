@@ -1,5 +1,5 @@
+// src/app/(pro)/pro/dashboard/page.tsx
 import * as React from "react"
-
 import { Container } from "@/components/shared/container"
 import { getServerSession } from "@/lib/get-session"
 import {
@@ -16,18 +16,23 @@ import {
 import Link from "next/link"
 
 import { OrderStatusCard } from "@/components/dashboard/order-status-card"
-import { getActiveWorkSummary, getProStats } from "@/actions/pro"
+import { getActiveWorkSummary, getProStats } from "@/actions/profile/get"
+import { unwrap } from "@/lib/utils"
+import { redirect } from "next/navigation"
 
 export default async function ProDashboardPage() {
-
   const session = await getServerSession()
+  if (!session?.user) redirect("/sign-in")
 
-
-
-  const [stats, activeWorks] = await Promise.all([
+  // Загружаем всё параллельно по нашему новому стандарту
+  const [statsRes, activeWorksRes] = await Promise.all([
     getProStats(),
     getActiveWorkSummary()
   ])
+
+  // Распаковываем данные (с дефолтными значениями, чтобы ничего не упало)
+  const stats = unwrap(statsRes, { rating: 5.0, reviewsCount: 0, earnings: 0, completedCount: 0 })
+  const activeWorks = unwrap(activeWorksRes, [])
 
   return (
     <Container className="bg-white">
@@ -38,7 +43,7 @@ export default async function ProDashboardPage() {
           <div className="w-1 h-1 bg-blue-600 rounded-full animate-pulse" />
         </div>
         <h1 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter text-slate-900 leading-none">
-          Привет, <span className="text-blue-600">{session?.user?.name ? session.user.name.split(' ')[0] : 'Партнер'}</span>
+          Привет, <span className="text-blue-600">{session.user.name ? session.user.name.split(' ')[0] : 'Партнер'}</span>
         </h1>
       </header>
 
@@ -65,7 +70,6 @@ export default async function ProDashboardPage() {
 
           {/* СЕТКА С ОТКЛИКАМИ И СООБЩЕНИЯМИ */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* МОИ ОТКЛИКИ (Та самая кнопка) */}
             <Link href="/pro/my-offers" className="group">
               <div className="h-full bg-blue-600 rounded-[2rem] p-8 text-white flex flex-col justify-between min-h-[200px] transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-200">
                 <div className="flex justify-between items-start">
@@ -81,8 +85,7 @@ export default async function ProDashboardPage() {
               </div>
             </Link>
 
-            {/* СООБЩЕНИЯ */}
-            <Link href="/chat" className="group">
+            <Link href="/messages" className="group">
               <div className="h-full bg-slate-50 border border-slate-100 rounded-[2rem] p-8 text-slate-900 flex flex-col justify-between min-h-[200px] transition-all hover:-translate-y-1 hover:bg-white hover:shadow-xl">
                 <div className="flex justify-between items-start">
                   <div className="p-3 bg-white border border-slate-100 rounded-2xl shadow-sm text-blue-600">
@@ -105,7 +108,7 @@ export default async function ProDashboardPage() {
               <h3 className="font-black uppercase italic text-slate-900">Сейчас в работе</h3>
             </div>
 
-            {activeWorks && activeWorks.length > 0 ? (
+            {activeWorks.length > 0 ? (
               <div className="grid gap-4">
                 {activeWorks.map((order) => (
                   <Link key={order.id} href={`/pro/orders/${order.id}`} className="group block">
@@ -126,7 +129,6 @@ export default async function ProDashboardPage() {
         {/* ПРАВАЯ ЧАСТЬ: СТАТИСТИКА И ПРОФИЛЬ (4 колонки) */}
         <div className="lg:col-span-4 space-y-6">
 
-          {/* ПЛИТКА ДОХОДА */}
           <div className="bg-emerald-50 border border-emerald-100 p-8 rounded-[2rem] flex flex-col justify-between min-h-[160px]">
             <div className="flex justify-between items-start">
               <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">Ваш доход</p>
@@ -134,13 +136,12 @@ export default async function ProDashboardPage() {
             </div>
             <div>
               <p className="text-4xl font-black italic text-slate-900 tracking-tighter leading-none">
-                {stats?.earnings.toLocaleString() || 0} <span className="text-xl">₽</span>
+                {stats.earnings.toLocaleString()} <span className="text-xl">₽</span>
               </p>
               <p className="text-[9px] font-bold text-emerald-600/60 uppercase mt-2 italic">Доступно к выводу</p>
             </div>
           </div>
 
-          {/* ПЛИТКА РЕЙТИНГА */}
           <div className="bg-amber-50 border border-amber-100 p-8 rounded-[2rem] flex flex-col justify-between min-h-[160px]">
             <div className="flex justify-between items-start">
               <p className="text-[10px] font-black text-amber-600 uppercase tracking-[0.2em]">Рейтинг</p>
@@ -148,27 +149,24 @@ export default async function ProDashboardPage() {
             </div>
             <div>
               <p className="text-4xl font-black italic text-slate-900 tracking-tighter leading-none">
-                {stats?.rating.toFixed(1) || "5.0"}
+                {stats.rating.toFixed(1)}
               </p>
-              <p className="text-[9px] font-bold text-amber-600/60 uppercase mt-2 italic">{stats?.reviewsCount || 0} отзывов</p>
+              <p className="text-[9px] font-bold text-amber-600/60 uppercase mt-2 italic">{stats.reviewsCount} отзывов</p>
             </div>
           </div>
 
-          {/* НАСТРОЙКИ */}
           <Link href="/pro/settings" className="block group">
             <div className="bg-slate-900 rounded-[2rem] p-6 text-white transition-all hover:bg-blue-600 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-white/10 rounded-xl">
                   <Settings className="w-5 h-5" />
                 </div>
-                <span className="font-black uppercase italic text-xs tracking-widest">Профиль</span>
+                <span className="font-black uppercase italic text-xs tracking-widest">Настройки <br/> профиля</span>
               </div>
-              <ArrowUpRight className="w-5 h-5 opacity-40 group-hover:opacity-100" />
+              <ArrowUpRight className="w-4 h-4 opacity-40 group-hover:opacity-100 transition-opacity" />
             </div>
           </Link>
-
         </div>
-
       </div>
     </Container>
   )

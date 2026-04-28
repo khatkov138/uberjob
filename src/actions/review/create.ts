@@ -1,80 +1,93 @@
+// app/actions/review/create.ts
 "use server"
 
 import prisma from "@/lib/prisma"
 import { createAuthAction } from "@/lib/server-utils"
-import { reviewSchema } from "@/lib/validation" // Путь к схеме
+import { reviewSchema } from "@/lib/validation"
 
 export async function leaveReviewAction(values: unknown) {
-    return createAuthAction(async (userId) => {
-        // 1. Валидация входных данных через Zod
-        const validated = reviewSchema.parse(values);
+  return createAuthAction(async (userId) => {
+    // 1. Валидация (Zod выбросит ошибку, если данные кривые)
+    const validated = reviewSchema.parse(values);
 
-        const result = await prisma.$transaction(async (tx) => {
-            // 2. БЕЗОПАСНОСТЬ: Только владелец завершенного заказа может оставить отзыв
-            const order = await tx.order.findFirst({
-                where: {
-                    id: validated.orderId,
-                    clientId: userId,
-                    status: "COMPLETED"
-                }
-            })
-
-            if (!order) {
-                throw new Error("Заказ не найден или не завершен")
+    // Вся работа с БД в одной транзакции
+    return await prisma.$transaction(async (tx) => {
+      
+      // 2. Ищем заказ и сразу достаем workerId мастера
+      // Важно: проверяем, что именно этот userId (клиент) создал этот заказ
+      const order = await tx.order.findFirst({
+        where: {
+          id: validated.orderId,
+          clientId: userId,
+          status: "COMPLETED",
+        },
+        select: {
+          id: true,
+          workerId: true, // Нам нужен userId мастера для уведомления
+          worker: { // Нам нужен ID профиля для связи с отзывом
+            select: {
+              profile: { select: { id: true } }
             }
+          }
+        }
+      });
 
-            // 3. Проверка лимита редактирования (7 дней)
-            const existing = await tx.review.findUnique({
-                where: { orderId: validated.orderId }
-            })
+      if (!order || !order.worker?.profile?.id) {
+        throw new Error("Заказ не найден, не завершен или у него нет исполнителя");
+      }
 
-            if (existing) {
-                const diffDays = (Date.now() - existing.createdAt.getTime()) / (1000 * 60 * 60 * 24)
-                if (diffDays > 7) throw new Error("Срок редактирования (7 дней) истек")
-            }
+      const profileId = order.worker.profile.id;
 
-            // 4. Upsert отзыва
-            const review = await tx.review.upsert({
-                where: { orderId: validated.orderId },
-                update: {
-                    rating: validated.rating,
-                    comment: validated.comment
-                },
-                create: {
-                    rating: validated.rating,
-                    comment: validated.comment,
-                    orderId: validated.orderId,
-                    profileId: validated.profileId,
-                },
-            })
+      // 3. Проверка лимита редактирования (7 дней)
+      const existing = await tx.review.findUnique({
+        where: { orderId: validated.orderId }
+      });
 
-            // 5. Пересчет рейтинга профиля мастера
-            const stats = await tx.review.aggregate({
-                where: { profileId: validated.profileId },
-                _avg: { rating: true },
-            })
+      if (existing) {
+        const diffDays = (Date.now() - existing.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+        if (diffDays > 7) throw new Error("Срок редактирования (7 дней) истек");
+      }
 
-            await tx.profile.update({
-                where: { id: validated.profileId },
-                data: { rating: stats._avg.rating || 5.0 },
-            })
+      // 4. Сохраняем/обновляем отзыв
+      const review = await tx.review.upsert({
+        where: { orderId: validated.orderId },
+        update: {
+          rating: validated.rating,
+          comment: validated.comment
+        },
+        create: {
+          rating: validated.rating,
+          comment: validated.comment,
+          orderId: validated.orderId,
+          profileId: profileId, // Исполнителя определил сервер, а не фронт!
+        },
+      });
 
-            // 6. Уведомление мастеру
-            if (order.workerId) {
-                await tx.notification.create({
-                    data: {
-                        userId: order.workerId,
-                        title: existing ? "Отзыв обновлен ⭐" : "Новый отзыв! ⭐",
-                        message: `Клиент оценил вашу работу на ${validated.rating} звезд`,
-                        type: "REVIEW",
-                        link: `/pro/orders/${order.id}`
-                    }
-                })
-            }
+      // 5. Пересчитываем средний рейтинг в профиле мастера
+      const stats = await tx.review.aggregate({
+        where: { profileId: profileId },
+        _avg: { rating: true },
+      });
 
-            return review
-        })
+      await tx.profile.update({
+        where: { id: profileId },
+        data: { rating: stats._avg.rating || 5.0 },
+      });
 
-        return result
-    })
+      // 6. Уведомление мастеру (используем order.workerId)
+      if (order.workerId) {
+        await tx.notification.create({
+          data: {
+            userId: order.workerId,
+            title: existing ? "Отзыв обновлен ⭐" : "Новый отзыв! ⭐",
+            message: `Клиент оценил вашу работу на ${validated.rating} звезд`,
+            type: "REVIEW",
+            link: `/pro/orders/${order.id}`
+          }
+        });
+      }
+
+      return review;
+    });
+  });
 }
