@@ -19,6 +19,8 @@ export async function GET(request: Request) {
     });
 
     const response = await fetch(`${process.env.YANDEX_SUGGEST_URI}?${params.toString()}`);
+
+   
     if (!response.ok) throw new Error("Yandex Suggest API error");
     
     const data = await response.json();

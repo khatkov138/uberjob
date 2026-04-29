@@ -4,9 +4,24 @@ import prisma from "@/lib/prisma"
 import { createAction, createAuthAction } from "@/lib/server-utils"
 import { InferActionResult } from "@/lib/types/types"
 import { delay, getDistance } from "@/lib/utils"
-import { OrderStatus, Prisma } from "@prisma/client"
+import { Category, Order, OrderStatus, Prisma } from "@prisma/client"
 
 // ЛЕНТА (Исполнитель)
+
+export type FeedOrder = Omit<Order, "price"> & {
+  price: number
+  distance: number | null
+  isMatch: boolean
+  offersCount: number
+  categories: {
+    categoryId: string;
+    category: Pick<Category, "name">
+  }[]
+  clientStats: {
+    projects: number
+    hireRate: number
+  }
+}
 
 export async function getOrders({ lat, lng, radius = 60 }: { lat?: number, lng?: number, radius?: number }) {
   return createAuthAction(async (userId) => {
@@ -17,20 +32,19 @@ export async function getOrders({ lat, lng, radius = 60 }: { lat?: number, lng?:
     })
     const skillIds = profile?.skills.map(s => s.categoryId) || []
 
-    // 2. SQL запрос с именами таблиц из твоих @@map
-    // Все агрегаты (COUNT) в Postgres возвращаются как BigInt
-    const nearbyOrders = await prisma.$queryRaw<(Prisma.OrderGetPayload<{}> & {
+    // 2. SQL Запрос. В generic указываем, что прилетит "грязный" объект с BigInt
+    const raw = await prisma.$queryRaw<(Order & {
       distance: number
       is_match: number
-      total_projects: bigint
-      completed_projects: bigint
-      offers_count: bigint
+      total_p: bigint
+      comp_p: bigint
+      off_c: bigint
     })[]>`
       SELECT o.*,
         (6371 * acos(cos(radians(${lat})) * cos(radians(o.lat)) * cos(radians(o.lng) - radians(${lng})) + sin(radians(${lat})) * sin(radians(o.lat)))) AS distance,
-        (SELECT COUNT(*) FROM "order" WHERE "clientId" = o."clientId") as total_projects,
-        (SELECT COUNT(*) FROM "order" WHERE "clientId" = o."clientId" AND "status" = 'COMPLETED') as completed_projects,
-        (SELECT COUNT(*) FROM "offer" WHERE "orderId" = o.id) as offers_count,
+        (SELECT COUNT(*) FROM "order" WHERE "clientId" = o."clientId") as total_p,
+        (SELECT COUNT(*) FROM "order" WHERE "clientId" = o."clientId" AND "status" = 'COMPLETED') as comp_p,
+        (SELECT COUNT(*) FROM "offer" WHERE "orderId" = o.id) as off_c,
         EXISTS (
           SELECT 1 FROM "order_category" oc 
           WHERE oc."orderId" = o.id AND oc."categoryId" IN (${skillIds.length > 0 ? skillIds : ['']})
@@ -41,49 +55,57 @@ export async function getOrders({ lat, lng, radius = 60 }: { lat?: number, lng?:
       ORDER BY is_match DESC, o."createdAt" DESC
     `
 
-    if (!nearbyOrders.length) return []
+    if (!raw.length) return []
 
-    // 3. Дозагрузка категорий через Prisma
-    const orderIds = nearbyOrders.map(o => o.id)
-    const categoriesData = await prisma.orderCategory.findMany({
-      where: { orderId: { in: orderIds } },
-      include: { category: true }
+    // 3. Дозагрузка названий категорий
+    const categories = await prisma.orderCategory.findMany({
+      where: { orderId: { in: raw.map(o => o.id) } },
+      include: { category: { select: { name: true } } }
     })
 
-    // 4. Мапим результат, принудительно превращая BigInt в Number для JSON
-    return nearbyOrders.map(o => {
-      const total = Number(o.total_projects)
-      const completed = Number(o.completed_projects)
+    // 4. Маппинг в FeedOrder. Теперь TS проверит каждое поле!
+    const result: FeedOrder[] = raw.map((o): FeedOrder => {
+      const total = Number(o.total_p)
+      const completed = Number(o.comp_p)
 
       return {
-        // Явно перечисляем поля, чтобы не прокинуть сырой BigInt из o.*
         id: o.id,
         title: o.title,
         description: o.description,
-        price: Number(o.price), // На всякий случай кастим цену, если она BigInt
+        price: Number(o.price),
         address: o.address,
-        lat: o.lat,
+        lat: o.lat, // Prisma Order уже Float
         lng: o.lng,
-        createdAt: o.createdAt,
-        status: o.status,
-        clientId: o.clientId,
 
-        // Наши вычисляемые поля
+        createdAt: o.createdAt,
+        updatedAt: o.updatedAt,
+        status: o.status,
+        dateType: o.dateType,
+        clientId: o.clientId,
+        workerId: o.workerId,
+
+        // Вычисляемые поля (гарантируем number/boolean)
         distance: o.distance ? Math.round(Number(o.distance) * 10) / 10 : null,
         isMatch: Boolean(o.is_match),
-        offersCount: Number(o.offers_count),
-        categories: categoriesData
-          .filter(c => c.orderId === o.id)
-          .map(c => ({ categoryId: c.categoryId, category: c.category })),
+        offersCount: Number(o.off_c),
+
         clientStats: {
           projects: total,
           hireRate: total > 0 ? Math.round((completed / total) * 100) : 0
-        }
+        },
+
+        categories: categories
+          .filter(c => c.orderId === o.id)
+          .map(c => ({
+            categoryId: c.categoryId,
+            category: { name: c.category.name }
+          }))
       }
     })
+
+    return result
   })
 }
-
 
 // МОИ ЗАКАЗЫ (Клиент)
 export async function getClientOrders() {
@@ -208,7 +230,6 @@ export async function getLatestPublicOrders() {
   });
 }
 
-export type FeedOrder = InferActionResult<typeof getOrders>
 
 export type ClientOrder = InferActionResult<typeof getClientOrders>
 export type OrderDetails = InferActionResult<typeof getOrderDetails>

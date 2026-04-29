@@ -14,9 +14,11 @@ import { getMyProfile, type FullProfile } from "@/actions/profile/get"
 
 import type { Session } from "@/lib/auth"
 import { FeedHeader } from "./_components/feed-header"
-import { OrderCard } from "./_components/order-card"
-import { EmptyState } from "./_components/empty-state"
+
 import { LoadingState } from "./_components/loading-state"
+import { OrdersRadarStatus } from "./_components/orders-radar-status"
+import { OrdersViewList } from "./_components/orders-view-list"
+import { OrdersViewMap } from "./_components/orders-view-map"
 
 interface OrdersPageClientProps {
     session: Session
@@ -133,52 +135,23 @@ export default function OrdersPageClient({
 
                 {/* --- КОНТЕНТНАЯ ОБЛАСТЬ --- */}
                 <div className="relative min-h-[500px]">
-                    {/* Плашка "Обновляем радар" при смене параметров */}
-                    {isOrdersFetching && (
-                        <div className="absolute inset-x-0 -top-4 z-40 flex justify-center pointer-events-none">
-                            <div className="bg-slate-900 text-white px-6 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
-                                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                                <span className="text-[9px] font-black uppercase tracking-widest italic">Сканирую эфир...</span>
-                            </div>
-                        </div>
-                    )}
+
+                    {/* Плашка "Сканирую эфир" (вынесли в отдельный компонент) */}
+                    <OrdersRadarStatus isVisible={isOrdersFetching} />
 
                     {viewMode === "list" ? (
-                        <div className={cn(
-                            "grid gap-8 transition-all duration-500",
-                            isOrdersFetching ? "opacity-30 blur-sm scale-[0.99] pointer-events-none" : "opacity-100"
-                        )}>
-                            {sortedOrders.length > 0 ? (
-                                sortedOrders.map((order) => {
-                                    const isMatched = order.categories.some(c => mySkillIds.has(c.categoryId))
-                                    return (
-                                        <OrderCard
-                                            key={order.id}
-                                            order={order}
-                                            isMatched={isMatched}
-                                        />
-                                    )
-                                })
-                            ) : !isOrdersFetching && <EmptyState />}
-                        </div>
+                        <OrdersViewList
+                            orders={sortedOrders}
+                            isFetching={isOrdersFetching}
+                            mySkillIds={mySkillIds}
+                        />
                     ) : (
-                        <div className="relative h-[650px] w-full isolation-isolate">
-                            <div className={cn(
-                                "w-full h-full rounded-[4rem] border-4 border-white shadow-2xl overflow-hidden bg-slate-100 transition-all duration-500",
-                                isOrdersFetching ? "opacity-50 grayscale-[0.5]" : "opacity-100",
-                                "animate-in fade-in duration-700"
-                            )}>
-                                {/* ЗАГЛУШКА КАРТЫ (Сюда вставим OrdersMap) */}
-                                <div className="w-full h-full flex flex-col items-center justify-center gap-4">
-                                    <div className="w-14 h-14 bg-white rounded-3xl shadow-md flex items-center justify-center animate-bounce">
-                                        <MapIcon className="w-7 h-7 text-blue-600" />
-                                    </div>
-                                    <p className="font-black italic text-slate-300 uppercase tracking-[0.3em] text-[10px]">
-                                        ZWORK / GEO-ENGINE ACTIVE
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+                        <OrdersViewMap
+                            orders={sortedOrders}
+                            center={[currentLat, currentLng]}
+                            isFetching={isOrdersFetching}
+                            mySkillIds={mySkillIds}
+                        />
                     )}
                 </div>
             </div>
