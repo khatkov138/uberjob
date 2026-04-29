@@ -2,20 +2,22 @@
 
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Loader2, Inbox } from "lucide-react"
+import { Loader2, LayoutList, Map as MapIcon } from "lucide-react"
 
 import { useLocationStore } from "@/store/use-location-store"
 import { roundCoord } from "@/lib/location-config"
-import { handleAction } from "@/lib/utils"
+import { cn, handleAction } from "@/lib/utils"
 
 import { Container } from "@/components/shared/container"
-
 import { getOrders, type FeedOrder } from "@/actions/order/get"
 import { getMyProfile, type FullProfile } from "@/actions/profile/get"
 
 import type { Session } from "@/lib/auth"
 import { FeedHeader } from "./_components/feed-header"
 import { OrderCard } from "./_components/order-card"
+import { EmptyState } from "./_components/empty-state"
+import { LoadingState } from "./_components/loading-state"
+// import { OrdersMap } from "./_components/orders-map" 
 
 interface OrdersPageClientProps {
     session: Session
@@ -24,58 +26,55 @@ interface OrdersPageClientProps {
     serverLocation: { lat: number; lng: number; radius: number; city: string }
 }
 
+type ViewMode = "list" | "map"
+
 export default function OrdersPageClient({
     session,
     initialOrders,
     initialProfile,
     serverLocation
 }: OrdersPageClientProps) {
-    // Достаем данные и флаг гидратации из стора
+    const [viewMode, setViewMode] = React.useState<ViewMode>("list")
     const { lat, lng, radius, _hasHydrated } = useLocationStore()
 
-    // 1. Координаты, которые реально пойдут в ключ
+    // 1. Стабильные координаты для ключа
     const currentLat = roundCoord(_hasHydrated ? lat : serverLocation.lat)
     const currentLng = roundCoord(_hasHydrated ? lng : serverLocation.lng)
     const currentRadius = _hasHydrated ? radius : serverLocation.radius
 
-    // 2. Проверяем, совпадает ли текущий ключ с тем, что прислал сервер
-    // Если мы поменяли радиус, серверные initialOrders нам уже не подходят
     const isServerKey =
         currentLat === roundCoord(serverLocation.lat) &&
         currentLng === roundCoord(serverLocation.lng) &&
         currentRadius === serverLocation.radius;
 
-    const { data: orders = [], isFetching: isOrdersFetching } = useQuery<FeedOrder[]>({
+    // --- ЗАГРУЗКА ДАННЫХ ---
+    const { data: orders = [], isFetching: isOrdersFetching, isPending: isInitialLoading } = useQuery<FeedOrder[]>({
         queryKey: ["orders", currentLat, currentLng, currentRadius, session.user.id],
         queryFn: () => handleAction(getOrders({ lat: currentLat, lng: currentLng, radius: currentRadius })),
-        // Подставляем начальные данные ТОЛЬКО если координаты совпадают
         initialData: isServerKey ? initialOrders : undefined,
         staleTime: 1000 * 60,
     })
 
-    // --- ПРОФИЛЬ МАСТЕРА ---
     const { data: profile, isFetching: isProfileFetching } = useQuery<FullProfile | null>({
         queryKey: ["user-profile", session.user.id],
         queryFn: () => handleAction(getMyProfile()),
         initialData: initialProfile ?? undefined,
     })
 
-    // Оптимизированный расчет специализаций через Set
+    // --- МЕМОИЗАЦИЯ ---
     const mySkillIds = React.useMemo(() =>
         new Set(profile?.skills.map(s => s.categoryId) || []),
         [profile])
 
-    // Живая статистика
-    const stats = React.useMemo(() => {
-        const total = orders.length
-        const matched = orders.filter(order =>
+    const stats = React.useMemo(() => ({
+        total: orders.length,
+        matched: orders.filter(order =>
             order.categories.some(cat => mySkillIds.has(cat.categoryId))
         ).length
-        return { total, matched, hidden: total - matched }
-    }, [orders, mySkillIds])
+    }), [orders, mySkillIds])
 
-    // Показываем глобальный лоадер только если нет даже серверных данных
-    if (!currentLat && !initialOrders.length) return <LoadingState />
+    // Глобальный лоадер при первом входе
+    if (isInitialLoading && !initialOrders.length) return <LoadingState />
 
     return (
         <Container className="bg-slate-50/50 py-10 pb-32">
@@ -87,59 +86,85 @@ export default function OrdersPageClient({
                     isUpdating={isOrdersFetching || isProfileFetching}
                 />
 
-                <div className="grid gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    {orders.length > 0 ? (
-                        orders.map((order) => {
-                            const isMatched = order.categories.some(c => mySkillIds.has(c.categoryId))
-                            return (
-                                <OrderCard
-                                    key={order.id}
-                                    order={order}
-                                    isMatched={isMatched}
-                                />
-                            )
-                        })
+                {/* --- ПЕРЕКЛЮЧАТЕЛЬ --- */}
+                <div className="flex justify-center md:justify-start">
+                    <div className="bg-white p-2 rounded-[2.5rem] flex items-center gap-2 border-2 border-slate-100 shadow-sm relative z-10">
+                        <button
+                            onClick={() => setViewMode("list")}
+                            className={cn(
+                                "flex items-center gap-3 px-8 py-3.5 rounded-[2rem] transition-all duration-500",
+                                viewMode === "list" 
+                                    ? "bg-slate-900 text-white shadow-xl scale-105" 
+                                    : "text-slate-400 hover:bg-slate-50"
+                            )}
+                        >
+                            <LayoutList className={cn("w-4 h-4", viewMode === "list" ? "text-blue-500" : "text-slate-300")} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] italic">Список</span>
+                        </button>
+
+                        <button
+                            onClick={() => setViewMode("map")}
+                            className={cn(
+                                "flex items-center gap-3 px-8 py-3.5 rounded-[2rem] transition-all duration-500",
+                                viewMode === "map" 
+                                    ? "bg-blue-600 text-white shadow-xl shadow-blue-100 scale-105" 
+                                    : "text-slate-400 hover:bg-slate-50"
+                            )}
+                        >
+                            <MapIcon className={cn("w-4 h-4", viewMode === "map" ? "text-white" : "text-slate-300")} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] italic">Карта</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* --- КОНТЕНТ --- */}
+                <div className="relative min-h-[500px]">
+                    {/* Плашка загрузки обновления */}
+                    {isOrdersFetching && (
+                        <div className="absolute inset-x-0 -top-4 z-40 flex justify-center pointer-events-none">
+                            <div className="bg-slate-900 text-white px-6 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+                                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                                <span className="text-[9px] font-black uppercase tracking-widest italic">Сканирую эфир...</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {viewMode === "list" ? (
+                        <div className={cn(
+                            "grid gap-8 transition-all duration-500",
+                            isOrdersFetching ? "opacity-30 blur-sm scale-[0.99] pointer-events-none" : "opacity-100"
+                        )}>
+                            {orders.length > 0 ? (
+                                orders.map((order) => (
+                                    <OrderCard
+                                        key={order.id}
+                                        order={order}
+                                        isMatched={order.categories.some(c => mySkillIds.has(c.categoryId))}
+                                    />
+                                ))
+                            ) : !isOrdersFetching && <EmptyState />}
+                        </div>
                     ) : (
-                        <EmptyState />
+                        <div className="relative h-[650px] w-full isolation-isolate">
+                            <div className={cn(
+                                "w-full h-full rounded-[4rem] border-4 border-white shadow-2xl overflow-hidden bg-slate-100 transition-all duration-500",
+                                isOrdersFetching ? "opacity-50 grayscale-[0.5]" : "opacity-100",
+                                "animate-in fade-in duration-700"
+                            )}>
+                                {/* Место для OrdersMap */}
+                                <div className="w-full h-full flex flex-col items-center justify-center gap-4">
+                                    <div className="w-14 h-14 bg-white rounded-3xl shadow-md flex items-center justify-center animate-bounce">
+                                        <MapIcon className="w-7 h-7 text-blue-600" />
+                                    </div>
+                                    <p className="font-black italic text-slate-300 uppercase tracking-[0.3em] text-[10px]">
+                                        ZWORK / GEO-ENGINE ACTIVE
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
         </Container>
-    )
-}
-
-// --- ВСПОМОГАТЕЛЬНЫЕ КОМПОНЕНТЫ ---
-
-function LoadingState() {
-    return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
-            <div className="w-20 h-20 bg-slate-900 rounded-[2.5rem] flex items-center justify-center rotate-3 shadow-2xl animate-pulse">
-                <Loader2 className="animate-spin text-blue-600 w-10 h-10 stroke-[3]" />
-            </div>
-            <div className="text-center">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">ZWORK / ENGINE</p>
-                <p className="text-xl font-black text-slate-900 italic uppercase tracking-tighter">Загрузка ленты...</p>
-            </div>
-        </div>
-    )
-}
-
-function EmptyState() {
-    return (
-        <div className="py-32 text-center bg-white rounded-[4rem] border-4 border-dashed border-slate-100 px-10 max-w-2xl mx-auto">
-            <div className="flex flex-col items-center gap-6">
-                <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center">
-                    <Inbox className="w-12 h-12 text-slate-200" />
-                </div>
-                <div className="space-y-2">
-                    <p className="font-black text-4xl italic text-slate-900 uppercase tracking-tighter leading-none">
-                        Тишина в эфире
-                    </p>
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed max-w-[280px] mx-auto">
-                        В этом радиусе пока нет заказов. Попробуйте выбрать другой город или увеличить расстояние.
-                    </p>
-                </div>
-            </div>
-        </div>
     )
 }

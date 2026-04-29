@@ -3,11 +3,13 @@
 import prisma from "@/lib/prisma"
 import { createAction, createAuthAction } from "@/lib/server-utils"
 import { InferActionResult } from "@/lib/types/types"
-import { getDistance } from "@/lib/utils"
+import { delay, getDistance } from "@/lib/utils"
 import { OrderStatus, Prisma } from "@prisma/client"
 
 // ЛЕНТА (Исполнитель)
 export async function getOrders({ lat, lng, radius = 60 }: { lat?: number, lng?: number, radius?: number }) {
+  //await delay(2000);
+  
   return createAuthAction(async (userId) => {
     const [allOrders, profile] = await Promise.all([
       prisma.order.findMany({

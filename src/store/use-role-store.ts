@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import Cookies from 'js-cookie'
+import { setCookie } from 'cookies-next' // Импортируем из cookies-next
 
 type RoleMode = 'CLIENT' | 'PRO'
 
@@ -15,8 +15,9 @@ export const useRoleModeStore = create<RoleState>()(
       mode: 'CLIENT',
       setMode: (mode) => {
         set({ mode })
-        // Сохраняем в куки на 1 год. Теперь сервер будет видеть это поле.
-        Cookies.set('zwork-mode', mode, { expires: 365 })
+        // Используем setCookie. Параметр maxAge задается в секундах.
+        // 365 дней * 24 часа * 60 мин * 60 сек = 31536000
+        setCookie('zwork-mode', mode, { maxAge: 31536000 })
       },
     }),
     { name: 'zwork-ui-mode' }

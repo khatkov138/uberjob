@@ -5,13 +5,14 @@ import { MapPin, ChevronDown, Plus, X, Settings2, Zap } from "lucide-react"
 import { cn, handleAction } from "@/lib/utils"
 import { useLocationStore } from "@/store/use-location-store"
 import { CategorySearchModal } from "./category-search-modal"
-import { LocationModal } from "@/components/geo/location-modal"
+
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { addSkill, removeSkill } from "@/actions/profile/manage"
 import { toast } from "sonner"
 
 import type { FullProfile } from "@/actions/profile/get"
 import type { DBCategory } from "@/actions/category/get"
+import { LocationModal } from "./location-modal"
 
 type UserSkill = NonNullable<FullProfile>["skills"][number]
 
@@ -76,7 +77,7 @@ export function FeedHeader({ userSkills, userId, stats, isUpdating }: FeedHeader
           <div className="flex flex-wrap gap-2">
             {/* Город */}
             <button 
-              onClick={openModal} 
+              onClick={openModal}
               className="flex items-center gap-2 bg-white px-5 py-2.5 rounded-2xl border-2 border-slate-100 hover:border-blue-200 transition-all shadow-sm active:scale-95"
             >
               <MapPin className={cn("w-4 h-4 text-blue-500", isUpdating && "animate-bounce")} />

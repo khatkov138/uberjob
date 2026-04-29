@@ -1,30 +1,33 @@
+import { createApiResponse, withApiAuth } from "@/lib/server-utils";
 import { NextResponse } from "next/server";
 
+
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const uri = searchParams.get("uri");
+  // Используем withApiAuth, чтобы защитить роут
+  return createApiResponse(async () => {
+    const { searchParams } = new URL(request.url);
+    const uri = searchParams.get("uri");
 
-  if (!uri) return NextResponse.json({ error: "No URI" }, { status: 400 });
+    if (!uri) throw new Error("No URI provided");
 
-  const API_KEY = "91d493f4-aa2a-42dc-8de4-52cb3c872e09";
-  
-  // Геокодируем по URI — это быстрее и точнее
-  const url = "https://geocode-maps.yandex.ru/v1"
-    + "?apikey=" + API_KEY
-    + "&format=json"
-    + "&uri=" + encodeURIComponent(uri)
-    + "&results=1";
+    const params = new URLSearchParams({
+      apikey: process.env.YANDEX_GEOCODE_KEY || "",
+      format: "json",
+      uri: uri,
+      results: "1"
+    });
 
-  try {
-    const response = await fetch(url);
+    const response = await fetch(`${process.env.YANDEX_GEOCODE_URI}?${params.toString()}`);
+    if (!response.ok) throw new Error("Yandex Geocode API error");
+
     const data = await response.json();
-    
-    // В ответе Яндекса координаты идут как "long lat"
-    const pos = data.response.GeoObjectCollection.featureMember[0].GeoObject.Point.pos;
+    const feature = data.response?.GeoObjectCollection?.featureMember?.[0];
+
+    if (!feature) throw new Error("Location not found");
+
+    const pos = feature.GeoObject.Point.pos;
     const [lng, lat] = pos.split(" ").map(Number);
 
-    return NextResponse.json({ lat, lng });
-  } catch (error) {
-    return NextResponse.json({ error: "Geocode error" }, { status: 500 });
-  }
+    return { lat, lng };
+  });
 }

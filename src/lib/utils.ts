@@ -33,6 +33,19 @@ export function unwrap<T>(res: ActionResponse<T>, fallback: T): T {
     return fallback;
 }
 
+export async function handleApi<T>(promise: Promise<Response>): Promise<T> {
+  const res = await promise;
+  const json = await res.json();
+
+  if (!res.ok || !json.success) {
+    // Выбрасываем ошибку, которую перехватит catch в компоненте
+    throw new Error(json.error || `API Error: ${res.status}`);
+  }
+
+  // Возвращаем чистые данные
+  return json.data as T;
+}
+
 
 /**
  * Вычисляет расстояние между двумя точками в километрах
