@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ⚡️ ZWORK / ENGINE v2.0
+> **UBER-MODEL FOR OFFLINE SERVICES** | NEXT.JS 16 • PRISMA • AI • PUSHER
 
-## Getting Started
+![ZWORK DASHBOARD](https://githubusercontent.com) *(замени на ссылку на свой скрин)*
 
-First, run the development server:
+## 🦾 ТЕХНОЛОГИЧЕСКИЙ СТЭК
+Проект собран на "стероидах" для максимальной скорости отклика:
+- **FRAMEWORK:** [Next.js 16](https://nextjs.org) (App Router, Turbopack)
+- **UI:** [Tailwind 4](https://tailwindcss.com) + [Shadcn/UI](https://shadcn.com) (Custom Neo-brutalism Style)
+- **DATABASE:** [Prisma](https://prisma.io) + PostgreSQL
+- **AI-DISPATCHER:** [Groq](https://groq.com) (Llama 3.3 70B) — автоматическая классификация ниш и генерация заголовков.
+- **REAL-TIME:** [Pusher](https://pusher.com) — заказы влетают в ленту мгновенно, без Refresh.
+- **STATE:** [Zustand](https://pmnd.rs) + [TanStack Query v5](https://tanstack.com)
+- **GEO:** [Yandex Maps API](https://yandex.ru) (Suggest + Geocoder)
 
+## 🧠 AI-КЛАССИФИКАЦИЯ (ZWORK DISPATCHER)
+Вместо выбора из 1000 категорий, пользователь просто пишет: *"Потекла труба в ванной, залейте пол"*. 
+**ИИ делает магию:**
+1. Определяет нишу (напр. *Сантехника*).
+2. Генерирует продающий заголовок.
+3. Выделяет ключевые слова.
+4. Синхронизирует справочник категорий в БД через `upsert`.
+
+## 📍 ГЕО-РАДАР
+Система работает по принципу радара:
+- Мастер выставляет **радиус поиска** (10-100 км).
+- Автоматический расчет дистанции по формуле **Haversine**.
+- Мгновенная фильтрация заказов "под навыки" мастера (`isMatched`).
+
+## 🛠 УСТАНОВКА
 ```bash
+# Клонируй репозиторий
+git clone https://github.com
+
+# Установи зависимости (через force, так как мы на React 19)
+npm install --force
+
+# Настрой переменные окружения (.env.local)
+GROQ_API_KEY=***
+YANDEX_MAPS_KEY=***
+PUSHER_SECRET=***
+
+# Запускай двигатель
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📈 ROADMAP
+- [x] AI-Классификация заказов
+- [x] Real-time лента (Pusher)
+- [x] Гео-фильтрация и Suggest API
+- [ ] **NEXT:** Интерактивная карта Яндекс (в разработке)
+- [ ] Система чатов и откликов
+- [ ] Платежный шлюз
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+**ZWORK** — *Работа должна летать.* 
+Created by [khatkov138](https://github.com)
