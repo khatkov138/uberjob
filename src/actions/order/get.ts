@@ -9,31 +9,19 @@ import { Category, Order, OrderStatus, Prisma } from "@prisma/client"
 
 // ЛЕНТА (Исполнитель)
 
-export type FeedOrder = Omit<Order, "price"> & {
-  price: number
-  distance: number | null
-  isMatch: boolean
-  offersCount: number
-  categories: {
-    categoryId: string;
-    category: Pick<Category, "name">
-  }[]
-  clientStats: {
-    projects: number
-    hireRate: number
-  }
-}
 
 export async function getOrders({ lat, lng, radius = 60 }: { lat?: number, lng?: number, radius?: number }) {
   return createAuthAction(async (userId) => {
-    // 1. Категории мастера
+   // await delay(2000)
+    // 1. Получаем категории (скиллы) мастера для расчета isMatch
     const profile = await prisma.profile.findUnique({
       where: { userId },
       select: { skills: { select: { categoryId: true } } }
     })
     const skillIds = profile?.skills.map(s => s.categoryId) || []
 
-    // 2. SQL Запрос. В generic указываем, что прилетит "грязный" объект с BigInt
+    // 2. Основной SQL Запрос для получения заказов и гео-дистанции
+    // Используем raw query, так как Prisma пока плохо умеет в сложные математические формулы для радиуса
     const raw = await prisma.$queryRaw<(Order & {
       distance: number
       is_match: number
@@ -58,16 +46,26 @@ export async function getOrders({ lat, lng, radius = 60 }: { lat?: number, lng?:
 
     if (!raw.length) return []
 
-    // 3. Дозагрузка названий категорий
+    // 3. Дозагрузка связанных данных (Категории)
     const categories = await prisma.orderCategory.findMany({
       where: { orderId: { in: raw.map(o => o.id) } },
       include: { category: { select: { name: true } } }
     })
 
-    // 4. Маппинг в FeedOrder. Теперь TS проверит каждое поле!
+    // 4. Дозагрузка данных КЛИЕНТОВ (Заказчиков) — ИСПРАВЛЕНИЕ ТИПА
+    const clientIds = [...new Set(raw.map(o => o.clientId))]
+    const clients = await prisma.user.findMany({
+      where: { id: { in: clientIds } },
+      select: { id: true, name: true, image: true }
+    })
+
+    // 5. Маппинг в итоговый формат FeedOrder
     const result: FeedOrder[] = raw.map((o): FeedOrder => {
       const total = Number(o.total_p)
       const completed = Number(o.comp_p)
+
+      // Находим конкретного клиента для этого заказа
+      const client = clients.find(c => c.id === o.clientId)
 
       return {
         id: o.id,
@@ -75,9 +73,8 @@ export async function getOrders({ lat, lng, radius = 60 }: { lat?: number, lng?:
         description: o.description,
         price: Number(o.price),
         address: o.address,
-        lat: o.lat, // Prisma Order уже Float
+        lat: o.lat,
         lng: o.lng,
-
         createdAt: o.createdAt,
         updatedAt: o.updatedAt,
         status: o.status,
@@ -85,10 +82,16 @@ export async function getOrders({ lat, lng, radius = 60 }: { lat?: number, lng?:
         clientId: o.clientId,
         workerId: o.workerId,
 
-        // Вычисляемые поля (гарантируем number/boolean)
+        // Вычисляемые поля (строгая типизация)
         distance: o.distance ? Math.round(Number(o.distance) * 10) / 10 : null,
         isMatch: Boolean(o.is_match),
         offersCount: Number(o.off_c),
+
+        // Данные клиента для OrderCard
+        client: client ? {
+          name: client.name,
+          image: client.image
+        } : null,
 
         clientStats: {
           projects: total,
@@ -107,7 +110,6 @@ export async function getOrders({ lat, lng, radius = 60 }: { lat?: number, lng?:
     return result
   })
 }
-
 // МОИ ЗАКАЗЫ (Клиент)
 export async function getClientOrders() {
   return createAuthAction(async (userId) => {
@@ -218,6 +220,25 @@ export async function getLatestPublicOrders() {
   });
 }
 
+export type FeedOrder = Omit<Order, "price"> & {
+  price: number
+  distance: number | null
+  isMatch: boolean
+  offersCount: number
+  // ДОБАВЛЯЕМ ОБЪЕКТ КЛИЕНТА
+  client: {
+    name: string | null
+    image: string | null
+  } | null
+  categories: {
+    categoryId: string;
+    category: Pick<Category, "name">
+  }[]
+  clientStats: {
+    projects: number
+    hireRate: number
+  }
+}
 
 export type ClientOrder = InferActionResult<typeof getClientOrders>
 export type OrderByIdResponse = InferActionResult<typeof getOrderById>
