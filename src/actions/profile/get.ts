@@ -9,7 +9,20 @@ async function getFullProfileQuery(userId: string) {
   return await prisma.profile.findUnique({
     where: { userId },
     include: {
-      skills: { include: { category: true } }
+      // Тянем базовые данные юзера (имя, аватар, почта)
+      user: {
+        select: {
+          name: true,
+          email: true,
+          image: true,
+        }
+      },
+      // Тянем категории (скиллы) с их названиями
+      skills: {
+        include: {
+          category: true
+        }
+      }
     }
   })
 }
@@ -20,11 +33,16 @@ async function getFullProfileQuery(userId: string) {
 export async function getMyProfile() {
   return createAuthAction(async (userId) => {
     const profile = await getFullProfileQuery(userId)
-    if (!profile) throw new Error("Профиль не найден")
+
+    if (!profile) {
+      throw new Error("Профиль не найден")
+    }
+
+    // Возвращаем плоский объект или как есть — 
+    // в компоненте будем обращаться к profile.user.name
     return profile
   })
 }
-
 /**
  * ПОЛУЧИТЬ ЧУЖОЙ ПРОФИЛЬ (Публично)
  */
@@ -61,9 +79,9 @@ export async function getProStats() {
     const [profile, completedOrders] = await Promise.all([
       prisma.profile.findUnique({
         where: { userId },
-        select: { 
-          rating: true, 
-          _count: { select: { reviews: true } } 
+        select: {
+          rating: true,
+          _count: { select: { reviews: true } }
         }
       }),
       prisma.order.findMany({

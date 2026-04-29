@@ -161,7 +161,7 @@ export default async function ProDashboardPage() {
                 <div className="p-3 bg-white/10 rounded-xl">
                   <Settings className="w-5 h-5" />
                 </div>
-                <span className="font-black uppercase italic text-xs tracking-widest">Настройки <br/> профиля</span>
+                <span className="font-black uppercase italic text-xs tracking-widest">Настройки <br /> профиля</span>
               </div>
               <ArrowUpRight className="w-4 h-4 opacity-40 group-hover:opacity-100 transition-opacity" />
             </div>

@@ -6,14 +6,12 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 // Store & Libs
 import { useLocationStore } from "@/store/use-location-store"
 import { roundCoord } from "@/lib/location-config"
-import { handleAction } from "@/lib/utils"
+import { handleAction, cn } from "@/lib/utils"
 
-// Actions & Types
+// Actions
 import { getOrders, type FeedOrder } from "@/actions/order/get"
 import { getMyProfile, type FullProfile } from "@/actions/profile/get"
 import { addSkill, removeSkill } from "@/actions/profile/manage"
-import { type DBCategory } from "@/actions/category/get"
-import type { Session } from "@/lib/auth"
 
 // Layout Components
 import { Container } from "@/components/shared/container"
@@ -28,21 +26,12 @@ import { LoadingState } from "./_components/shared/loading-state"
 import { CategorySearchModal } from "./_components/shared/category-search-modal"
 import { LocationModal } from "./_components/shared/location-modal"
 
-interface OrdersPageClientProps {
-  session: Session
-  initialOrders: FeedOrder[]
-  initialProfile: FullProfile | null
-  serverLocation: { lat: number; lng: number; radius: number; city: string }
-}
-
-type UserSkill = NonNullable<FullProfile>["skills"][number]
-
 export default function OrdersPageClient({
   session,
   initialOrders,
   initialProfile,
   serverLocation
-}: OrdersPageClientProps) {
+}: any) {
   const queryClient = useQueryClient()
   const [viewMode, setViewMode] = React.useState<"list" | "map">("list")
   const [isCatModalOpen, setIsCatModalOpen] = React.useState(false)
@@ -59,18 +48,20 @@ export default function OrdersPageClient({
     currentRadius === serverLocation.radius
 
   // --- QUERIES ---
-  const { data: orders = [], isFetching: isOrdersFetching, isPending: isInitialLoading } = useQuery<FeedOrder[]>({
-    queryKey: ["orders", currentLat, currentLng, currentRadius, session.user.id],
+  const { data: orders = [], isFetching: isOrdersFetching, isPending: isInitialLoading } = useQuery({
+    queryKey: ["orders", currentLat, currentLng, currentRadius, session?.user?.id],
     queryFn: () => handleAction(getOrders({ lat: currentLat, lng: currentLng, radius: currentRadius })),
     initialData: isServerKey ? initialOrders : undefined,
-    placeholderData: keepPreviousData, // ЭТО УБЕРЕТ СКАЧОК В 0
+    placeholderData: keepPreviousData,
   })
 
-  const profileKey = ["user-profile", session.user.id]
+  const profileKey = ["user-profile", session?.user?.id]
+
   const { data: profile } = useQuery<FullProfile | null>({
     queryKey: profileKey,
     queryFn: () => handleAction(getMyProfile()),
     initialData: initialProfile ?? undefined,
+    enabled: !!session?.user?.id
   })
 
   // --- MUTATIONS ---
@@ -82,106 +73,130 @@ export default function OrdersPageClient({
       await queryClient.cancelQueries({ queryKey: profileKey })
       const prev = queryClient.getQueryData<FullProfile>(profileKey)
       if (prev) {
-        const allCats = queryClient.getQueryData<DBCategory[]>(["all-categories"])
-        const catName = allCats?.find(c => c.id === id)?.name || "..."
         queryClient.setQueryData<FullProfile>(profileKey, {
           ...prev,
           skills: action === 'add'
-            ? [...prev.skills, { categoryId: id, category: { name: catName } } as UserSkill]
-            : prev.skills.filter(s => s.categoryId !== id)
+            ? [...prev.skills, { categoryId: id, category: { name: '...' } } as any]
+            : prev.skills.filter((s: any) => s.categoryId !== id)
         })
       }
       return { prev }
     },
-    onError: (_, __, context) => {
-      if (context?.prev) queryClient.setQueryData(profileKey, context.prev)
-    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: profileKey })
   })
 
-  const mySkillIds = React.useMemo(() => new Set(profile?.skills.map(s => s.categoryId) || []), [profile])
-
-  const sortedOrders = React.useMemo(() => {
-    return [...orders].sort((a, b) => {
-      const aMatch = a.categories.some(c => mySkillIds.has(c.categoryId)) ? 1 : 0
-      const bMatch = b.categories.some(c => mySkillIds.has(c.categoryId)) ? 1 : 0
-      if (aMatch !== bMatch) return bMatch - aMatch
-      return (a.distance || 0) - (b.distance || 0)
-    })
-  }, [orders, mySkillIds])
+  const mySkillIds = React.useMemo(() => new Set(profile?.skills.map((s: any) => s.categoryId) || []), [profile])
 
   const stats = React.useMemo(() => {
-    if (!_hasHydrated) {
-      // Пока стор не ожил, считаем статсу по серверным заказам
-      return {
-        total: initialOrders.length,
-        matched: initialOrders.filter(o => o.categories.some(c => mySkillIds.has(c.categoryId))).length
-      }
-    }
+    const activeOrders = _hasHydrated ? orders : initialOrders
     return {
-      total: orders.length,
-      matched: orders.filter(o => o.categories.some(c => mySkillIds.has(c.categoryId))).length
+      total: activeOrders.length,
+      matched: activeOrders.filter((o: any) => o.categories.some((c: any) => mySkillIds.has(c.categoryId))).length
     }
   }, [orders, initialOrders, mySkillIds, _hasHydrated])
 
   if (isInitialLoading && !initialOrders.length) return <LoadingState />
 
   return (
-    <Container className="bg-white max-w-7xl">
+    <Container className="bg-white max-w-7xl pt-10 pb-20">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
 
-        {/* ЛЕВАЯ КОЛОНКА */}
-        <aside className="lg:col-span-4">
+        {/* ЛЕВАЯ КОЛОНКА (3/12) */}
+        <aside className="lg:col-span-3 space-y-12">
+          <header className="px-2 space-y-2">
+            <h1 className="text-4xl font-black italic uppercase tracking-tighter text-slate-900 leading-[0.8]">
+              Поиск <br /> <span className="text-blue-600">заказов</span>
+            </h1>
+            <div className="flex items-center gap-2 opacity-40">
+              <div className={cn("w-1 h-1 rounded-full bg-blue-600", isOrdersFetching ? "animate-ping" : "animate-pulse")} />
+              <span className="text-[8px] font-black uppercase tracking-[0.3em]">Live Feed</span>
+            </div>
+          </header>
+
           <OrdersSidebar
-            stats={stats}
-            skills={profile?.skills || []}
+            userId={session?.user?.id}
             onAddClick={() => setIsCatModalOpen(true)}
             onRemoveSkill={(id) => handleToggleSkill({ id, action: 'remove' })}
+            isFetching={isOrdersFetching}
           />
         </aside>
 
-        {/* ПРАВАЯ КОЛОНКА */}
-        <section className="lg:col-span-8 space-y-6">
-          <OrdersToolbar
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-            city={_hasHydrated ? city : serverLocation.city}
-          />
+        {/* ПРАВАЯ КОЛОНКА (9/12) */}
+        <section className="lg:col-span-9 space-y-8">
 
-          {/* Стабильный контейнер для вьюпорта */}
-          <div className="relative min-h-[650px] rounded-[3rem] shadow-2xl shadow-slate-100 bg-slate-50">
+          {/* SEO ЗАГОЛОВОК + СЧЕТЧИК */}
+          <div className="px-2 pt-4 space-y-4 transition-all">
+            <div className="flex items-baseline gap-4 flex-wrap">
+              <h2 className="text-5xl font-black italic uppercase tracking-tighter text-slate-900 leading-none">
+                Заказы <span className="text-blue-600 ml-2 whitespace-nowrap">в г. {city || serverLocation.city}</span>
+              </h2>
+              <div className="flex items-center gap-3">
+                <span className="text-5xl font-black italic text-slate-100">/</span>
+                <span className="text-5xl font-black italic text-slate-900 tracking-tighter animate-in fade-in zoom-in duration-500">
+                  {mySkillIds.size > 0 ? stats.matched : stats.total}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded-md border border-emerald-100">
+                <div className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter">
+                  всего в локации: {stats.total}
+                </span>
+              </div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase italic tracking-wide flex items-center gap-2">
+                <span>{mySkillIds.size > 0 ? `Отфильтровано по ${mySkillIds.size} категориям` : "Все категории"}</span>
+                <span className="opacity-20">|</span>
+                <span>Радиус {radius}км</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ТУЛБАР */}
+          <div className="sticky top-6 z-30">
+            <OrdersToolbar
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+              city={_hasHydrated ? city : serverLocation.city}
+            />
+          </div>
+
+          {/* КОНТЕНТ */}
+          <div className="relative min-h-[700px] rounded-[3.5rem] bg-slate-50 border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden">
             <FetchingRadar isVisible={isOrdersFetching} />
 
-            {viewMode === "list" ? (
-              <div className="animate-in fade-in duration-300">
-                <OrdersFeed
-                  orders={sortedOrders}
-                  mySkillIds={mySkillIds}
-                  isFetching={isOrdersFetching}
-                />
-              </div>
-            ) : (
-              <div className="h-[650px] w-full animate-in fade-in duration-300">
-                <MapViewport
-                  orders={orders}
-                  center={[currentLat, currentLng]}
-                  radius={currentRadius}
-                  mySkillIds={mySkillIds}
-                  isFetching={isOrdersFetching}
-                />
-              </div>
-            )}
+            <div className={cn("h-full transition-all duration-500", isOrdersFetching && "blur-sm opacity-50")}>
+              {viewMode === "list" ? (
+                <div className="p-2 animate-in fade-in duration-500">
+                  <OrdersFeed
+                    orders={orders}
+                    mySkillIds={mySkillIds}
+                    isFetching={isOrdersFetching}
+                  />
+                </div>
+              ) : (
+                <div className="h-[700px] w-full animate-in fade-in duration-500">
+                  <MapViewport
+                    orders={orders}
+                    center={[currentLat, currentLng]}
+                    radius={radius}
+                    mySkillIds={mySkillIds}
+                    isFetching={isOrdersFetching}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </section>
       </div>
-
       <LocationModal />
       <CategorySearchModal
         isOpen={isCatModalOpen}
         onClose={() => setIsCatModalOpen(false)}
         userCategoryIds={Array.from(mySkillIds)}
-        onAdd={(id) => handleToggleSkill({ id, action: 'add' })}
-        onRemove={(id) => handleToggleSkill({ id, action: 'remove' })}
+        onAdd={(id: string) => handleToggleSkill({ id, action: 'add' })}
+        onRemove={(id: string) => handleToggleSkill({ id, action: 'remove' })}
       />
     </Container>
   )

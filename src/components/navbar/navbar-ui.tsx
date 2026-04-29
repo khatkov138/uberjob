@@ -87,7 +87,7 @@ export function NavbarUI({ user }: NavbarUIProps) {
                                     className="w-full h-12 flex items-center justify-center gap-3 bg-slate-900 hover:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] transition-all shadow-xl shadow-slate-200 active:scale-95"
                                 >
                                     <Search size={18} className="stroke-[3px]" />
-                                    <span>Найти работу</span>
+                                    <span>Поиск заказов</span>
                                 </Link>
                             )}
                         </div>

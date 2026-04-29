@@ -1,86 +1,146 @@
 "use client"
 
 import * as React from "react"
-import { Settings2, Zap, X, Plus } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { useQuery } from "@tanstack/react-query"
+import { Settings2, X, Plus, Users, Activity, Clock, ShieldCheck, MapPin, LogIn } from "lucide-react"
+import Link from "next/link"
+
+import { cn, handleAction } from "@/lib/utils"
 import { useLocationStore } from "@/store/use-location-store"
+import { getMyProfile, type FullProfile } from "@/actions/profile/get"
 
 interface OrdersSidebarProps {
-  stats: { total: number; matched: number }
-  skills: any[]
   onAddClick: () => void
   onRemoveSkill: (id: string) => void
   isFetching?: boolean
+  userId?: string
 }
 
-export function OrdersSidebar({ stats, skills, onAddClick, onRemoveSkill, isFetching }: OrdersSidebarProps) {
-  const { _hasHydrated } = useLocationStore()
+export function OrdersSidebar({ onAddClick, onRemoveSkill, isFetching, userId }: OrdersSidebarProps) {
+  const { city } = useLocationStore()
+
+  // Подтягиваем профиль. Он уже в кэше, так как PageClient сделал этот запрос.
+  // Внутри profile.skills уже лежат категории благодаря твоему инклуду в Prisma.
+  const { data: profile } = useQuery<FullProfile | null>({
+    queryKey: ["user-profile", userId],
+    queryFn: () => handleAction(getMyProfile()),
+    enabled: !!userId,
+    staleTime: Infinity,
+  })
+
+  const isAuth = !!profile?.id
+  const categories = profile?.skills || [] // Берем навыки прямо из профиля
+  const hasCategories = categories.length > 0
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1 mb-8 px-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] font-black text-blue-600 uppercase tracking-[0.3em]">PRO / FEED</span>
-          <div className={cn("w-1 h-1 bg-blue-600 rounded-full", isFetching ? "animate-ping" : "animate-pulse")} />
-        </div>
-        <h1 className="text-5xl font-black italic uppercase tracking-tighter text-slate-900 leading-none">
-          Лента <span className="text-blue-600">PRO</span>
-        </h1>
-      </header>
 
-      {/* СТАТИСТИКА */}
-      <div className={cn(
-        "bg-emerald-50 border border-emerald-100 p-8 rounded-[2rem] space-y-4 transition-all duration-500",
-        !_hasHydrated && "opacity-50 grayscale animate-pulse pointer-events-none"
-      )}>
-        <div className="flex justify-between items-start">
-          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">Подходящие задачи</p>
-          <Zap className={cn("w-5 h-5 text-emerald-500 fill-current", isFetching && "animate-bounce")} />
+      {/* 1. ШАПКА (ПРОФИЛЬ / ГОСТЬ) */}
+      {isAuth ? (
+        <div className="bg-slate-900 rounded-[2.5rem] p-6 text-white shadow-xl shadow-slate-200 animate-in fade-in duration-500">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-blue-600 border-2 border-white/20 flex items-center justify-center text-lg font-black italic shadow-inner">
+              {profile.user.name ? profile.user.name[0] : 'P'}
+            </div>
+            <div>
+              <div className="flex items-center gap-1">
+                <h4 className="font-black uppercase italic text-sm tracking-tight leading-none">
+                  {profile.user.name ? profile.user.name.split(' ')[0] : 'Партнер'}
+                </h4>
+                <ShieldCheck size={12} className="text-blue-400" />
+              </div>
+              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1 italic">PRO Аккаунт</p>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-white/10 flex justify-between items-center text-[10px] font-black uppercase italic">
+            <div className="flex items-center gap-2">
+              <MapPin size={12} className="text-blue-400" />
+              <span>{city || 'Ангарск'}</span>
+            </div>
+            <Link href="/pro/profile" className="text-blue-400 hover:text-white transition-colors underline-offset-4 hover:underline">
+              Настройки
+            </Link>
+          </div>
         </div>
-        <div className="flex items-baseline gap-2">
-          {_hasHydrated ? (
-            <>
-              <p className="text-6xl font-black italic text-slate-900 tracking-tighter leading-none">{stats.matched}</p>
-              <span className="text-sm font-black italic text-emerald-600 uppercase">из {stats.total}</span>
-            </>
+      ) : (
+        <div className="bg-blue-600 rounded-[2.5rem] p-8 text-white shadow-xl shadow-blue-100 animate-in zoom-in-95 duration-500">
+          <h4 className="text-xl font-black uppercase italic tracking-tighter leading-none mb-4 text-white">
+            Хотите брать <br /> эти заказы?
+          </h4>
+          <p className="text-[10px] font-bold uppercase opacity-80 mb-6 leading-tight text-blue-50">
+            Зарегистрируйтесь как мастер, чтобы предлагать свои услуги
+          </p>
+          <Link href="/sign-in" className="flex items-center justify-center gap-2 w-full py-3 bg-white text-blue-600 rounded-2xl text-[10px] font-black uppercase hover:bg-slate-50 transition-all active:scale-95 shadow-lg">
+            <LogIn size={14} strokeWidth={3} />
+            Войти в систему
+          </Link>
+        </div>
+      )}
+
+      {/* 2. ВАШИ КАТЕГОРИИ (Берем из profile.skills) */}
+      <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-slate-900">
+            <Settings2 className="w-4 h-4 text-blue-600" />
+            <h3 className="text-xs font-black uppercase italic tracking-tight text-slate-900">
+              {isAuth ? "Ваши категории" : "Фильтр ленты"}
+            </h3>
+          </div>
+          {isAuth && (
+            <button
+              onClick={onAddClick}
+              className="p-2 bg-slate-50 rounded-xl text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm active:scale-90"
+            >
+              <Plus size={16} strokeWidth={3} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {hasCategories ? (
+            categories.map((skill: any) => (
+              <div
+                key={skill.categoryId}
+                className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[10px] font-black text-slate-900 uppercase italic transition-all hover:border-blue-600 hover:bg-white"
+              >
+                {skill.category?.name}
+                {isAuth && (
+                  <button
+                    onClick={() => onRemoveSkill(skill.categoryId)}
+                    className="text-slate-300 hover:text-red-500 transition-colors"
+                  >
+                    <X size={12} strokeWidth={3} />
+                  </button>
+                )}
+              </div>
+            ))
           ) : (
-            <div className="h-12 w-32 bg-emerald-200/50 rounded-xl animate-pulse" />
+            <button
+              onClick={onAddClick}
+              className="text-[10px] font-bold text-blue-600 uppercase italic py-2 hover:underline tracking-tight text-left"
+            >
+              + Выберите категории для поиска
+            </button>
           )}
         </div>
       </div>
 
-      {/* СПЕЦИАЛИЗАЦИИ */}
-      <div className={cn(
-        "bg-slate-50 border border-slate-100 p-8 rounded-[2.5rem] space-y-6 transition-all duration-500",
-        !_hasHydrated && "opacity-50 pointer-events-none"
-      )}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-slate-900">
-            <Settings2 className="w-4 h-4 text-blue-600" />
-            <h3 className="text-xs font-black uppercase italic">Ваши ниши</h3>
-          </div>
-          <button 
-            onClick={onAddClick}
-            disabled={!_hasHydrated}
-            className="p-2 bg-white rounded-xl border border-slate-100 text-blue-600 hover:shadow-md transition-all active:scale-95 disabled:opacity-50"
-          >
-            <Plus size={14} />
-          </button>
+      {/* 3. ПУЛЬС ПЛАТФОРМЫ */}
+      <div className="px-8 py-4 space-y-4">
+        <div className="flex items-center gap-2 opacity-30">
+          <Activity size={14} className="text-slate-900" />
+          <span className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-900 leading-none">Пульс Zwork</span>
         </div>
-        
-        <div className="flex flex-wrap gap-2">
-          {_hasHydrated ? (
-             skills.map((skill) => (
-              <div key={skill.categoryId} className="flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-xl text-[10px] font-bold text-slate-600 uppercase italic animate-in fade-in zoom-in">
-                {skill.category?.name}
-                <button onClick={() => onRemoveSkill(skill.categoryId)} className="hover:text-red-500 transition-colors">
-                  <X size={12} />
-                </button>
-              </div>
-            ))
-          ) : (
-            [1, 2, 3].map(i => <div key={i} className="h-8 w-20 bg-slate-200 rounded-xl animate-pulse" />)
-          )}
+        <div className="space-y-2.5">
+          <div className="flex justify-between items-center text-[10px] font-bold uppercase">
+            <span className="text-slate-400 font-bold">Online</span>
+            <span className="text-slate-900 italic font-black tabular-nums leading-none">1,402</span>
+          </div>
+          <div className="flex justify-between items-center text-[10px] font-bold uppercase">
+            <span className="text-slate-400 font-bold">Last Order</span>
+            <span className="text-slate-900 italic font-black leading-none uppercase">2 мин назад</span>
+          </div>
         </div>
       </div>
     </div>
