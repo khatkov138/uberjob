@@ -17,7 +17,6 @@ import { FeedHeader } from "./_components/feed-header"
 import { OrderCard } from "./_components/order-card"
 import { EmptyState } from "./_components/empty-state"
 import { LoadingState } from "./_components/loading-state"
-// import { OrdersMap } from "./_components/orders-map" 
 
 interface OrdersPageClientProps {
     session: Session
@@ -37,7 +36,7 @@ export default function OrdersPageClient({
     const [viewMode, setViewMode] = React.useState<ViewMode>("list")
     const { lat, lng, radius, _hasHydrated } = useLocationStore()
 
-    // 1. Стабильные координаты для ключа
+    // 1. Стабильные координаты для кеша TanStack Query
     const currentLat = roundCoord(_hasHydrated ? lat : serverLocation.lat)
     const currentLng = roundCoord(_hasHydrated ? lng : serverLocation.lng)
     const currentRadius = _hasHydrated ? radius : serverLocation.radius
@@ -47,7 +46,7 @@ export default function OrdersPageClient({
         currentLng === roundCoord(serverLocation.lng) &&
         currentRadius === serverLocation.radius;
 
-    // --- ЗАГРУЗКА ДАННЫХ ---
+    // --- ЗАГРУЗКА ЗАКАЗОВ ---
     const { data: orders = [], isFetching: isOrdersFetching, isPending: isInitialLoading } = useQuery<FeedOrder[]>({
         queryKey: ["orders", currentLat, currentLng, currentRadius, session.user.id],
         queryFn: () => handleAction(getOrders({ lat: currentLat, lng: currentLng, radius: currentRadius })),
@@ -55,16 +54,31 @@ export default function OrdersPageClient({
         staleTime: 1000 * 60,
     })
 
+    // --- ЗАГРУЗКА ПРОФИЛЯ ---
     const { data: profile, isFetching: isProfileFetching } = useQuery<FullProfile | null>({
         queryKey: ["user-profile", session.user.id],
         queryFn: () => handleAction(getMyProfile()),
         initialData: initialProfile ?? undefined,
     })
 
-    // --- МЕМОИЗАЦИЯ ---
+    // --- ЛОГИКА МАТЧИНГА И СОРТИРОВКИ ---
     const mySkillIds = React.useMemo(() =>
         new Set(profile?.skills.map(s => s.categoryId) || []),
         [profile])
+
+    // УМНАЯ СОРТИРОВКА: Сначала Matched (по скиллам), потом по дистанции
+    const sortedOrders = React.useMemo(() => {
+        return [...orders].sort((a, b) => {
+            const aMatched = a.categories.some(c => mySkillIds.has(c.categoryId)) ? 1 : 0
+            const bMatched = b.categories.some(c => mySkillIds.has(c.categoryId)) ? 1 : 0
+
+            // Если статусы "подходит/не подходит" разные — тот что подходит выше
+            if (aMatched !== bMatched) return bMatched - aMatched
+
+            // Если оба одинаковы по статусу — сортируем по близости (ближайшие выше)
+            return (a.distance || 0) - (b.distance || 0)
+        })
+    }, [orders, mySkillIds])
 
     const stats = React.useMemo(() => ({
         total: orders.length,
@@ -73,7 +87,7 @@ export default function OrdersPageClient({
         ).length
     }), [orders, mySkillIds])
 
-    // Глобальный лоадер при первом входе
+    // Показываем полноэкранный лоадер только при самом первом входе
     if (isInitialLoading && !initialOrders.length) return <LoadingState />
 
     return (
@@ -86,15 +100,15 @@ export default function OrdersPageClient({
                     isUpdating={isOrdersFetching || isProfileFetching}
                 />
 
-                {/* --- ПЕРЕКЛЮЧАТЕЛЬ --- */}
+                {/* --- ПЕРЕКЛЮЧАТЕЛЬ: СПИСОК / КАРТА --- */}
                 <div className="flex justify-center md:justify-start">
                     <div className="bg-white p-2 rounded-[2.5rem] flex items-center gap-2 border-2 border-slate-100 shadow-sm relative z-10">
                         <button
                             onClick={() => setViewMode("list")}
                             className={cn(
                                 "flex items-center gap-3 px-8 py-3.5 rounded-[2rem] transition-all duration-500",
-                                viewMode === "list" 
-                                    ? "bg-slate-900 text-white shadow-xl scale-105" 
+                                viewMode === "list"
+                                    ? "bg-slate-900 text-white shadow-xl scale-105"
                                     : "text-slate-400 hover:bg-slate-50"
                             )}
                         >
@@ -106,8 +120,8 @@ export default function OrdersPageClient({
                             onClick={() => setViewMode("map")}
                             className={cn(
                                 "flex items-center gap-3 px-8 py-3.5 rounded-[2rem] transition-all duration-500",
-                                viewMode === "map" 
-                                    ? "bg-blue-600 text-white shadow-xl shadow-blue-100 scale-105" 
+                                viewMode === "map"
+                                    ? "bg-blue-600 text-white shadow-xl shadow-blue-100 scale-105"
                                     : "text-slate-400 hover:bg-slate-50"
                             )}
                         >
@@ -117,9 +131,9 @@ export default function OrdersPageClient({
                     </div>
                 </div>
 
-                {/* --- КОНТЕНТ --- */}
+                {/* --- КОНТЕНТНАЯ ОБЛАСТЬ --- */}
                 <div className="relative min-h-[500px]">
-                    {/* Плашка загрузки обновления */}
+                    {/* Плашка "Обновляем радар" при смене параметров */}
                     {isOrdersFetching && (
                         <div className="absolute inset-x-0 -top-4 z-40 flex justify-center pointer-events-none">
                             <div className="bg-slate-900 text-white px-6 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -134,14 +148,17 @@ export default function OrdersPageClient({
                             "grid gap-8 transition-all duration-500",
                             isOrdersFetching ? "opacity-30 blur-sm scale-[0.99] pointer-events-none" : "opacity-100"
                         )}>
-                            {orders.length > 0 ? (
-                                orders.map((order) => (
-                                    <OrderCard
-                                        key={order.id}
-                                        order={order}
-                                        isMatched={order.categories.some(c => mySkillIds.has(c.categoryId))}
-                                    />
-                                ))
+                            {sortedOrders.length > 0 ? (
+                                sortedOrders.map((order) => {
+                                    const isMatched = order.categories.some(c => mySkillIds.has(c.categoryId))
+                                    return (
+                                        <OrderCard
+                                            key={order.id}
+                                            order={order}
+                                            isMatched={isMatched}
+                                        />
+                                    )
+                                })
                             ) : !isOrdersFetching && <EmptyState />}
                         </div>
                     ) : (
@@ -151,7 +168,7 @@ export default function OrdersPageClient({
                                 isOrdersFetching ? "opacity-50 grayscale-[0.5]" : "opacity-100",
                                 "animate-in fade-in duration-700"
                             )}>
-                                {/* Место для OrdersMap */}
+                                {/* ЗАГЛУШКА КАРТЫ (Сюда вставим OrdersMap) */}
                                 <div className="w-full h-full flex flex-col items-center justify-center gap-4">
                                     <div className="w-14 h-14 bg-white rounded-3xl shadow-md flex items-center justify-center animate-bounce">
                                         <MapIcon className="w-7 h-7 text-blue-600" />

@@ -7,76 +7,82 @@ import { delay, getDistance } from "@/lib/utils"
 import { OrderStatus, Prisma } from "@prisma/client"
 
 // ЛЕНТА (Исполнитель)
+
 export async function getOrders({ lat, lng, radius = 60 }: { lat?: number, lng?: number, radius?: number }) {
-  //await delay(2000);
-  
   return createAuthAction(async (userId) => {
-    const [allOrders, profile] = await Promise.all([
-      prisma.order.findMany({
-        where: {
-          status: "PENDING",
-         // clientId: { not: userId }
-        },
-        include: {
-          client: {
-            select: {
-              name: true,
-              image: true,
-              _count: {
-                select: {
-                  ordersCreated: true, // Сколько всего создал заказов
-                }
-              },
-              // Чтобы посчитать Hire Rate, нам нужно знать, сколько заказов реально завершено
-              ordersCreated: {
-                where: { status: "COMPLETED" },
-                select: { id: true }
-              }
-            }
-          },
-          categories: { include: { category: true } },
-          _count: { select: { offers: true } }
-        },
-        orderBy: { createdAt: 'desc' }
-      }),
-      prisma.profile.findUnique({
-        where: { userId },
-        select: { skills: { select: { categoryId: true } } }
-      })
-    ])
+    // 1. Категории мастера
+    const profile = await prisma.profile.findUnique({
+      where: { userId },
+      select: { skills: { select: { categoryId: true } } }
+    })
+    const skillIds = profile?.skills.map(s => s.categoryId) || []
 
-    const masterCategoryIds = profile?.skills.map(s => s.categoryId) || []
+    // 2. SQL запрос с именами таблиц из твоих @@map
+    // Все агрегаты (COUNT) в Postgres возвращаются как BigInt
+    const nearbyOrders = await prisma.$queryRaw<(Prisma.OrderGetPayload<{}> & {
+      distance: number
+      is_match: number
+      total_projects: bigint
+      completed_projects: bigint
+      offers_count: bigint
+    })[]>`
+      SELECT o.*,
+        (6371 * acos(cos(radians(${lat})) * cos(radians(o.lat)) * cos(radians(o.lng) - radians(${lng})) + sin(radians(${lat})) * sin(radians(o.lat)))) AS distance,
+        (SELECT COUNT(*) FROM "order" WHERE "clientId" = o."clientId") as total_projects,
+        (SELECT COUNT(*) FROM "order" WHERE "clientId" = o."clientId" AND "status" = 'COMPLETED') as completed_projects,
+        (SELECT COUNT(*) FROM "offer" WHERE "orderId" = o.id) as offers_count,
+        EXISTS (
+          SELECT 1 FROM "order_category" oc 
+          WHERE oc."orderId" = o.id AND oc."categoryId" IN (${skillIds.length > 0 ? skillIds : ['']})
+        ) as is_match
+      FROM "order" o
+      WHERE o.status = 'PENDING'
+      AND (6371 * acos(cos(radians(${lat})) * cos(radians(o.lat)) * cos(radians(o.lng) - radians(${lng})) + sin(radians(${lat})) * sin(radians(o.lat)))) <= ${radius}
+      ORDER BY is_match DESC, o."createdAt" DESC
+    `
 
-    return allOrders.map((order) => {
-      const distance = lat && lng && order.lat && order.lng
-        ? getDistance(lat, lng, order.lat, order.lng)
-        : null
+    if (!nearbyOrders.length) return []
 
-      const isMatch = order.categories.some(c => masterCategoryIds.includes(c.categoryId))
+    // 3. Дозагрузка категорий через Prisma
+    const orderIds = nearbyOrders.map(o => o.id)
+    const categoriesData = await prisma.orderCategory.findMany({
+      where: { orderId: { in: orderIds } },
+      include: { category: true }
+    })
 
-      // Считаем статы клиента
-      const totalProjects = order.client._count.ordersCreated
-      const completedProjects = order.client.ordersCreated.length
-      const hireRate = totalProjects > 0 ? Math.round((completedProjects / totalProjects) * 100) : 0
+    // 4. Мапим результат, принудительно превращая BigInt в Number для JSON
+    return nearbyOrders.map(o => {
+      const total = Number(o.total_projects)
+      const completed = Number(o.completed_projects)
 
       return {
-        ...order,
-        distance,
-        isMatch,
-        offersCount: order._count?.offers || 0,
+        // Явно перечисляем поля, чтобы не прокинуть сырой BigInt из o.*
+        id: o.id,
+        title: o.title,
+        description: o.description,
+        price: Number(o.price), // На всякий случай кастим цену, если она BigInt
+        address: o.address,
+        lat: o.lat,
+        lng: o.lng,
+        createdAt: o.createdAt,
+        status: o.status,
+        clientId: o.clientId,
+
+        // Наши вычисляемые поля
+        distance: o.distance ? Math.round(Number(o.distance) * 10) / 10 : null,
+        isMatch: Boolean(o.is_match),
+        offersCount: Number(o.offers_count),
+        categories: categoriesData
+          .filter(c => c.orderId === o.id)
+          .map(c => ({ categoryId: c.categoryId, category: c.category })),
         clientStats: {
-          projects: totalProjects,
-          hireRate: hireRate
+          projects: total,
+          hireRate: total > 0 ? Math.round((completed / total) * 100) : 0
         }
       }
     })
-      // Оставляем фильтр ТОЛЬКО по радиусу (география важнее категорий на старте)
-      .filter(order => !lat || !lng || (order.distance ?? 0) <= radius)
-      // Сортируем: сначала те, что "в масть", потом все остальные
-      .sort((a, b) => (a.isMatch === b.isMatch ? 0 : a.isMatch ? -1 : 1))
   })
 }
-
 
 
 // МОИ ЗАКАЗЫ (Клиент)
