@@ -149,6 +149,7 @@ export default function OrdersPageClient({
                         <OrdersViewMap
                             orders={sortedOrders}
                             center={[currentLat, currentLng]}
+                            radius={currentRadius} // Добавь эту строку
                             isFetching={isOrdersFetching}
                             mySkillIds={mySkillIds}
                         />

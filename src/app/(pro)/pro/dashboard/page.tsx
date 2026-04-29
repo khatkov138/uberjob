@@ -70,7 +70,7 @@ export default async function ProDashboardPage() {
 
           {/* СЕТКА С ОТКЛИКАМИ И СООБЩЕНИЯМИ */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Link href="/pro/my-offers" className="group">
+            <Link href="/pro/offers" className="group">
               <div className="h-full bg-blue-600 rounded-[2rem] p-8 text-white flex flex-col justify-between min-h-[200px] transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-200">
                 <div className="flex justify-between items-start">
                   <div className="p-3 bg-white/10 rounded-2xl">

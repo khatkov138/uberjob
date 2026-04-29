@@ -55,7 +55,7 @@ export function ClientOrdersList({ initialOrders }: ClientOrdersListProps) {
                     {['ACCEPTED', 'IN_PROGRESS'].includes(order.status) ? 'В процессе' : 'Ожидание мастеров'}
                   </span>
                 </div>
-                <Link href={`/client/orders/${order.id}`} className="block group/title">
+                <Link href={`/orders/${order.id}`} className="block group/title">
                   <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-slate-900 leading-none group-hover/title:text-blue-600 transition-colors flex items-center gap-3">
                     {order.title}
                     <ArrowUpRight className="w-8 h-8 opacity-0 -translate-y-2 group-hover/title:opacity-100 group-hover/title:translate-y-0 transition-all duration-300" />

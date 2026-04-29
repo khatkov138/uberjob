@@ -2,54 +2,51 @@
 
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ChevronLeft, MapPin, Clock, ShieldCheck, Zap, Banknote, Loader2 } from "lucide-react"
+import { ChevronLeft, MapPin, Clock, Zap, Banknote, ShieldCheck, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
 import { cn, handleAction } from "@/lib/utils"
 import { getOrderById, type OrderByIdResponse } from "@/actions/order/get"
-import { OfferForm } from "./offer-form"
+import { OffersList } from "./offers-list"
 
 interface OrderDetailsUIProps {
-  orderId: string // Добавляем в интерфейс
+  orderId: string
   initialData: OrderByIdResponse
+  context: {
+    userId: string | null
+    isOwner: boolean
+    isAssignedWorker: boolean
+  }
 }
 
-export function OrderDetailsUI({ orderId, initialData }: OrderDetailsUIProps) {
+export function OrderDetailsUI({ orderId, initialData, context }: OrderDetailsUIProps) {
   const { data } = useQuery({
-    // Теперь queryKey железно зависит от orderId из пропсов
     queryKey: ["order-details", orderId],
     queryFn: async () => await handleAction(getOrderById(orderId)),
     initialData: initialData,
     staleTime: 1000 * 60 * 5,
   })
 
-  // 1. Проверяем наличие данных. 
-  // Если нет ни свежих (data), ни серверных (initialData) — показываем заглушку.
-  const currentData = data ?? initialData;
+  const currentData = data ?? initialData
+  const { order: currentOrder, existingOffer: hasOffer } = currentData
 
-  if (!currentData) {
-    return <div className="p-20 text-center font-black uppercase italic">Загрузка...</div>;
-  }
-
-  // 2. Теперь TS на 100% уверен, что currentData существует.
-  const { order: currentOrder, existingOffer: hasOffer } = currentData;
-
-  // Дальше весь код будет работать без ошибок
   const timeAgo = React.useMemo(() =>
     formatDistanceToNow(new Date(currentOrder.createdAt), { addSuffix: true, locale: ru }),
     [currentOrder.createdAt]
   )
 
-
   const isOrderClosed = currentOrder.status !== "PENDING" && currentOrder.status !== "SEARCHING"
+
+  // Динамическая ссылка "Назад"
+  const backHref = context.isOwner ? "/orders" : "/pro/orders"
 
   return (
     <div className="w-full space-y-6 animate-in fade-in duration-500">
       {/* НАВИГАЦИЯ */}
       <div className="flex items-center justify-between">
         <Link
-          href="/pro/orders"
+          href={backHref}
           className="flex items-center gap-3 text-slate-400 hover:text-slate-900 transition-all group"
         >
           <div className="p-2.5 bg-white rounded-2xl border border-slate-200 group-hover:border-blue-600 group-hover:shadow-lg group-hover:shadow-blue-50 transition-all">
@@ -78,7 +75,7 @@ export function OrderDetailsUI({ orderId, initialData }: OrderDetailsUIProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* ЛЕВО: ДЕТАЛИ */}
+        {/* ЛЕВО: ДЕТАЛИ (ОБЩИЕ) */}
         <div className="lg:col-span-8 space-y-8">
           <div className="bg-white rounded-[3.5rem] p-8 md:p-14 border border-slate-100 relative overflow-hidden shadow-sm">
             <div className="absolute top-0 right-0 p-12 opacity-[0.02] pointer-events-none">
@@ -89,10 +86,7 @@ export function OrderDetailsUI({ orderId, initialData }: OrderDetailsUIProps) {
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-2">
                   {currentOrder.categories.map((catObj) => (
-                    <span
-                      key={catObj.categoryId}
-                      className="px-4 py-1.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest italic"
-                    >
+                    <span key={catObj.categoryId} className="px-4 py-1.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest italic">
                       #{catObj.category.name}
                     </span>
                   ))}
@@ -143,55 +137,89 @@ export function OrderDetailsUI({ orderId, initialData }: OrderDetailsUIProps) {
           </div>
         </div>
 
-        {/* ПРАВО: ЗАКАЗЧИК */}
+        {/* ПРАВО: КОНТЕКСТНАЯ ЛОГИКА */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="bg-slate-900 rounded-[3rem] p-8 text-white relative overflow-hidden shadow-2xl">
-            <div className="relative z-10 space-y-8">
-              <div className="flex items-center gap-5">
-                <div className="w-16 h-16 rounded-[1.5rem] bg-blue-600 flex items-center justify-center text-2xl font-black italic shrink-0 overflow-hidden shadow-xl rotate-[-3deg]">
-                  {currentOrder.client.image ? (
-                    <img src={currentOrder.client.image} className="w-full h-full object-cover" alt="Avatar" />
-                  ) : (
-                    currentOrder.client.name.charAt(0).toUpperCase()
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] mb-1">Клиент</p>
-                  <h3 className="text-2xl font-black tracking-tighter truncate uppercase italic leading-none">{currentOrder.client.name}</h3>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-6 py-6 border-y border-white/10">
-                <div>
-                  <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Заказов</p>
-                  <p className="text-3xl font-black italic text-blue-500 leading-none">{currentOrder.client._count.ordersCreated}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Откликов</p>
-                  <p className="text-3xl font-black italic text-white leading-none">{currentOrder._count.offers}</p>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* ФОРМА ОТКЛИКА */}
-          <div className="bg-white rounded-[2.5rem] p-8 border-2 border-slate-100 shadow-xl shadow-slate-200/50">
-            {hasOffer ? (
-              <div className="text-center py-8 space-y-5 animate-in zoom-in duration-300">
-                <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-[1.5rem] flex items-center justify-center mx-auto border-2 border-emerald-100 rotate-12">
-                  <Zap className="w-8 h-8 fill-current" />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="font-black uppercase italic text-xl text-slate-900 tracking-tighter">ОТКЛИК ОТПРАВЛЕН</h4>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ожидайте ответа заказчика в чате</p>
+          {/* 1. ЕСЛИ ГОСТЬ */}
+          {!context.userId && (
+            <div className="bg-white rounded-[3rem] p-10 border-4 border-black shadow-[12px_12px_0px_0px_rgba(37,99,235,1)] text-center space-y-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto rotate-3">
+                <Zap className="w-8 h-8 text-blue-600 animate-pulse" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-black italic uppercase text-2xl tracking-tighter leading-none">
+                  Хотите <span className="text-blue-600">откликнуться?</span>
+                </h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+                  Только авторизованные мастера <br /> могут предлагать услуги
+                </p>
+              </div>
+              <Link href="/sign-in" className="block w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase italic text-xs tracking-widest hover:bg-blue-600 transition-all active:scale-95">
+                Войти в систему
+              </Link>
+            </div>
+          )}
+
+          {/* 2. ЕСЛИ ВЛАДЕЛЕЦ (КЛИЕНТ) */}
+          {context.isOwner && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-[2.5rem] p-8 border-2 border-slate-100 shadow-xl">
+                <h3 className="text-[11px] font-black uppercase tracking-widest italic mb-6">Управление</h3>
+                <button className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black uppercase italic text-[10px] tracking-widest">
+                  Редактировать заказ
+                </button>
+              </div>
+              <OffersList offers={currentOrder.offers || []} orderId={orderId} />
+            </div>
+          )}
+
+          {/* 3. ЕСЛИ МАСТЕР (PRO) */}
+          {context.userId && !context.isOwner && (
+            <>
+              <div className="bg-slate-900 rounded-[3rem] p-8 text-white relative overflow-hidden shadow-2xl">
+                <div className="relative z-10 space-y-8">
+                  <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 rounded-[1.5rem] bg-blue-600 flex items-center justify-center text-2xl font-black italic shrink-0 overflow-hidden shadow-xl rotate-[-3deg]">
+                      {currentOrder.client.image ? (
+                        <img src={currentOrder.client.image} className="w-full h-full object-cover" alt="Avatar" />
+                      ) : currentOrder.client.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] mb-1">Клиент</p>
+                      <h3 className="text-2xl font-black tracking-tighter truncate uppercase italic leading-none">{currentOrder.client.name}</h3>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6 py-6 border-y border-white/10">
+                    <div>
+                      <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Заказов</p>
+                      <p className="text-3xl font-black italic text-blue-500 leading-none">{currentOrder.client._count?.ordersCreated || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Откликов</p>
+                      <p className="text-3xl font-black italic text-white leading-none">{currentOrder._count?.offers || 0}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            ) : (
-              <OfferForm
-                orderId={currentOrder.id}
-                defaultPrice={0}
-              />
-            )}
-          </div>
+
+              <div className="bg-white rounded-[2.5rem] p-8 border-2 border-slate-100 shadow-xl">
+                {hasOffer ? (
+                  <div className="text-center py-8 space-y-5 animate-in zoom-in">
+                    <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-[1.5rem] flex items-center justify-center mx-auto border-2 border-emerald-100 rotate-12">
+                      <ShieldCheck className="w-8 h-8 fill-current" />
+                    </div>
+                    <h4 className="font-black uppercase italic text-xl text-slate-900 tracking-tighter leading-none">ОТКЛИК ОТПРАВЛЕН</h4>
+                  </div>
+                ) : isOrderClosed ? (
+                  <div className="text-center py-8 opacity-50">
+                    <p className="font-black uppercase italic text-slate-400">Набор закрыт</p>
+                  </div>
+                ) : (
+                  <>offerform</> /* <OfferForm orderId={currentOrder.id} defaultPrice={currentOrder.price} />*/
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -1,7 +1,8 @@
 import * as React from "react"
-import { MyOffersList } from "./my-offers-list"
+
 import { Container } from "@/components/shared/container"
 import { getMyOffers } from "@/actions/offer/offers"
+import { MyOffersList } from "./my-offers-list"
 
 export default async function MyOffersPage() {
 

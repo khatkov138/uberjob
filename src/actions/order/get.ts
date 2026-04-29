@@ -1,5 +1,6 @@
 "use server"
 
+import { getServerSession } from "@/lib/get-session"
 import prisma from "@/lib/prisma"
 import { createAction, createAuthAction } from "@/lib/server-utils"
 import { InferActionResult } from "@/lib/types/types"
@@ -147,57 +148,44 @@ export async function getActiveOrdersCount(role: 'CLIENT' | 'WORKER') {
 }
 
 
-// ДЕТАЛИ ЗАКАЗА
+
 export async function getOrderById(id: string) {
-  return createAuthAction(async (userId) => {
+  return createAction(async () => {
+    const session = await getServerSession()
+    const userId = session?.user?.id || null
+
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
         client: { select: { name: true, image: true, createdAt: true, _count: { select: { ordersCreated: true } } } },
         categories: { include: { category: true } },
-        _count: { select: { offers: true } }
+        _count: { select: { offers: true } },
+        // Магия: подгружаем отклики только если это владелец
+        offers: {
+          where: {
+            order: { clientId: userId || "guest_access" }
+          },
+          include: {
+            worker: { select: { name: true, image: true } }
+          },
+          orderBy: { createdAt: "desc" }
+        }
       }
     })
+
     if (!order) throw new Error("Заказ не найден")
-    const existingOffer = await prisma.offer.findFirst({ where: { orderId: id, workerId: userId } })
-    return { order, existingOffer: !!existingOffer, userId }
+
+    const existingOffer = userId
+      ? await prisma.offer.findFirst({ where: { orderId: id, workerId: userId } })
+      : null
+
+    return {
+      order,
+      existingOffer: !!existingOffer,
+      userId
+    }
   })
 }
-
-
-export async function getOrderDetails(orderId: string) {
-  return createAuthAction(async (userId) => {
-    const order = await prisma.order.findUnique({
-      where: {
-        id: orderId,
-        clientId: userId // Безопасность: только владелец заказа видит детали
-      },
-      include: {
-        worker: {
-          select: {
-            name: true,
-            image: true,
-            profile: { select: { id: true, rating: true, skills: true } }
-          },
-        },
-        review: true,
-        messages: {
-          orderBy: { createdAt: 'asc' }
-        },
-        categories: {
-          include: {
-            category: true
-          }
-        },
-      },
-    });
-
-    if (!order) throw new Error("Заказ не найден или доступ запрещен");
-
-    return order;
-  });
-}
-
 
 /**
  * ПОСЛЕДНИЕ ПУБЛИЧНЫЕ ЗАКАЗЫ
@@ -232,6 +220,6 @@ export async function getLatestPublicOrders() {
 
 
 export type ClientOrder = InferActionResult<typeof getClientOrders>
-export type OrderDetails = InferActionResult<typeof getOrderDetails>
 export type OrderByIdResponse = InferActionResult<typeof getOrderById>
+
 

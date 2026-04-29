@@ -8,12 +8,13 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { MapPin, Wallet, ArrowRight, Loader2, AlertCircle } from "lucide-react"
 
-import { AddressInput } from "@/components/geo/address-input"
+
 import { createOrderSchema, type CreateOrderValues } from "@/lib/validation"
 
 import { useClientLocationStore } from "@/store/use-client-location-store"
 import { cn, handleAction } from "@/lib/utils"
 import { createOrder } from "@/actions/order/create"
+import { AddressInput } from "./address-input"
 
 export function CreateOrderForm() {
     const router = useRouter()

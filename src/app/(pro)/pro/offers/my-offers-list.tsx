@@ -51,7 +51,7 @@ export function MyOffersList({ initialOffers }: MyOffersListProps) {
               </div>
 
               <div className="space-y-1">
-                <Link href={`/pro/orders/${offer.order.id}`}>
+                <Link href={`/orders/${offer.order.id}`}>
                   <h3 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter text-slate-900 group-hover:text-blue-600 transition-colors leading-[0.9]">
                     {offer.order.title}
                   </h3>
@@ -119,7 +119,7 @@ export function MyOffersList({ initialOffers }: MyOffersListProps) {
 
             {/* ПЕРЕХОД */}
             <Link
-              href={`/pro/orders/${offer.order.id}`}
+              href={`/orders/${offer.order.id}`}
               className="absolute top-1/2 -right-4 -translate-y-1/2 w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:right-6 transition-all duration-500 shadow-xl z-10"
             >
               <ChevronRight className="w-6 h-6" />

@@ -10,6 +10,7 @@ import { FeedOrder } from "@/actions/order/get"
 interface OrdersViewMapProps {
     orders: FeedOrder[]
     center: [number, number]
+    radius: number // Добавили сюда
     isFetching: boolean
     mySkillIds: Set<string>
 }
@@ -42,7 +43,7 @@ export function OrdersViewMap({
     orders,
     center,
     isFetching,
-    mySkillIds
+    mySkillIds, radius
 }: OrdersViewMapProps) {
     return (
         <div className="relative h-[650px] w-full isolation-isolate">
@@ -56,6 +57,7 @@ export function OrdersViewMap({
                 <OrdersMap
                     orders={orders}
                     center={center}
+                    radius={radius} // Теперь пробрасываем радиус
                     mySkillIds={mySkillIds}
                 />
             </div>
