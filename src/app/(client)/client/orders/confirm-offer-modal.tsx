@@ -5,8 +5,9 @@ import { X, Zap, Loader2 } from "lucide-react"
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { handleAction } from "@/lib/utils"
-import { acceptOffer } from "@/actions/order/manage"
+
 import { ClientOrder, getClientOrders } from "@/actions/order/get"
+import { acceptOffer } from "@/actions/offer/manage"
 
 interface ConfirmOfferModalProps {
     ids: { orderId: string; offerId: string } | null

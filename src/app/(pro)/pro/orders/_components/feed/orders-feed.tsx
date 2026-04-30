@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils"
 import { OrderCard } from "./order-card"
 import { EmptyState } from "../shared/empty-state"
-import { OrderCardSkeleton } from "../shared/order-card-skeleton" // Импортируем
+import { OrderCardSkeleton } from "../shared/order-card-skeleton"
 import { FeedOrder } from "@/actions/order/get"
 
 interface Props {
@@ -13,16 +13,17 @@ interface Props {
 }
 
 export function OrdersFeed({ orders, isFetching, mySkillIds }: Props) {
-    // 1. Состояние полной пустоты (когда нет данных и нет загрузки)
     if (orders.length === 0 && !isFetching) {
         return <EmptyState />
     }
 
     return (
-        <div className="relative min-h-[600px] p-6 md:p-8">
-            {/* ГРУППА СКЕЛЕТОНОВ: Показываем только во время Fetching */}
+        /* 1. Убрали p-6 md:p-8. Теперь список занимает всю доступную ширину */
+        <div className="relative min-h-[600px]">
+            
+            {/* ГРУППА СКЕЛЕТОНОВ: Синхронизируем отступы и gap со списком */}
             {isFetching && (
-                <div className="absolute inset-0 z-20 p-6 md:p-8 space-y-8 animate-in fade-in duration-500">
+                <div className="absolute inset-0 z-20 space-y-10 animate-in fade-in duration-500">
                     {[1, 2, 3].map((i) => (
                         <OrderCardSkeleton key={`skeleton-${i}`} />
                     ))}
@@ -31,9 +32,9 @@ export function OrdersFeed({ orders, isFetching, mySkillIds }: Props) {
 
             {/* ОСНОВНОЙ СПИСОК */}
             <div className={cn(
-                "grid gap-8 transition-all duration-700",
-                // Если грузимся — блюрим старые данные, чтобы они служили фоном для скелетонов
-                isFetching ? "opacity-0 blur-xl scale-[0.98] pointer-events-none" : "opacity-100 blur-0 scale-100"
+                /* 2. Увеличили gap до 10 для большего объема */
+                "grid gap-10 transition-all duration-700",
+                isFetching ? "opacity-0 blur-2xl scale-[0.98] pointer-events-none" : "opacity-100 blur-0 scale-100"
             )}>
                 {orders.map((order) => {
                     const isMatched = order.categories.some(c => mySkillIds.has(c.categoryId))

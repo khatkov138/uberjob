@@ -128,7 +128,7 @@ export function OffersList({ order }: OffersListProps) {
                 <MessageSquare className="w-4 h-4" />
                 <span>Чат</span>
               </Link>
-            </div>
+            </div> 
           </div>
         )
       })}

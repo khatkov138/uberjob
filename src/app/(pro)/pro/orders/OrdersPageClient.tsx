@@ -162,13 +162,32 @@ export default function OrdersPageClient({
             />
           </div>
 
-          {/* КОНТЕНТ */}
-          <div className="relative min-h-[700px] rounded-[3.5rem] bg-slate-50 border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden">
+          {/* ГЛАВНЫЙ КОНТЕЙНЕР КОНТЕНТА */}
+          <div className={cn(
+            "relative min-h-[700px] rounded-[3.5rem] transition-all duration-500",
+            /* 
+               ЛОГИКА СЛОЕВ:
+               1. В режиме КАРТЫ: оставляем рамку (border) и фон, чтобы карта была в "раме".
+               2. В режиме СПИСКА: убираем рамку (border-transparent) и оставляем только 
+                  мягкий фон (bg-slate-50). Теперь белые карточки со своими рамками будут 
+                  единственным графическим акцентом.
+            */
+            viewMode === "list"
+              ? "bg-slate-50/50 border-transparent shadow-none"
+              : "bg-slate-50 border border-slate-100 shadow-2xl shadow-slate-200/40"
+          )}>
+
+            {/* Радар теперь летает поверх всего без ограничений */}
             <FetchingRadar isVisible={isOrdersFetching} />
 
             <div className={cn("h-full transition-all duration-500", isOrdersFetching && "blur-sm opacity-50")}>
               {viewMode === "list" ? (
-                <div className="p-2 animate-in fade-in duration-500">
+                /* 
+                   Для списка добавляем p-4 или p-6. 
+                   Это создаст "воздушный зазор" между краем подложки и карточкой.
+                   Белая карточка на светло-сером фоне (slate-50) будет выглядеть объемно.
+                */
+                <div className="p-4 md:p-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <OrdersFeed
                     orders={orders}
                     mySkillIds={mySkillIds}
@@ -176,7 +195,8 @@ export default function OrdersPageClient({
                   />
                 </div>
               ) : (
-                <div className="h-[700px] w-full animate-in fade-in duration-500">
+                /* КАРТА: остается как была — в край (overflow-hidden нужен только здесь) */
+                <div className="h-[700px] w-full rounded-[3.5rem] overflow-hidden animate-in fade-in duration-500">
                   <MapViewport
                     orders={orders}
                     center={[currentLat, currentLng]}
@@ -188,6 +208,7 @@ export default function OrdersPageClient({
               )}
             </div>
           </div>
+
         </section>
       </div>
       <LocationModal />

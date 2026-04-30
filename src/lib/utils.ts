@@ -11,12 +11,12 @@ export const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, 
 
 export async function handleAction<T>(promise: Promise<ActionResponse<T>>): Promise<T> {
   const res = await promise;
-  
+
   if (!res.success) {
     // Если success: false, то кидаем ошибку. Текст ошибки берем из экшена.
     throw new Error(res.error || "Action failed");
   }
-  
+
   // Возвращаем данные как есть. Если там null — значит так и задумано (например, при удалении).
   return res.data as T;
 }
@@ -26,11 +26,11 @@ export async function handleAction<T>(promise: Promise<ActionResponse<T>>): Prom
  */
 
 export function unwrap<T>(res: ActionResponse<T>, fallback: T): T {
-    // Если успех — отдаем данные, если ошибка — отдаем дефолтное значение
-    if (res.success && res.data !== null) {
-        return res.data as T;
-    }
-    return fallback;
+  // Если успех — отдаем данные, если ошибка — отдаем дефолтное значение
+  if (res.success && res.data !== null) {
+    return res.data as T;
+  }
+  return fallback;
 }
 
 export async function handleApi<T>(promise: Promise<Response>): Promise<T> {
@@ -92,4 +92,6 @@ export const getContextKey = (orderId?: string | null, userId1?: string, userId2
 
 // Хелпер для TanStack Query
 export const getMessagesQueryKey = (contextKey: string) => ["messages", contextKey];
+
+
 
