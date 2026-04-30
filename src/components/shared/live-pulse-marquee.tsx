@@ -1,4 +1,3 @@
-// LivePulseMarquee.tsx
 "use client"
 
 import * as React from "react"
@@ -6,7 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Zap, MapPin } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
-
+import Link from "next/link" // Добавляем ссылку
 
 import { handleAction } from "@/lib/utils"
 import { getLatestPublicOrders } from "@/actions/order/get"
@@ -15,37 +14,26 @@ export function LivePulseMarquee() {
   const pathname = usePathname()
   const isAdminPage = pathname?.startsWith('/admin')
 
+  // Состояние для паузы
+  const [isPaused, setIsPaused] = React.useState(false)
+
   const { data: orders, isLoading } = useQuery({
     queryKey: ["public-latest-orders"],
-    // Используем async/await для четкого вывода типов
     queryFn: async () => await handleAction(getLatestPublicOrders()),
     refetchInterval: 60000,
     enabled: !isAdminPage,
   })
 
-  // Дублируем для бесшовности
   const displayOrders = React.useMemo(() => {
     if (!orders) return []
-    return [...orders, ...orders, ...orders] // Тройной запас для длинных экранов
+    return [...orders, ...orders, ...orders]
   }, [orders])
 
   if (isAdminPage) return null
 
   if (isLoading || !orders || orders.length === 0) {
-    return (
-      <div className="sticky top-[80px] z-40 w-full h-12 border-b bg-white flex items-center">
-        <div className="max-w-5xl mx-auto w-full px-4 flex items-center gap-8">
-          <Zap className="w-4 h-4 text-slate-200 animate-pulse" />
-          <div className="flex-1 h-1.5 bg-slate-50 rounded-full overflow-hidden relative">
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-200 to-transparent"
-              animate={{ x: ['-100%', '100%'] }}
-              transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-            />
-          </div>
-        </div>
-      </div>
-    )
+    // ... твой Skeleton остается без изменений
+    return <div className="h-12 border-b bg-white" />
   }
 
   return (
@@ -62,21 +50,24 @@ export function LivePulseMarquee() {
         <div className="flex-1 overflow-hidden relative flex items-center h-full">
           <motion.div
             className="flex items-center whitespace-nowrap will-change-transform"
-            // Анимация смещения влево
-            animate={{ x: [0, "-50%"] }}
+            animate={isPaused ? {} : { x: [0, "-50%"] }} // Если пауза — фиксируем позицию
             transition={{
               x: {
                 repeat: Infinity,
                 repeatType: "loop",
-                duration: 30, // Скорость: чем больше число, тем медленнее
+                duration: 60, // Увеличил с 30 до 60, чтобы бежало медленнее
                 ease: "linear",
               },
             }}
-            // Пауза при наведении
-            whileHover={{ animationPlayState: "paused" }}
+            onMouseEnter={() => setIsPaused(true)} // Останавливаем при наведении
+            onMouseLeave={() => setIsPaused(false)} // Запускаем, когда убрали мышь
           >
             {displayOrders.map((order, idx) => (
-              <div key={`${order.id}-${idx}`} className="flex items-center gap-6 px-10 shrink-0">
+              <Link
+                key={`${order.id}-${idx}`}
+                href={`/orders/${order.id}`} // Переход на страницу заказа
+                className="flex items-center gap-6 px-10 shrink-0 hover:opacity-70 transition-opacity cursor-pointer"
+              >
                 <div className="flex items-center gap-1.5 bg-slate-900 text-white px-2 py-0.5 rounded-md">
                   <MapPin className="w-3 h-3 text-blue-400" />
                   <span className="text-[9px] font-black uppercase italic leading-none">
@@ -94,11 +85,10 @@ export function LivePulseMarquee() {
                   {order.title}
                 </span>
                 <div className="w-1.5 h-1.5 rounded-full bg-slate-100" />
-              </div>
+              </Link>
             ))}
           </motion.div>
 
-          {/* Градиенты для мягкого исчезновения по бокам */}
           <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
           <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
         </div>

@@ -7,7 +7,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Loader2, ArrowRight } from "lucide-react"
 
-
 import { handleAction, cn } from "@/lib/utils"
 import { createOfferSchema, type CreateOfferValues } from "@/lib/validation"
 import { createOffer } from "@/actions/offer/create"
@@ -25,14 +24,12 @@ export function OfferForm({ orderId, defaultPrice }: { orderId: string, defaultP
   })
 
   const mutation = useMutation({
-    // Оборачиваем в handleAction, переводим рубли в копейки
     mutationFn: (values: CreateOfferValues) =>
       handleAction(createOffer({ ...values, price: values.price * 100 })),
     onSuccess: () => {
-      toast.success("ПРЕДЛОЖЕНИЕ ОТПРАВЛЕНО", {
-        className: "bg-blue-600 text-white font-black italic uppercase"
+      toast.success("ОТКЛИК ОТПРАВЛЕН", {
+        className: "bg-blue-600 text-white font-black italic uppercase rounded-2xl border-none shadow-2xl"
       })
-      // Обновляем данные заказа, чтобы форма скрылась и появился статус "Вы в деле"
       queryClient.invalidateQueries({ queryKey: ["order-details", orderId] })
     },
     onError: (err: Error) => toast.error(err.message)
@@ -40,64 +37,70 @@ export function OfferForm({ orderId, defaultPrice }: { orderId: string, defaultP
 
   return (
     <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-6">
-
-      {/* ПРИМЕР С КОНТРОЛЛЕРОМ ДЛЯ ЦЕНЫ */}
-      <div className="space-y-1.5">
-        <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-4">Ваша цена (₽)</label>
+      {/* ЦЕНА */}
+      <div className="space-y-2">
+        <label className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-300 ml-4">
+          Цена предложения (₽)
+        </label>
         <Controller
           control={form.control}
           name="price"
           render={({ field, fieldState }) => (
-            <>
+            <div className="relative group">
               <input
                 {...field}
                 type="number"
                 onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
-                placeholder="Напр: 500"
+                placeholder="0"
                 className={cn(
-                  "w-full h-16 px-6 bg-slate-50 border-2 border-transparent rounded-[1.5rem] focus:border-blue-600 focus:bg-white outline-none text-3xl font-black italic transition-all shadow-inner",
+                  "w-full h-20 px-8 bg-slate-50 border border-slate-100 rounded-[2rem] text-4xl font-black italic text-slate-900 outline-none transition-all focus:bg-white focus:border-blue-600 focus:shadow-xl focus:shadow-blue-50",
                   fieldState.invalid && "border-red-500 bg-red-50"
                 )}
               />
-              {fieldState.error && <p className="text-[9px] font-bold text-red-500 ml-4 uppercase italic mt-1">{fieldState.error.message}</p>}
-            </>
+              <div className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-200 font-black italic text-2xl group-focus-within:text-blue-600 transition-colors">
+                ₽
+              </div>
+            </div>
           )}
         />
       </div>
 
       {/* СООБЩЕНИЕ */}
-      <div className="space-y-1.5">
-        <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-4">Сообщение</label>
+      <div className="space-y-2">
+        <label className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-300 ml-4">
+          Детали работы
+        </label>
         <Controller
           control={form.control}
           name="message"
           render={({ field }) => (
             <textarea
               {...field}
-              placeholder="Опишите ваш опыт..."
-              className="w-full min-h-[120px] p-6 bg-slate-50 border-2 border-transparent rounded-[1.5rem] focus:border-blue-600 focus:bg-white outline-none font-bold italic text-slate-600 transition-all resize-none shadow-inner leading-tight"
+              placeholder="Опишите ваш опыт и сроки..."
+              className="w-full min-h-[160px] p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem] font-bold italic text-slate-700 outline-none transition-all focus:bg-white focus:border-blue-600 focus:shadow-xl focus:shadow-blue-50 resize-none leading-tight"
             />
           )}
         />
       </div>
 
+      {/* КНОПКА ОТПРАВКИ */}
       <button
         type="submit"
         disabled={mutation.isPending}
-        className="w-full h-20 bg-slate-900 text-white rounded-[2rem] font-black uppercase italic tracking-widest shadow-2xl shadow-slate-200 hover:bg-blue-600 hover:-translate-y-1 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-4 group"
+        className="group w-full h-20 bg-slate-900 text-white rounded-[2rem] font-black uppercase italic tracking-widest text-xs transition-all hover:bg-blue-600 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-200 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-4"
       >
         {mutation.isPending ? (
           <Loader2 className="animate-spin w-6 h-6" />
         ) : (
           <>
-            <span className="text-lg">Отправить отклик</span>
-            <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
+            <span>Предложить услугу</span>
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
           </>
         )}
       </button>
 
-      <p className="text-[8px] font-bold text-slate-300 uppercase text-center tracking-[0.2em]">
-        Нажимая кнопку, вы подтверждаете готовность выполнить работу
+      <p className="text-[8px] font-bold text-slate-300 uppercase text-center tracking-[0.2em] italic">
+        Нажимая кнопку, вы подтверждаете <br /> готовность выполнить работу
       </p>
     </form>
   )
