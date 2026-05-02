@@ -28,6 +28,7 @@ export function CreateOrderForm() {
             address: lastCity || "",
             lat: lastLat || 0,
             lng: lastLng || 0,
+            yandexUri: "", // <-- Обязательно добавь это
             price: 0,
             dateType: "ASAP",
         }
@@ -45,7 +46,7 @@ export function CreateOrderForm() {
             toast.success("ЗАДАЧА ЗАПУЩЕНА")
 
             // В экшене мы возвращали { id: result.id }
-            router.push(`/client/orders/${data.id}`)
+            router.push(`/order/${data.id}`)
         },
 
         onError: (error: Error) => {
@@ -119,9 +120,12 @@ export function CreateOrderForm() {
                                         placeholder="Город или адрес..."
                                         defaultValue={field.value}
                                         onSelect={(data) => {
+                                            // 2. Теперь сохраняем все 4 параметра, включая uri
                                             form.setValue("address", data.address, { shouldValidate: true })
                                             form.setValue("lat", data.lat, { shouldValidate: true })
                                             form.setValue("lng", data.lng, { shouldValidate: true })
+                                            form.setValue("yandexUri", data.uri, { shouldValidate: true }) // <-- Сохраняем URI
+
                                             setClientLocation(data.address, data.lat, data.lng)
                                         }}
                                     />

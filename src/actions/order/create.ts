@@ -1,3 +1,4 @@
+// src/actions/order/create.ts
 "use server"
 
 import prisma from "@/lib/prisma"
@@ -5,62 +6,66 @@ import { OrderStatus } from "@prisma/client"
 import { createAuthAction } from "@/lib/server-utils"
 import { analyzeTask } from "./lib/analyze"
 import { createOrderSchema, type CreateOrderValues } from "@/lib/validation"
+import { getOrCreateLocation } from "@/actions/location/manage" // Импортируем наш умный экшен
 
 /**
- * ГЛАВНЫЙ ЭКШЕН: Создание заказа ZWORK
+ * ГЛАВНЫЙ ЭКШЕН: Создание заказа ZWORK с привязкой к локации
  */
 export async function createOrder(values: CreateOrderValues) {
-  // Обертка для проверки сессии (userId)
   return createAuthAction(async (userId) => {
 
-    // 1. Валидация входных данных через Zod
+    // 1. Валидация входных данных
     const validated = createOrderSchema.parse(values);
 
-    // 2. ИИ-Классификация (Определяем title, ниши и keywords)
-    // Функция analyzeTask возвращает: { title: string, categories: Array<{name, keywords}> }
+    // 2. РАБОТА С ЛОКАЦИЕЙ (Новый этап)
+    // Синхронизируем город в нашей БД и получаем его данные
+    // Мы используем yandexUri из валидированных данных
+    const locationRes = await getOrCreateLocation(validated.yandexUri, validated.address);
+    
+    // Находим ID локации в нашей БД (он нам нужен для связи в Prisma)
+    const dbLocation = await prisma.location.findUnique({
+      where: { yandexUri: validated.yandexUri },
+      select: { id: true }
+    });
+
+    // 3. ИИ-Классификация задачи
     const aiResponse = await analyzeTask(validated.description);
 
-    // ПРЕДОХРАНИТЕЛЬ: Если ИИ не вернул категории, создаем дефолтную
     const aiCategories = aiResponse.categories?.length
       ? aiResponse.categories
       : [{ name: "Разное", keywords: [] }];
 
-    // 3. Синхронизация категорий (Upsert)
-    // Создаем или получаем ID всех ниш, которые определил ИИ
+    // 4. Синхронизация категорий (Ниши)
     const categoryIds = await Promise.all(
       aiCategories.map(async (cat: any) => {
         const dbCategory = await prisma.category.upsert({
           where: { name: cat.name },
-          update: {
-            // Обновляем ключевые слова для улучшения поиска в будущем
-            keywords: { set: cat.keywords || [] }
-          },
-          create: {
-            name: cat.name,
-            keywords: cat.keywords || [],
-          },
+          update: { keywords: { set: cat.keywords || [] } },
+          create: { name: cat.name, keywords: cat.keywords || [] },
           select: { id: true },
         });
         return dbCategory.id;
       })
     );
 
-    // 4. ТРАНЗАКЦИЯ: Создание заказа и системных уведомлений
+    // 5. ТРАНЗАКЦИЯ: Создание заказа и уведомлений
     const result = await prisma.$transaction(async (tx) => {
-      // Создаем сам заказ
       const newOrder = await tx.order.create({
         data: {
           title: aiResponse.title || validated.description.slice(0, 50),
           description: validated.description,
-          address: validated.address,
-          // Сохраняем цену в копейках/центах
+          // ВАЖНО: Мы убрали поле address из модели Order, 
+          // теперь "правда" о городе лежит в locationId, а координаты в lat/lng
           price: Math.round(validated.price * 100),
           status: OrderStatus.PENDING,
           clientId: userId,
           lat: validated.lat,
           lng: validated.lng,
           dateType: validated.dateType,
-          // Связываем с категориями через промежуточную таблицу
+          
+          // ПРИВЯЗКА К ЛОКАЦИИ: Связываем заказ с городом в нашей базе
+          locationId: dbLocation?.id, 
+
           categories: {
             create: categoryIds.map((id) => ({
               categoryId: id,
@@ -68,27 +73,20 @@ export async function createOrder(values: CreateOrderValues) {
           },
         },
         include: {
-          client: {
-            select: { name: true, image: true }
-          },
-          categories: {
-            include: { category: true }
-          }
+          categories: { include: { category: true } }
         }
       });
 
-      // Ищем профили мастеров, у которых есть эти скиллы (categoryId)
+      // Поиск подходящих мастеров
       const matchingWorkers = await tx.profile.findMany({
         where: {
-          skills: {
-            some: { categoryId: { in: categoryIds } },
-          },
-          userId: { not: userId }, // Не уведомляем автора заказа
+          skills: { some: { categoryId: { in: categoryIds } } },
+          userId: { not: userId },
         },
         select: { userId: true },
       });
 
-      // Создаем уведомления в БД для ленты уведомлений
+      // Создание системных уведомлений
       if (matchingWorkers.length > 0) {
         await tx.notification.createMany({
           data: matchingWorkers.map((worker) => ({
@@ -96,32 +94,14 @@ export async function createOrder(values: CreateOrderValues) {
             title: `ZWORK: ${newOrder.title}`,
             message: `Новый заказ в вашей нише!`,
             type: "NEW_ORDER",
-            link: `/pro/orders/${newOrder.id}`,
+            link: `/order/${newOrder.id}`, // Исправили ссылку на /order/
           })),
         });
       }
 
-      return { newOrder, workerIds: matchingWorkers.map(w => w.userId) };
+      return { newOrder };
     });
 
-    /*   // 5. REAL-TIME: Пушим заказ в живую ленту через Pusher
-       // Мастера на странице /pro/orders мгновенно увидят карточку
-       try {
-         await pusherServer.trigger("orders-feed", "new-order", {
-           order: {
-             ...result.newOrder,
-             // Форматируем для соответствия типу FeedOrder на фронте
-             offersCount: 0,
-             clientStats: { projects: 1, hireRate: 0 } 
-           },
-           lat: validated.lat,
-           lng: validated.lng
-         });
-       } catch (pusherError) {
-         console.error("PUSHER_TRIGGER_ERROR:", pusherError);
-         // Не кидаем ошибку здесь, чтобы заказ все равно считался созданным
-       }
-   */
     return { id: result.newOrder.id };
   });
 }

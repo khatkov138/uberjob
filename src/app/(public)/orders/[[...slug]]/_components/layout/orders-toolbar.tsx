@@ -9,12 +9,17 @@ interface OrdersToolbarProps {
   viewMode: "list" | "map"
   setViewMode: (mode: "list" | "map") => void
   city: string
+  serverRadius: number // Переименуем для ясности
 }
 
-export function OrdersToolbar({ viewMode, setViewMode, city }: OrdersToolbarProps) {
+export function OrdersToolbar({ viewMode, setViewMode, city, serverRadius }: OrdersToolbarProps) {
   // Используем setState для открытия модалки, раз в деструктуризации только isModalOpen
-  const { radius, setRadius } = useLocationStore()
+  const { radius: storeRadius, setRadius, _hasHydrated } = useLocationStore()
   const radiusOptions = [10, 30, 50, 100]
+
+  // ПРИОРИТЕТ: Пока стор не проснулся — верим серверу. 
+  // Как только проснулся — верим стору.
+  const activeRadius = _hasHydrated ? storeRadius : serverRadius
 
   const handleOpenLocation = () => {
     useLocationStore.setState({ isModalOpen: true })
@@ -54,7 +59,7 @@ export function OrdersToolbar({ viewMode, setViewMode, city }: OrdersToolbarProp
       {/* 2. ГЕО-НАСТРОЙКИ (Город и Радиус) */}
       <div className="flex items-center gap-3 pr-2">
         {/* КНОПКА ГОРОДА: Теперь рабочая */}
-        <button 
+        <button
           onClick={handleOpenLocation}
           className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors group"
         >
@@ -71,10 +76,11 @@ export function OrdersToolbar({ viewMode, setViewMode, city }: OrdersToolbarProp
           {radiusOptions.map((r) => (
             <button
               key={r}
-              onClick={() => setRadius(r)}
+              onClick={() => setRadius(r)} // Клик по-прежнему меняет стор
               className={cn(
                 "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all",
-                radius === r
+                // Используем вычисленный activeRadius для подсветки
+                activeRadius === r
                   ? "bg-white text-blue-600 shadow-sm border border-slate-100"
                   : "text-slate-400 hover:text-slate-600"
               )}

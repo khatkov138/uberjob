@@ -3,10 +3,12 @@
 import * as React from "react"
 import { Input } from "@/components/ui/input"
 import { MapPin, Loader2, X } from "lucide-react"
-import { cn, handleApi } from "@/lib/utils" // Используем твой хелпер handleApi
+import { cn, handleAction, handleApi } from "@/lib/utils" // Используем твой хелпер handleApi
+import { getOrCreateLocation } from "@/actions/location/manage"
+import { toast } from "sonner"
 
 interface AddressInputProps {
-  onSelect: (data: { address: string; lat: number; lng: number }) => void
+  onSelect: (data: { address: string; lat: number; lng: number; uri: string }) => void // Добавили uri
   onChange?: (val: string) => void
   defaultValue?: string
   placeholder?: string
@@ -71,18 +73,22 @@ export function AddressInput({ onSelect, onChange, defaultValue = "", placeholde
     setIsLoading(true)
 
     try {
-      // handleApi вытащит координаты { lat, lng } из json.data
-      const coords = await handleApi<{ lat: number; lng: number }>(
-        fetch("/api/geo/geocode?uri=" + encodeURIComponent(item.uri))
+      // 2. ВМЕСТО FETCH ВЫЗЫВАЕМ ЭКШЕН
+      // handleAction обработает ActionResponse и вернет чистые данные
+      const locationData = await handleAction(
+        getOrCreateLocation(item.uri, cityName)
       )
 
+      // 3. Теперь у нас есть и координаты, и слаг, и всё остальное из нашей БД
       onSelect({
         address: fullDisplay,
-        lat: coords.lat,
-        lng: coords.lng
+        lat: locationData.lat,
+        lng: locationData.lng,
+        uri: item.uri // пробрасываем URI дальше в форму
       })
     } catch (err) {
-      console.error("ZWORK_GEOCODE_ERROR:", err)
+      console.error("ZWORK_GEO_ERROR:", err)
+      toast.error("Не удалось определить координаты")
     } finally {
       setIsLoading(false)
     }
@@ -93,9 +99,9 @@ export function AddressInput({ onSelect, onChange, defaultValue = "", placeholde
     setSuggestions([])
     setIsOpen(false)
     if (onChange) onChange("")
-    onSelect({ address: "", lat: 0, lng: 0 })
+    // 3. Сбрасываем и тут тоже
+    onSelect({ address: "", lat: 0, lng: 0, uri: "" })
   }
-
   return (
     <div className="relative w-full" ref={containerRef}>
       <div className="relative group">

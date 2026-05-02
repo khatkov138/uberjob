@@ -25,18 +25,47 @@ import { FetchingRadar } from "./_components/shared/fetching-radar"
 import { LoadingState } from "./_components/shared/loading-state"
 import { CategorySearchModal } from "./_components/shared/category-search-modal"
 import { LocationModal } from "./_components/shared/location-modal"
+import { Session } from "@/lib/auth"
+import { DBCategory } from "@/actions/category/get"
+
+interface OrdersPageClientProps {
+  session: Session | null
+  initialOrders: FeedOrder[]
+  initialProfile: FullProfile | null
+  serverLocation: {
+    city: string
+    lat: number
+    lng: number
+    radius: number,
+    slug: string
+  }
+}
 
 export default function OrdersPageClient({
   session,
   initialOrders,
   initialProfile,
   serverLocation
-}: any) {
+}: OrdersPageClientProps) {
   const queryClient = useQueryClient()
+
+  // Явно указываем тип для режима отображения
   const [viewMode, setViewMode] = React.useState<"list" | "map">("list")
   const [isCatModalOpen, setIsCatModalOpen] = React.useState(false)
 
-  const { lat, lng, radius, city, _hasHydrated } = useLocationStore()
+  const { lat, lng, radius, city, _hasHydrated, setLocation, } = useLocationStore()
+
+  React.useEffect(() => {
+    if (_hasHydrated && serverLocation.city !== city) {
+      // serverLocation.slug ОБЯЗАТЕЛЬНО должен тут быть
+      setLocation(
+        serverLocation.city,
+        serverLocation.lat,
+        serverLocation.lng,
+        serverLocation.slug
+      );
+    }
+  }, [_hasHydrated, serverLocation, city, setLocation]);
 
   // --- ГЕО ПАРАМЕТРЫ ---
   const currentLat = roundCoord(_hasHydrated ? lat : serverLocation.lat)
@@ -48,9 +77,10 @@ export default function OrdersPageClient({
     currentRadius === serverLocation.radius
 
   // --- QUERIES ---
-  const { data: orders = [], isFetching: isOrdersFetching, isPending: isInitialLoading } = useQuery({
+  // Типизируем useQuery как массив FeedOrder
+  const { data: orders = [], isFetching: isOrdersFetching, isPending: isInitialLoading } = useQuery<FeedOrder[]>({
     queryKey: ["orders", currentLat, currentLng, currentRadius, session?.user?.id],
-    queryFn: () => handleAction(getOrders({ lat: currentLat, lng: currentLng, radius: currentRadius })),
+    queryFn: async () => handleAction(getOrders({ lat: currentLat, lng: currentLng, radius: currentRadius })),
     initialData: isServerKey ? initialOrders : undefined,
     placeholderData: keepPreviousData,
   })
@@ -64,37 +94,68 @@ export default function OrdersPageClient({
     enabled: !!session?.user?.id
   })
 
+
   // --- MUTATIONS ---
+  // Типизируем входные параметры мутации
   const { mutate: handleToggleSkill } = useMutation({
     mutationFn: async ({ id, action }: { id: string, action: 'add' | 'remove' }) => {
       return action === 'add' ? handleAction(addSkill(id)) : handleAction(removeSkill(id))
     },
+
     onMutate: async ({ id, action }) => {
       await queryClient.cancelQueries({ queryKey: profileKey })
-      const prev = queryClient.getQueryData<FullProfile>(profileKey)
-      if (prev) {
+      const previousProfile = queryClient.getQueryData<FullProfile>(profileKey)
+
+      if (previousProfile) {
+        // 1. Ищем категорию в кеше всех категорий (массив DBCategory)
+        const allCategories = queryClient.getQueryData<DBCategory[]>(['all-categories'])
+        const categoryName = allCategories?.find(cat => cat.id === id)?.name ?? '...'
+
+        // 2. Формируем новый скилл строго по твоей структуре
+        const newSkill = {
+          profileId: previousProfile.id, // profileId берем из текущего профиля
+          categoryId: id,
+          category: {
+            id: id,
+            name: categoryName
+          }
+        }
+
+        // 3. Обновляем кеш
         queryClient.setQueryData<FullProfile>(profileKey, {
-          ...prev,
+          ...previousProfile,
           skills: action === 'add'
-            ? [...prev.skills, { categoryId: id, category: { name: '...' } } as any]
-            : prev.skills.filter((s: any) => s.categoryId !== id)
+            ? [...previousProfile.skills, newSkill]
+            : previousProfile.skills.filter((s) => s.categoryId !== id)
         })
       }
-      return { prev }
+
+      return { previousProfile }
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: profileKey })
+
+    onError: (err, variables, context) => {
+      if (context?.previousProfile) {
+        queryClient.setQueryData(profileKey, context.previousProfile)
+      }
+    },
+    // onSuccess пустой, чтобы не было лишних GET-запросов (инвалидации)
   })
 
-  const mySkillIds = React.useMemo(() => new Set(profile?.skills.map((s: any) => s.categoryId) || []), [profile])
+  // Теперь stats типизированы автоматически через вывод типов
+  const mySkillIds = React.useMemo(() =>
+    new Set(profile?.skills.map((s) => s.categoryId) || []),
+    [profile]
+  )
 
   const stats = React.useMemo(() => {
     const activeOrders = _hasHydrated ? orders : initialOrders
     return {
       total: activeOrders.length,
-      matched: activeOrders.filter((o: any) => o.categories.some((c: any) => mySkillIds.has(c.categoryId))).length
+      matched: activeOrders.filter((o) =>
+        o.categories.some((c) => mySkillIds.has(c.categoryId))
+      ).length
     }
   }, [orders, initialOrders, mySkillIds, _hasHydrated])
-
   if (isInitialLoading && !initialOrders.length) return <LoadingState />
 
   return (
@@ -118,6 +179,9 @@ export default function OrdersPageClient({
             onAddClick={() => setIsCatModalOpen(true)}
             onRemoveSkill={(id) => handleToggleSkill({ id, action: 'remove' })}
             isFetching={isOrdersFetching}
+            // Передаем данные для Пульса
+            citySlug={serverLocation.slug}
+            cityName={serverLocation.city}
           />
         </aside>
 
@@ -128,7 +192,7 @@ export default function OrdersPageClient({
           <div className="px-2 pt-4 space-y-4 transition-all">
             <div className="flex items-baseline gap-4 flex-wrap">
               <h2 className="text-5xl font-black italic uppercase tracking-tighter text-slate-900 leading-none">
-                Заказы <span className="text-blue-600 ml-2 whitespace-nowrap">в г. {city || serverLocation.city}</span>
+                Заказы <span className="text-blue-600 ml-2 whitespace-nowrap">в {serverLocation.city}</span>
               </h2>
               <div className="flex items-center gap-3">
                 <span className="text-5xl font-black italic text-slate-100">/</span>
@@ -158,7 +222,8 @@ export default function OrdersPageClient({
             <OrdersToolbar
               viewMode={viewMode}
               setViewMode={setViewMode}
-              city={_hasHydrated ? city : serverLocation.city}
+              city={serverLocation.city}
+              serverRadius={serverLocation.radius}
             />
           </div>
 

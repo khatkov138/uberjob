@@ -4,6 +4,11 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "./get-session";
 import { headers } from "next/headers";
 import { auth } from "./auth";
+import { cookies } from "next/headers"
+import { DEFAULT_LOCATION, roundCoord } from "@/lib/location-config"
+import { cache } from "react";
+
+
 
 export type ActionResponse<T> =
 
@@ -67,3 +72,31 @@ export async function withApiAuth<T>(fn: (userId: string) => Promise<T>) {
 
     return createApiResponse(() => fn(userId));
 }
+
+
+
+
+export const getServerLocation = cache(async () => {
+    const cookieStore = await cookies()
+    const locationRaw = cookieStore.get("user-location-storage")?.value
+
+    // Если кук нет, сразу возвращаем дефолт из твоего конфига
+    if (!locationRaw) return { ...DEFAULT_LOCATION }
+
+    try {
+        const parsed = JSON.parse(decodeURIComponent(locationRaw))
+        if (parsed?.state) {
+            return {
+                city: parsed.state.city ?? DEFAULT_LOCATION.city,
+                slug: parsed.state.slug ?? DEFAULT_LOCATION.slug, // Добавь эту строку
+                lat: roundCoord(parsed.state.lat ?? DEFAULT_LOCATION.lat),
+                lng: roundCoord(parsed.state.lng ?? DEFAULT_LOCATION.lng),
+                radius: Number(parsed.state.radius ?? DEFAULT_LOCATION.radius)
+            }
+        }
+    } catch (e) {
+        console.error("Ошибка парсинга кук локации", e)
+    }
+
+    return { ...DEFAULT_LOCATION }
+})

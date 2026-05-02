@@ -20,7 +20,12 @@ async function getFullProfileQuery(userId: string) {
       // Тянем категории (скиллы) с их названиями
       skills: {
         include: {
-          category: true
+          category: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
         }
       }
     }

@@ -94,4 +94,23 @@ export const getContextKey = (orderId?: string | null, userId1?: string, userId2
 export const getMessagesQueryKey = (contextKey: string) => ["messages", contextKey];
 
 
+export function slugify(text: string) {
+  const charMap: { [key: string]: string } = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh',
+    'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
+    'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'ts',
+    'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ы': 'y', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+  };
+
+  return text
+    .toLowerCase()
+    .split('')
+    .map(char => charMap[char] || char)
+    .join('')
+    .replace(/[^a-z0-9]/g, '-') // заменяем всё лишнее на дефисы
+    .replace(/-+/g, '-')        // убираем дубли дефисов
+    .replace(/^-|-$/g, '');     // обрезаем по краям
+}
+
+
 

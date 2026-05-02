@@ -7,13 +7,14 @@ import { DEFAULT_LOCATION, roundCoord } from '@/lib/location-config'
 
 interface LocationState {
   city: string
+  slug: string // Добавили слаг
   lat: number
   lng: number
   radius: number
   isModalOpen: boolean
-  // Флаг готовности данных из кук
   _hasHydrated: boolean 
-  setLocation: (city: string, lat: number, lng: number) => void
+  // Обновили сигнатуру: теперь принимает 4 аргумента
+  setLocation: (city: string, lat: number, lng: number, slug: string) => void
   setRadius: (radius: number) => void
   openModal: () => void
   closeModal: () => void
@@ -30,11 +31,13 @@ export const useLocationStore = create<LocationState>()(
   persist(
     (set) => ({
       ...DEFAULT_LOCATION,
+      // В DEFAULT_LOCATION тоже должен быть slug (например, 'angarsk')
       isModalOpen: false,
-      _hasHydrated: false, // Изначально false
+      _hasHydrated: false,
 
-      setLocation: (city, lat, lng) => set({ 
+      setLocation: (city, lat, lng, slug) => set({ 
         city, 
+        slug, // Сохраняем слаг в стор и куки
         lat: roundCoord(lat), 
         lng: roundCoord(lng) 
       }),
@@ -46,12 +49,12 @@ export const useLocationStore = create<LocationState>()(
     {
       name: 'user-location-storage',
       storage: createJSONStorage(() => cookieStorage),
-      // Эта функция сработает, когда Zustand вычитает данные из кук
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true)
       },
       partialize: (state) => ({
         city: state.city,
+        slug: state.slug, // Обязательно сохраняем слаг в куки
         lat: state.lat,
         lng: state.lng,
         radius: state.radius,

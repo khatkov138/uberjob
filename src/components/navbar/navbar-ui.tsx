@@ -14,6 +14,7 @@ import { NotificationsBell } from "./notifications-bell"
 import { UnreadBadge } from "./unread-badge"
 import { useNotifications } from "@/hooks/use-notifications"
 import { User } from "@/lib/auth"
+import { useLocationStore } from "@/store/use-location-store"
 
 interface NavbarUIProps {
     // Используем встроенный тип Better-Auth для пользователя
@@ -23,6 +24,17 @@ interface NavbarUIProps {
 export function NavbarUI({ user }: NavbarUIProps) {
     const { mode } = useRoleModeStore()
     const pathname = usePathname()
+
+    const { slug, _hasHydrated } = useLocationStore()
+    const [navHref, setNavHref] = React.useState("/orders")
+
+    // Как только стор "ожил" и мы узнали слаг, меняем ссылку
+    React.useEffect(() => {
+        if (_hasHydrated && slug) {
+            setNavHref(`/orders/${slug}`)
+        }
+    }, [_hasHydrated, slug])
+
 
     const [mounted, setMounted] = React.useState(false)
     React.useEffect(() => setMounted(true), [])
@@ -83,12 +95,13 @@ export function NavbarUI({ user }: NavbarUIProps) {
                                 </Link>
                             ) : (
                                 <Link
-                                    href="/pro/orders"
+                                    href={navHref} // <-- Динамическая ссылка
                                     className="w-full h-12 flex items-center justify-center gap-3 bg-slate-900 hover:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] transition-all shadow-xl shadow-slate-200 active:scale-95"
                                 >
                                     <Search size={18} className="stroke-[3px]" />
                                     <span>Поиск заказов</span>
                                 </Link>
+
                             )}
                         </div>
                     )}

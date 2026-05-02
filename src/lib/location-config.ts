@@ -2,11 +2,11 @@
 
 export const DEFAULT_LOCATION = {
   city: "Иркутск",
+  slug: "irkutsk", // Добавляем слаг для дефолтной навигации
   lat: 52.2895,
   lng: 104.2806,
   radius: 50
 }
-
 // Функция для нормализации координат (4 знака = точность ~11 метров)
 export const roundCoord = (n: number | string | undefined | null): number => {
   const num = parseFloat(String(n))

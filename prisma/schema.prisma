@@ -97,7 +97,8 @@ model Order {
   description String
   categories  OrderCategory[] // Явная связь
   price       Int // Бюджет в копейках
-  address     String
+  locationId  String?
+  location    Location?       @relation(fields: [locationId], references: [id])
 
   lat Float
   lng Float
@@ -285,6 +286,21 @@ model Message {
 
   @@index([senderId, recipientId])
   @@map("message")
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  slug      String   @unique // 'irkutsk' - для URL
+  name      String // 'Иркутск' - для UI
+  yandexUri String   @unique // Тот самый URI от Яндекса
+  lat       Float
+  lng       Float
+  createdAt DateTime @default(now())
+
+  orders Order[]
+
+  @@index([slug])
+  @@map("location")
 }
 
 // --- ENUMS ---

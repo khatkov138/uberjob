@@ -5,8 +5,10 @@ import { useLocationStore } from "@/store/use-location-store"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Search, MapPin, Loader2, Target } from "lucide-react"
-import { handleApi } from "@/lib/utils"
+import { handleAction, handleApi } from "@/lib/utils"
 import { toast } from "sonner"
+import { getOrCreateLocation } from "@/actions/location/manage"
+import { useRouter } from "next/navigation"
 
 // --- ТИПИЗАЦИЯ ЯНДЕКС API ---
 
@@ -25,8 +27,9 @@ interface GeocodeResponse {
 // ----------------------------
 
 export function LocationModal() {
-  const { isModalOpen, closeModal, setLocation, city: currentCity } = useLocationStore()
 
+  const router = useRouter()
+  const { isModalOpen, closeModal, setLocation, city: currentCity } = useLocationStore()
   const [query, setQuery] = React.useState("")
   const [suggestions, setSuggestions] = React.useState<YandexSuggestItem[]>([]) // Без any
   const [isLoading, setIsLoading] = React.useState(false)
@@ -55,27 +58,31 @@ export function LocationModal() {
     }
   }
 
-  const handleSelect = async (item: YandexSuggestItem) => { // Типизированный параметр
+  const handleSelect = async (item: YandexSuggestItem) => {
     setIsLoading(true)
     try {
-      const coords = await handleApi<GeocodeResponse>(
-        fetch(`/api/geo/geocode?uri=${encodeURIComponent(item.uri)}`)
+      // handleAction — твой хелпер для обработки ActionResponse
+      const location = await handleAction(
+        getOrCreateLocation(item.uri, item.title.text)
       )
 
-      setLocation(item.title.text, coords.lat, coords.lng)
+      // Обновляем клиентский Zustand стор
+      setLocation(location.name, location.lat, location.lng, location.slug)
+
+      // Делаем красивый редирект на SEO-роут
+      router.push(`/orders/${location.slug}`)
 
       setQuery("")
       setSuggestions([])
       closeModal()
-
-      toast.success(`Локация: ${item.title.text}`)
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Ошибка координат"
-      toast.error(message)
+      toast.success(`Локация: ${location.name}`)
+    } catch (err: any) {
+      toast.error(err.message || "Ошибка калибровки")
     } finally {
       setIsLoading(false)
     }
   }
+
 
   return (
     <Dialog open={isModalOpen} onOpenChange={(open) => !open && closeModal()}>
