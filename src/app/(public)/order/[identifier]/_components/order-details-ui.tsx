@@ -7,7 +7,7 @@ import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
 import { cn, handleAction } from "@/lib/utils"
-import { getOrderById, type OrderByIdResponse } from "@/actions/order/get"
+import { getOrderByIdOrSlug, type OrderByIdResponse } from "@/actions/order/get"
 import { OffersList } from "./offers-list"
 import { OfferForm } from "./offer-form"
 
@@ -25,7 +25,7 @@ export function OrderDetailsUI({ orderId, initialData, context }: OrderDetailsUI
   // Подключаем TanStack Query: берем initialData с сервера и вешаем на ключ
   const { data } = useQuery({
     queryKey: ["order-details", orderId],
-    queryFn: async () => await handleAction(getOrderById(orderId)),
+    queryFn: async () => await handleAction(getOrderByIdOrSlug(orderId)),
     initialData, // Гидратация: юзер видит данные сразу, без лоадера
     staleTime: 1000 * 60 * 5, // 5 минут считаем данные свежими
   })
@@ -102,7 +102,7 @@ export function OrderDetailsUI({ orderId, initialData, context }: OrderDetailsUI
               </div>
               <div className="flex items-center gap-3">
                 <MapPin className="w-5 h-5 text-blue-600" />
-                <p className="text-[11px] font-black text-slate-900 uppercase italic tracking-tight">{order.address}</p>
+                <p className="text-[11px] font-black text-slate-900 uppercase italic tracking-tight">adress</p>
               </div>
             </div>
           </div>

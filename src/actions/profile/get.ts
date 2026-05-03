@@ -23,7 +23,8 @@ async function getFullProfileQuery(userId: string) {
           category: {
             select: {
               id: true,
-              name: true
+              name: true,
+              slug: true // ОБЯЗАТЕЛЬНО: добавляем для SEO и роутинга
             }
           }
         }

@@ -14,16 +14,14 @@ interface OrdersToolbarProps {
 
 export function OrdersToolbar({ viewMode, setViewMode, city, serverRadius }: OrdersToolbarProps) {
   // Используем setState для открытия модалки, раз в деструктуризации только isModalOpen
-  const { radius: storeRadius, setRadius, _hasHydrated } = useLocationStore()
+  const { radius: storeRadius, setRadius, _hasHydrated, openModal } = useLocationStore()
   const radiusOptions = [10, 30, 50, 100]
 
   // ПРИОРИТЕТ: Пока стор не проснулся — верим серверу. 
   // Как только проснулся — верим стору.
   const activeRadius = _hasHydrated ? storeRadius : serverRadius
 
-  const handleOpenLocation = () => {
-    useLocationStore.setState({ isModalOpen: true })
-  }
+
 
   return (
     <div className="bg-white border border-slate-100 p-2 rounded-[2rem] shadow-sm flex items-center justify-between">
@@ -60,7 +58,7 @@ export function OrdersToolbar({ viewMode, setViewMode, city, serverRadius }: Ord
       <div className="flex items-center gap-3 pr-2">
         {/* КНОПКА ГОРОДА: Теперь рабочая */}
         <button
-          onClick={handleOpenLocation}
+          onClick={openModal}
           className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors group"
         >
           <MapPin size={14} className="text-blue-600 group-hover:scale-110 transition-transform" />

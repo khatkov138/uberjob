@@ -1,14 +1,14 @@
 import { notFound } from "next/navigation"
-import { getOrderById } from "@/actions/order/get"
+import { getOrderByIdOrSlug } from "@/actions/order/get"
 import { OrderDetailsUI } from "./_components/order-details-ui"
 import { Container } from "@/components/shared/container"
 import { unwrap } from "@/lib/utils"
 import { getServerSession } from "@/lib/get-session"
 
 // Добавим SEO, раз у нас проект про заказы
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params
-    const data = unwrap(await getOrderById(id), null)
+export async function generateMetadata({ params }: { params: Promise<{ identifier: string }> }) {
+    const { identifier } = await params
+    const data = unwrap(await getOrderByIdOrSlug(identifier), null)
     if (!data) return { title: "Заказ не найден" }
 
     return {
@@ -17,20 +17,23 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     }
 }
 
-export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params
+export default async function OrderPage({ params }: { params: Promise<{ identifier: string }> }) {
+    const { identifier } = await params
     const session = await getServerSession()
-    const data = unwrap(await getOrderById(id), null)
+
+    // 1. На сервере ищем по тому, что пришло в URL (id или slug)
+    const data = unwrap(await getOrderByIdOrSlug(identifier), null)
 
     if (!data) return notFound()
 
     const userId = session?.user?.id || null
 
     return (
-        /* Убрал bg-white, чтобы оставить системный фон контейнера */
-        <Container className="max-w-7xl">
+        <Container className="max-w-7xl py-10">
             <OrderDetailsUI
-                orderId={id}
+                // ВАЖНО: передаем в UI реальный UUID из базы, 
+                // чтобы useQuery зацепился за стабильный ключ
+                orderId={data.order.id}
                 initialData={data}
                 context={{
                     userId,

@@ -56,20 +56,24 @@ model User {
 model Profile {
   id     String @id @default(cuid())
   userId String @unique
-  // Связь теперь общая, без привязки только к "Worker"
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // --- ГЕЙМИФИКАЦИЯ И УРОВНИ ---
+  level          Int @default(1) // Текущий уровень (1-80)
+  exp            Int @default(0) // Текущий опыт (XP)
+  weeklyBidsLeft Int @default(10) // Оставшиеся отклики на этой неделе
+  maxWeeklyBids  Int @default(10) // Доступный лимит (растет с уровнем)
+
   // --- ОБЩИЕ ДАННЫЕ (Личность) ---
-  phone     String? // Телефон для связи по заказам
-  city      String? // Город проживания
-  avatarUrl String? // Ссылка на фото (если не из соцсетей)
-  bio       String? // Кратко о себе / Опыт работы
+  phone     String?
+  city      String?
+  avatarUrl String?
+  bio       String?
 
   // --- ПРОФЕССИОНАЛЬНЫЕ ДАННЫЕ (PRO) ---
-  skills ProfileCategory[] // Явная связь 
-  rating Float             @default(5.0)
-
-  completedCount Int @default(0) // Сколько заказов реально завершено
+  skills         ProfileCategory[]
+  rating         Float             @default(5.0)
+  completedCount Int               @default(0)
 
   // --- ГЕОПОЗИЦИЯ (Uber-механика) ---
   lastLat  Float?
@@ -87,12 +91,12 @@ model Profile {
 // --- СИСТЕМА ЗАКАЗОВ ---
 
 model Order {
-  id        String      @id @default(cuid())
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  status    OrderStatus @default(PENDING)
-  dateType  DateType    @default(ASAP)
-
+  id          String          @id @default(cuid())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  status      OrderStatus     @default(PENDING)
+  dateType    DateType        @default(ASAP)
+  slug        String          @unique // Добавляем уникальный слаг
   title       String
   description String
   categories  OrderCategory[] // Явная связь
@@ -116,18 +120,21 @@ model Order {
   messages     Message[]
   transactions Transaction[]
 
+  @@index([slug]) // Индекс для моментального поиска
   @@map("order")
 }
 
 model Category {
   id        String            @id @default(cuid())
-  name      String            @unique
-  keywords  String[] // Для умного поиска и пре-фильтрации ИИ
+  name      String
+  slug      String            @unique // Добавляем обязательный уникальный слаг
+  keywords  String[]
   orders    OrderCategory[]
   profiles  ProfileCategory[]
   createdAt DateTime          @default(now())
 
-  @@index([keywords]) // Ускоряет поиск, когда категорий станет много
+  @@index([slug]) // Индекс для быстрого поиска в роутах
+  @@index([keywords])
   @@map("category")
 }
 
