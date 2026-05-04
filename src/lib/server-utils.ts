@@ -80,23 +80,31 @@ export const getServerLocation = cache(async () => {
     const cookieStore = await cookies()
     const locationRaw = cookieStore.get("user-location-storage")?.value
 
-    // Если кук нет, сразу возвращаем дефолт из твоего конфига
+    // 1. Если кук нет — отдаем дефолт
     if (!locationRaw) return { ...DEFAULT_LOCATION }
 
     try {
+        // 2. Декодируем и парсим JSON из Zustand persist
         const parsed = JSON.parse(decodeURIComponent(locationRaw))
-        if (parsed?.state) {
+        const state = parsed?.state
+
+        if (state) {
             return {
-                city: parsed.state.city ?? DEFAULT_LOCATION.city,
-                slug: parsed.state.slug ?? DEFAULT_LOCATION.slug, // Добавь эту строку
-                lat: roundCoord(parsed.state.lat ?? DEFAULT_LOCATION.lat),
-                lng: roundCoord(parsed.state.lng ?? DEFAULT_LOCATION.lng),
-                radius: Number(parsed.state.radius ?? DEFAULT_LOCATION.radius)
+                city: state.city ?? DEFAULT_LOCATION.city,
+                slug: state.slug ?? DEFAULT_LOCATION.slug,
+                lat: roundCoord(state.lat ?? DEFAULT_LOCATION.lat),
+                lng: roundCoord(state.lng ?? DEFAULT_LOCATION.lng),
+                radius: Number(state.radius ?? DEFAULT_LOCATION.radius),
+                yandexUri: state.yandexUri ?? DEFAULT_LOCATION.yandexUri
             }
         }
     } catch (e) {
-        console.error("Ошибка парсинга кук локации", e)
+        console.error("ZWORK_SERVER_LOCATION_ERROR:", e)
     }
 
+    // 3. Фолбэк на дефолт при ошибке парсинга
     return { ...DEFAULT_LOCATION }
 })
+
+export type ServerLocation = Awaited<ReturnType<typeof getServerLocation>>;
+

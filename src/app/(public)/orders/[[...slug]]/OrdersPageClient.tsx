@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import { toast } from "sonner"
 
@@ -20,19 +20,14 @@ import { MapViewport } from "./_components/map/map-viewport"
 import { LocationModal } from "./_components/shared/location-modal"
 import { CategorySearchModal } from "./_components/shared/category-search-modal"
 import { OrdersToolbar } from "./_components/layout/orders-toolbar"
+import { useLocationStore } from "@/store/use-location-store"
+import { type ServerLocation } from "@/lib/server-utils"
 
 interface OrdersPageClientProps {
   session: Session | null
   initialOrders: FeedOrder[]
   initialProfile: FullProfile | null
-  serverLocation: {
-    city: string
-    lat: number
-    lng: number
-    radius: number
-    slug: string
-    categoryId?: string
-  }
+  serverLocation: ServerLocation
   popularCategories: PopularCategoryResult[]
   currentCategory: DBCategory | null
 }
@@ -45,6 +40,7 @@ export default function OrdersPageClient({
   popularCategories,
   currentCategory
 }: OrdersPageClientProps) {
+
   const queryClient = useQueryClient()
   const userId = session?.user?.id
   const queryKey = ["user-profile", userId]
@@ -60,11 +56,35 @@ export default function OrdersPageClient({
     enabled: !!userId,
   })
 
+  const { radius: storeRadius, _hasHydrated, slug: storeSlug, setLocation } = useLocationStore()
+
+  const activeFilters = useMemo(() => ({
+    ...serverLocation,
+    // Если стор еще не ожил, берем серверный радиус, чтобы ключ совпал с SSR
+    radius: _hasHydrated ? storeRadius : serverLocation.radius
+  }), [serverLocation, storeRadius, _hasHydrated])
+
   // --- ДАННЫЕ ЛЕНТЫ ---
-  const { data: orders = [], isFetching: isOrdersFetching } = useQuery<FeedOrder[]>({
-    queryKey: ["orders", serverLocation],
-    queryFn: async () => handleAction(getOrders(serverLocation)),
-    initialData: initialOrders,
+  const { data: orders = [], isFetching: isOrdersFetching } = useQuery({
+    queryKey: ["orders", activeFilters],
+    queryFn: async () => await handleAction(getOrders(activeFilters)),
+    // Используем placeholderData вместо initialData
+    // Это позволит сохранить список заказов на экране, пока грузятся новые
+    placeholderData: (previousData) => {
+      // Если previousData существует (мы уже что-то загружали на клиенте) — оставляем его.
+      // Если нет (это самый первый переход или сброс) — подставляем серверные initialOrders.
+      return previousData ?? initialOrders;
+    },
+    initialData: () => {
+      // Если радиус в фильтрах совпадает с тем, что пришло с сервера — отдаем готовые данные
+      // Это предотвратит запрос при первой загрузке
+      if (activeFilters.radius === serverLocation.radius) {
+        return initialOrders;
+      }
+      return undefined;
+    },
+    // Теперь можно поставить нормальный staleTime
+    staleTime: 1000 * 60 * 5,
   })
 
   // --- СПРАВОЧНИК КАТЕГОРИЙ ---
@@ -83,6 +103,19 @@ export default function OrdersPageClient({
     total: orders.length,
     matched: orders.filter(o => o.categories.some(c => mySkillIds.has(c.categoryId))).length
   }), [orders, mySkillIds])
+
+  useEffect(() => {
+    if (_hasHydrated && serverLocation.slug !== storeSlug) {
+      // Обновляем глобальный стор данными, которые пришли из URL (от сервера)
+      setLocation(
+        serverLocation.city,
+        serverLocation.lat,
+        serverLocation.lng,
+        serverLocation.slug,
+        serverLocation.yandexUri
+      )
+    }
+  }, [_hasHydrated, serverLocation, storeSlug])
 
   // --- МУТАЦИЯ С OPTIMISTIC UPDATE ---
   const { mutate: toggleSkill } = useMutation({
@@ -133,6 +166,10 @@ export default function OrdersPageClient({
   // Теперь вызовы стали совсем элементарными
   const onAdd = (id: string) => toggleSkill({ id, action: 'add' });
   const onRemove = (id: string) => toggleSkill({ id, action: 'remove' });
+
+
+  const displayRadius = _hasHydrated ? storeRadius : serverLocation.radius
+
   return (
     <Container className="bg-white max-w-7xl pt-10 pb-20">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -158,14 +195,25 @@ export default function OrdersPageClient({
           />
         </aside>
 
-        <section className="lg:col-span-9 space-y-8">
-          <div className="px-2 pt-4 space-y-4">
+        <section className="lg:col-span-9">
+          {/* ЗАГОЛОВОК И СТАТИСТИКА: Теперь с фиксированным отступом снизу, чтобы не "прилипать" к блоку */}
+          <div className="px-2 pt-4 pb-8 space-y-4">
             <div className="flex items-baseline gap-4 flex-wrap">
               <h2 className="text-5xl font-black italic uppercase tracking-tighter text-slate-900 leading-none">
                 {currentCategory ? (
-                  <>{currentCategory.name} <span className="text-blue-600 ml-2 whitespace-nowrap">в {serverLocation.city}</span></>
+                  <>
+                    {currentCategory.name}{" "}
+                    <span className="text-blue-600 ml-2 whitespace-nowrap">
+                      в {serverLocation.city}
+                    </span>
+                  </>
                 ) : (
-                  <>Заказы <span className="text-blue-600 ml-2 whitespace-nowrap">в {serverLocation.city}</span></>
+                  <>
+                    Заказы{" "}
+                    <span className="text-blue-600 ml-2 whitespace-nowrap">
+                      в {serverLocation.city}
+                    </span>
+                  </>
                 )}
               </h2>
               <div className="flex items-center gap-3">
@@ -181,32 +229,57 @@ export default function OrdersPageClient({
                 <div className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />
                 <span>всего рядом: {stats.total}</span>
               </div>
-              <span className="ml-2">{mySkillIds.size > 0 ? `Подходит вам: ${stats.matched}` : "Все категории"} • {serverLocation.radius}км</span>
+              <span className="ml-2">
+                {mySkillIds.size > 0 ? `Подходит вам: ${stats.matched}` : "Все категории"}
+                • {displayRadius}км
+              </span>
             </div>
           </div>
 
-          <div className="sticky top-6 z-30">
-            <OrdersToolbar viewMode={viewMode} setViewMode={setViewMode} city={serverLocation.city} serverRadius={serverLocation.radius} />
-          </div>
+          {/* ЕДИНЫЙ МОНОЛИТНЫЙ БЛОК: Тулбар + Контент */}
+          <div className="flex flex-col shadow-2xl shadow-slate-200/40 rounded-[3.5rem] border border-slate-100 bg-white overflow-hidden">
 
-          <div className={cn(
-            "relative min-h-[700px] rounded-[3.5rem] transition-all duration-500 overflow-hidden",
-            viewMode === "list" ? "bg-slate-50/50 shadow-none" : "bg-slate-50 border border-slate-100 shadow-2xl shadow-slate-200/40"
-          )}>
-            <FetchingRadar isVisible={isOrdersFetching} />
-            <div className={cn("h-full transition-all duration-500", isOrdersFetching && "blur-sm opacity-50")}>
-              {viewMode === "list" ? (
-                <div className="p-4 md:p-6 animate-in fade-in slide-in-from-bottom-2">
-                  <OrdersFeed orders={orders} mySkillIds={mySkillIds} isFetching={isOrdersFetching} />
-                </div>
-              ) : (
-                <div className="h-[700px] w-full rounded-[3.5rem] overflow-hidden">
-                  <MapViewport orders={orders} center={[serverLocation.lat, serverLocation.lng]} radius={serverLocation.radius} mySkillIds={mySkillIds} isFetching={isOrdersFetching} />
-                </div>
-              )}
+            {/* TOOLBAR: Убрали внешние отступы, он теперь "крышка" контента */}
+            <div className="sticky top-0 z-30 bg-white border-b border-slate-50">
+              <OrdersToolbar
+                viewMode={viewMode}
+                setViewMode={setViewMode}
+                serverCity={serverLocation.city}
+                serverRadius={serverLocation.radius}
+              // Внутри тулбара убери закругления и тени, если передаешь такой флаг
+              />
+            </div>
+
+            {/* CONTENT AREA: Склеен с тулбаром без швов */}
+            <div className={cn(
+              "relative min-h-[700px] transition-all duration-500",
+              viewMode === "list" ? "bg-white" : "bg-slate-50"
+            )}>
+              <FetchingRadar isVisible={isOrdersFetching} />
+
+              <div className={cn("h-full transition-all duration-500", isOrdersFetching && "blur-sm opacity-50")}>
+                {viewMode === "list" ? (
+                  <div className="p-4 md:p-8 animate-in fade-in slide-in-from-bottom-2">
+                    <OrdersFeed orders={orders} mySkillIds={mySkillIds} isFetching={isOrdersFetching} />
+                  </div>
+                ) : (
+                  <div className="h-[750px] w-full relative">
+                    {/* Карта теперь занимает всё пространство до краев скругленного родителя */}
+                    <MapViewport
+                      orders={orders}
+                      center={[serverLocation.lat, serverLocation.lng]}
+                      radius={serverLocation.radius}
+                      mySkillIds={mySkillIds}
+                      isFetching={isOrdersFetching}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </section>
+
+
       </div>
 
       <LocationModal />

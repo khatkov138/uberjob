@@ -13,17 +13,13 @@ export const passwordSchema = z
 export const createOrderSchema = z.object({
   description: z.string().min(10, "Опишите задачу подробнее"),
   address: z.string().min(1, "Укажите населенный пункт"),
-
-  // Новое поле для связи с нашей базой локаций
   yandexUri: z.string().min(1, "Ошибка идентификатора локации"),
-
-  lat: z.number(),
-  lng: z.number(),
+  lat: z.number().refine(n => n !== 0, "Укажите место на карте"),
+  lng: z.number().refine(n => n !== 0, "Укажите место на карте"),
+  // Просто число, без coerce. Валидация пройдет, так как в инпуте valueAsNumber
   price: z.number().min(0, "Цена не может быть отрицательной"),
   dateType: z.enum(["ASAP", "SCHEDULED"]),
 });
-
-// Экспортируем тип, который Zod вывел автоматически
 export type CreateOrderValues = z.infer<typeof createOrderSchema>;
 
 

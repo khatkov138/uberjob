@@ -7,14 +7,15 @@ import { DEFAULT_LOCATION, roundCoord } from '@/lib/location-config'
 
 interface LocationState {
   city: string
-  slug: string // Добавили слаг
+  slug: string
   lat: number
   lng: number
+  yandexUri: string // <--- Добавили "паспорт" локации
   radius: number
   isModalOpen: boolean
-  _hasHydrated: boolean 
-  // Обновили сигнатуру: теперь принимает 4 аргумента
-  setLocation: (city: string, lat: number, lng: number, slug: string) => void
+  _hasHydrated: boolean
+  // Теперь принимает 5 аргументов для полной синхронизации
+  setLocation: (city: string, lat: number, lng: number, slug: string, yandexUri: string) => void
   setRadius: (radius: number) => void
   openModal: () => void
   closeModal: () => void
@@ -31,16 +32,18 @@ export const useLocationStore = create<LocationState>()(
   persist(
     (set) => ({
       ...DEFAULT_LOCATION,
-      // В DEFAULT_LOCATION тоже должен быть slug (например, 'angarsk')
+      yandexUri: DEFAULT_LOCATION.yandexUri, // Убедись, что в конфиге есть дефолт
       isModalOpen: false,
       _hasHydrated: false,
 
-      setLocation: (city, lat, lng, slug) => set({ 
-        city, 
-        slug, // Сохраняем слаг в стор и куки
-        lat: roundCoord(lat), 
-        lng: roundCoord(lng) 
+      setLocation: (city, lat, lng, slug, yandexUri) => set({
+        city,
+        slug,
+        lat: roundCoord(lat),
+        lng: roundCoord(lng),
+        yandexUri // Сохраняем URI
       }),
+
       setRadius: (radius) => set({ radius }),
       openModal: () => set({ isModalOpen: true }),
       closeModal: () => set({ isModalOpen: false }),
@@ -54,10 +57,11 @@ export const useLocationStore = create<LocationState>()(
       },
       partialize: (state) => ({
         city: state.city,
-        slug: state.slug, // Обязательно сохраняем слаг в куки
+        slug: state.slug,
         lat: state.lat,
         lng: state.lng,
         radius: state.radius,
+        yandexUri: state.yandexUri, // <--- Важно: сохраняем в куки для SSR
       }),
     }
   )

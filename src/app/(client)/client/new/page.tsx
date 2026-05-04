@@ -1,10 +1,15 @@
 
 import { Container } from "@/components/shared/container";
 import { CreateOrderForm } from "./create-order-form";
+import { getServerLocation } from "@/lib/server-utils";
 
-export default function NewOrderPage() {
+export default async function NewOrderPage() {
+
+  // Достаем локацию напрямую из кук на сервере
+  const serverLocation = await getServerLocation()
+
   return (
-   <Container className="bg-white h-full flex flex-col">
+    <Container className="bg-white h-full flex flex-col">
       {/* Уменьшили mb и размер для экономии места */}
       <header className="mb-6 shrink-0">
         <div className="flex items-center gap-2 mb-1">
@@ -20,7 +25,7 @@ export default function NewOrderPage() {
 
       {/* Форма теперь должна уметь тянуться */}
       <div className="flex-1 min-h-0">
-         <CreateOrderForm />
+        <CreateOrderForm initialLocation={serverLocation} />
       </div>
     </Container>
   )

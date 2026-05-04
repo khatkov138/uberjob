@@ -4,7 +4,7 @@ import { getServerSession } from "@/lib/get-session"
 import prisma from "@/lib/prisma"
 import { createAction, createAuthAction } from "@/lib/server-utils"
 import { InferActionResult } from "@/lib/types/types"
-import { delay, getDistance } from "@/lib/utils"
+
 import { Category, Location, Order, OrderStatus, Prisma } from "@prisma/client"
 
 // ЛЕНТА (Исполнитель)
@@ -27,19 +27,22 @@ export async function getOrders({
   lng,
   radius = 60,
   categoryId,
-  locationId
+  page = 0,
+  limit = 15
 }: {
   lat?: number,
   lng?: number,
   radius?: number,
   categoryId?: string,
-  locationId?: string
+  locationId?: string,
+  page?: number,
+  limit?: number
 }) {
   return createAction<FeedOrder[]>(async () => {
     const session = await getServerSession()
     const userId = session?.user?.id
 
-    // 1. Получаем скиллы для подсвечивания матчей
+    // 1. Скиллы для подсветки Match
     let skillIds: string[] = []
     if (userId) {
       const profile = await prisma.profile.findUnique({
@@ -48,35 +51,31 @@ export async function getOrders({
       })
       skillIds = profile?.skills.map(s => s.categoryId) || []
     }
-    const hasSkills = skillIds.length > 0
 
-    // 2. Формируем SQL-условие для дистанции
-    const distanceSql = (lat && lng)
-      ? Prisma.raw(`(6371 * acos(cos(radians(${lat})) * cos(radians(o.lat)) * cos(radians(o.lng) - radians(${lng})) + sin(radians(${lat})) * sin(radians(o.lat))))`)
-      : Prisma.raw(`NULL`)
+    // 2. Формула дистанции
+    const distSql = Prisma.raw(`
+      (6371 * acos(
+        cos(radians(${lat})) * cos(radians(o.lat)) * 
+        cos(radians(o.lng) - radians(${lng})) + 
+        sin(radians(${lat})) * sin(radians(o.lat))
+      ))
+    `)
 
-    // 3. Выполняем SQL запрос
-    // 1. Подготовка условий
-    const skillsList = skillIds.length > 0 ? skillIds.map(id => `'${id}'`).join(',') : "''";
-
-    // 2. Основной SQL
+    // 3. Запрос с приоритетом Даты создания
     const raw = await prisma.$queryRaw<RawOrderQueryResult[]>`
       SELECT 
         o.*,
         l.name as loc_name, 
         l.slug as loc_slug,
-        (6371 * acos(
-          cos(radians((${lat})::double precision)) * cos(radians(o.lat)) * 
-          cos(radians(o.lng) - radians((${lng})::double precision)) + 
-          sin(radians((${lat})::double precision)) * sin(radians(o.lat))
-        )) AS distance,
+        ${distSql} AS distance,
         (SELECT COUNT(*)::int FROM "order" WHERE "clientId" = o."clientId") as total_p,
         (SELECT COUNT(*)::int FROM "order" WHERE "clientId" = o."clientId" AND "status" = 'COMPLETED') as comp_p,
         (SELECT COUNT(*)::int FROM "offer" WHERE "orderId" = o.id) as off_c,
         CASE 
           WHEN EXISTS (
             SELECT 1 FROM "order_category" oc 
-            WHERE oc."orderId" = o.id AND oc."categoryId" IN (${Prisma.raw(skillsList)})
+            WHERE oc."orderId" = o.id 
+            AND oc."categoryId" = ANY(${skillIds})
           ) THEN true ELSE false 
         END as is_match
       FROM "order" o
@@ -84,18 +83,21 @@ export async function getOrders({
       ${categoryId ? Prisma.raw(`JOIN "order_category" filter_oc ON filter_oc."orderId" = o.id`) : Prisma.raw('')}
       WHERE o.status = 'PENDING'
       ${categoryId ? Prisma.raw(`AND filter_oc."categoryId" = '${categoryId}'`) : Prisma.raw('')}
-      AND (6371 * acos(
-          cos(radians((${lat})::double precision)) * cos(radians(o.lat)) * 
-          cos(radians(o.lng) - radians((${lng})::double precision)) + 
-          sin(radians((${lat})::double precision)) * sin(radians(o.lat))
-        )) <= (${radius})::double precision
-      ORDER BY is_match DESC, distance ASC, o."createdAt" DESC
+      AND ${distSql} <= ${radius}
+      
+      -- СОРТИРОВКА: Сначала матчи, потом самые новые, потом по дистанции
+      ORDER BY 
+        is_match DESC, 
+        o."createdAt" DESC, 
+        distance ASC,
+        o.id DESC
+        
+      LIMIT ${limit} OFFSET ${page * limit}
     `
-
 
     if (!raw.length) return []
 
-    // 4. Загружаем связи (категории и юзеров)
+    // 4. Загрузка связей (Categories & Clients)
     const orderIds = raw.map(o => o.id)
     const clientIds = [...new Set(raw.map(o => o.clientId))]
 
@@ -113,26 +115,23 @@ export async function getOrders({
     // 5. Маппинг в FeedOrder
     return raw.map((o): FeedOrder => {
       const client = clients.find(c => c.id === o.clientId)
-      const total = Number(o.total_p)
-      const completed = Number(o.comp_p)
 
-      // Извлекаем SQL-специфичные поля
+      // Выносим SQL-поля, чтобы они не попали в основной объект
       const {
-        loc_name, loc_slug, is_match, off_c,
-        total_p, comp_p, price, distance, ...orderData
+        loc_name, loc_slug, total_p, comp_p, off_c, is_match, distance, ...orderData
       } = o
 
       return {
         ...orderData,
-        price: Number(price),
+        price: Number(o.price),
         distance: distance !== null ? Math.round(Number(distance) * 10) / 10 : null,
         isMatch: Boolean(is_match),
         offersCount: Number(off_c),
         location: loc_name ? { name: loc_name, slug: loc_slug ?? "" } : null,
         client: client ? { name: client.name, image: client.image } : null,
         clientStats: {
-          projects: total,
-          hireRate: total > 0 ? Math.round((completed / total) * 100) : 0
+          projects: Number(total_p),
+          hireRate: Number(total_p) > 0 ? Math.round((Number(comp_p) / Number(total_p)) * 100) : 0
         },
         categories: categories
           .filter(cat => cat.orderId === o.id)

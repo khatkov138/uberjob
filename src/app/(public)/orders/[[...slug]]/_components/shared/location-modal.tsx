@@ -67,7 +67,7 @@ export function LocationModal() {
       )
 
       // Обновляем клиентский Zustand стор
-      setLocation(location.name, location.lat, location.lng, location.slug)
+      setLocation(location.name, location.lat, location.lng, location.slug, "yandexuri")
 
       // Делаем красивый редирект на SEO-роут
       router.push(`/orders/${location.slug}`)

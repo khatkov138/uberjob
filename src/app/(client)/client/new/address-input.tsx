@@ -1,156 +1,112 @@
+// @/components/orders/address-input.tsx
 "use client"
 
 import * as React from "react"
+import { Search, MapPin, Loader2, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { MapPin, Loader2, X } from "lucide-react"
-import { cn, handleAction, handleApi } from "@/lib/utils" // Используем твой хелпер handleApi
-import { getOrCreateLocation } from "@/actions/location/manage"
-import { toast } from "sonner"
+import { handleApi } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 
 interface AddressInputProps {
-  onSelect: (data: { address: string; lat: number; lng: number; uri: string }) => void // Добавили uri
-  onChange?: (val: string) => void
-  defaultValue?: string
-  placeholder?: string
+    defaultValue?: string
+    // Теперь передаем весь объект suggestion, чтобы модалка сама решала, что с ним делать
+    onSelect: (item: any) => void
+    placeholder?: string
 }
 
-export function AddressInput({ onSelect, onChange, defaultValue = "", placeholder }: AddressInputProps) {
-  const [query, setQuery] = React.useState(defaultValue)
-  const [suggestions, setSuggestions] = React.useState<any[]>([])
-  const [isOpen, setIsOpen] = React.useState(false)
-  const [isLoading, setIsLoading] = React.useState(false)
-  const containerRef = React.useRef<HTMLDivElement>(null)
+export function AddressInput({ defaultValue, onSelect, placeholder }: AddressInputProps) {
+    const [query, setQuery] = React.useState(defaultValue || "")
+    const [suggestions, setSuggestions] = React.useState<any[]>([])
+    const [isLoading, setIsLoading] = React.useState(false)
 
-  // Синхронизация с внешним значением
-  React.useEffect(() => {
-    setQuery(defaultValue)
-  }, [defaultValue])
-
-  // Закрытие при клике вне компонента
-  React.useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-
-  const handleInputChange = async (val: string) => {
-    setQuery(val)
-    if (onChange) onChange(val)
-
-    if (val.length < 3) {
-      setSuggestions([])
-      setIsOpen(false)
-      return
+    const fetchSuggestions = async (text: string) => {
+        if (text.length < 3) {
+            setSuggestions([])
+            return
+        }
+        setIsLoading(true)
+        try {
+            const data = await handleApi<any[]>(
+                fetch(`/api/geo/suggest?text=${encodeURIComponent(text)}`)
+            )
+            setSuggestions(data)
+        } catch (err) {
+            console.error("ZWORK_SUGGEST_ERROR:", err)
+        } finally {
+            setIsLoading(false)
+        }
     }
 
-    setIsLoading(true)
-    try {
-      // handleApi сам вытащит массив из json.data
-      const data = await handleApi<any[]>(
-        fetch("/api/geo/suggest?text=" + encodeURIComponent(val))
-      )
-      setSuggestions(data)
-      setIsOpen(data.length > 0)
-    } catch (err) {
-      console.error("ZWORK_SUGGEST_ERROR:", err)
-      setSuggestions([])
-    } finally {
-      setIsLoading(false)
+    const handleItemClick = (item: any) => {
+        setQuery(item.title.text) // Сразу подставляем текст в инпут
+        setSuggestions([])         // Закрываем список
+        onSelect(item)             // Передаем item в OrderGeoModal
     }
-  }
 
-  const handleSelect = async (item: any) => {
-    const cityName = item.title.text
-    const subTitle = item.subtitle?.text || ""
-    const fullDisplay = subTitle ? `${subTitle}, ${cityName}` : cityName
+    return (
+        <div className="relative w-full">
+            <div className="relative group">
+                <Search className={cn(
+                    "absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors",
+                    isLoading ? "text-blue-500 animate-pulse" : "text-slate-400"
+                )} />
 
-    setQuery(fullDisplay)
-    setIsOpen(false)
-    setIsLoading(true)
+                <Input
+                    value={query}
+                    onChange={(e) => {
+                        setQuery(e.target.value)
+                        fetchSuggestions(e.target.value)
+                    }}
+                    placeholder={placeholder || "Введите город или точный адрес..."}
+                    className="h-16 pl-14 pr-12 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-blue-600 font-black italic text-lg uppercase tracking-tighter transition-all outline-none shadow-inner"
+                />
 
-    try {
-      // 2. ВМЕСТО FETCH ВЫЗЫВАЕМ ЭКШЕН
-      // handleAction обработает ActionResponse и вернет чистые данные
-      const locationData = await handleAction(
-        getOrCreateLocation(item.uri, cityName)
-      )
+                {query && !isLoading && (
+                    <button
+                        type="button"
+                        onClick={() => { setQuery(""); setSuggestions([]); }}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-slate-100 rounded-full transition-colors"
+                    >
+                        <X className="w-4 h-4 text-slate-400" />
+                    </button>
+                )}
 
-      // 3. Теперь у нас есть и координаты, и слаг, и всё остальное из нашей БД
-      onSelect({
-        address: fullDisplay,
-        lat: locationData.lat,
-        lng: locationData.lng,
-        uri: item.uri // пробрасываем URI дальше в форму
-      })
-    } catch (err) {
-      console.error("ZWORK_GEO_ERROR:", err)
-      toast.error("Не удалось определить координаты")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+                {isLoading && (
+                    <div className="absolute right-5 top-1/2 -translate-y-1/2">
+                        <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                    </div>
+                )}
+            </div>
 
-  const clearInput = () => {
-    setQuery("")
-    setSuggestions([])
-    setIsOpen(false)
-    if (onChange) onChange("")
-    // 3. Сбрасываем и тут тоже
-    onSelect({ address: "", lat: 0, lng: 0, uri: "" })
-  }
-  return (
-    <div className="relative w-full" ref={containerRef}>
-      <div className="relative group">
-        <Input
-          value={query}
-          onChange={(e) => handleInputChange(e.target.value)}
-          placeholder={placeholder || "Где выполнить работу?"}
-          className={cn(
-            "h-14 rounded-2xl pr-12 border-2 border-slate-100 bg-slate-50 focus:bg-white focus:border-blue-600 transition-all font-black italic uppercase text-[11px] tracking-[0.1em]",
-            isLoading && "opacity-70"
-          )}
-          onFocus={() => query.length >= 3 && setIsOpen(true)}
-          autoComplete="off"
-        />
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-          ) : query ? (
-            <button type="button" onClick={clearInput} className="p-1 hover:bg-slate-100 rounded-lg transition-colors">
-              <X className="w-4 h-4 text-slate-400 hover:text-red-500" />
-            </button>
-          ) : (
-            <MapPin className="w-4 h-4 text-slate-300" />
-          )}
+            {/* Выпадающий список подсказок */}
+            {suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-[2.5rem] shadow-2xl z-[70] overflow-hidden p-2 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                        {suggestions.map((item, i) => (
+                            <button
+                                key={i}
+                                type="button"
+                                onClick={() => handleItemClick(item)}
+                                className="w-full flex items-center gap-4 p-4 hover:bg-slate-50 rounded-2xl transition-all text-left group"
+                            >
+                                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-white group-hover:shadow-md transition-all">
+                                    <MapPin className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="font-black uppercase italic text-sm tracking-tighter text-slate-900 leading-none mb-1 truncate">
+                                        {item.title.text}
+                                    </span>
+                                    {item.subtitle?.text && (
+                                        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 truncate">
+                                            {item.subtitle.text}
+                                        </span>
+                                    )}
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
-      </div>
-
-      {/* СПИСОК ПОДСКАЗОК — NEO-BRUTALISM */}
-      {isOpen && suggestions.length > 0 && (
-        <div className="absolute z-[100] w-full bg-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] rounded-[2rem] mt-3 overflow-hidden max-h-72 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
-          {suggestions.map((s, i) => (
-            <button
-              key={i}
-              type="button" // Критически важно, чтобы не сабмитило форму
-              onClick={() => handleSelect(s)}
-              className="w-full p-5 text-left hover:bg-blue-600 hover:text-white flex flex-col gap-1 border-b-2 border-slate-100 last:border-0 transition-all group/item active:bg-blue-700"
-            >
-              <span className="font-black text-xs uppercase italic tracking-wider leading-none">
-                {s.title.text}
-              </span>
-              {s.subtitle?.text && (
-                <span className="text-[9px] font-bold opacity-60 uppercase tracking-tighter group-hover/item:text-white/80">
-                  {s.subtitle.text}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+    )
 }

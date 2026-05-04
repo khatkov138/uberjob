@@ -8,7 +8,7 @@ import { analyzeTask } from "./lib/analyze"
 import { createOrderSchema, type CreateOrderValues } from "@/lib/validation"
 import { getOrCreateLocation } from "@/actions/location/manage" // Импортируем наш умный экшен
 import { slugify } from "@/lib/utils"
-
+import { createId } from '@paralleldrive/cuid2';
 /**
  * ГЛАВНЫЙ ЭКШЕН: Создание заказа ZWORK с привязкой к локации
  */
@@ -48,11 +48,15 @@ export async function createOrder(values: CreateOrderValues) {
       })
     );
 
-    // --- НОВОЕ: ГЕНЕРАЦИЯ СЛАГА ДЛЯ ЗАКАЗА ---
+    // 1. Генерируем ID заранее
+    const id = createId();
+    // 2. Берем последние 6-8 символов для слага (они самые уникальные)
+    const shortId = id.slice(0, 8);
+
     const orderTitle = aiResponse.title || validated.description.slice(0, 50);
     const titlePart = slugify(orderTitle);
     const cityPart = dbLocation?.slug || "russia";
-    const shortId = Math.random().toString(36).substring(2, 8); // генерим 6 символов
+
     const orderSlug = `${titlePart}-${cityPart}-${shortId}`;
     // -----------------------------------------
 
@@ -60,7 +64,8 @@ export async function createOrder(values: CreateOrderValues) {
     const result = await prisma.$transaction(async (tx) => {
       const newOrder = await tx.order.create({
         data: {
-          slug: orderSlug, // Сохраняем слаг
+          id,
+          slug: orderSlug,
           title: orderTitle,
           description: validated.description,
           price: Math.round(validated.price * 100),

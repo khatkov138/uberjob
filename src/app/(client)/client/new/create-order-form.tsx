@@ -8,27 +8,31 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { MapPin, Wallet, ArrowRight, Loader2, AlertCircle } from "lucide-react"
 
-
 import { createOrderSchema, type CreateOrderValues } from "@/lib/validation"
-
-import { useClientLocationStore } from "@/store/use-client-location-store"
 import { cn, handleAction } from "@/lib/utils"
 import { createOrder } from "@/actions/order/create"
-import { AddressInput } from "./address-input"
+import { OrderGeoModal } from "./order-geo-modal"
+import { ServerLocation } from "@/lib/server-utils"
+import { useLocationStore } from "@/store/use-location-store"
 
-export function CreateOrderForm() {
+interface CreateOrderFormProps {
+    initialLocation: ServerLocation
+}
+export function CreateOrderForm({ initialLocation }: CreateOrderFormProps) {
     const router = useRouter()
-    const { lastCity, lastLat, lastLng, setClientLocation } = useClientLocationStore()
+    const [isGeoOpen, setIsGeoOpen] = React.useState(false)
+
+    const { setLocation } = useLocationStore()
 
     const form = useForm<CreateOrderValues>({
         resolver: zodResolver(createOrderSchema),
-        mode: "onChange",
         defaultValues: {
             description: "",
-            address: lastCity || "",
-            lat: lastLat || 0,
-            lng: lastLng || 0,
-            yandexUri: "", // <-- Обязательно добавь это
+            // Защищаемся через опциональную цепочку или оператор ??
+            address: initialLocation?.city ?? "",
+            lat: initialLocation?.lat ?? 0,
+            lng: initialLocation?.lng ?? 0,
+            yandexUri: initialLocation?.yandexUri ?? "",
             price: 0,
             dateType: "ASAP",
         }
@@ -37,31 +41,20 @@ export function CreateOrderForm() {
     const description = form.watch("description")
 
     const mutation = useMutation({
-        // handleAction вернет { id: string }, если всё ок, 
-        // либо кинет throw, который уйдет в onError
         mutationFn: (data: CreateOrderValues) => handleAction(createOrder(data)),
-
         onSuccess: (data) => {
-            // Нам больше не нужны if (res.success), данные уже чистые
             toast.success("ЗАДАЧА ЗАПУЩЕНА")
-
-            // В экшене мы возвращали { id: result.id }
-            router.push(`/order/${data.id}`)
+            router.push(`/order/${data.slug}`)
         },
-
         onError: (error: Error) => {
-            // Сюда попадет любой throw из createAuthAction или самого экшена
             toast.error(error.message || "Ошибка публикации")
         }
     })
 
-
-    const onSubmit = (data: CreateOrderValues) => mutation.mutate(data)
-
     return (
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-12">
+        <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-12">
 
-            {/* 1. ВЕРНУЛИ ВЫСОТУ: min-h-[220px] */}
+            {/* ОПИСАНИЕ */}
             <div className="relative group cursor-text">
                 <Controller
                     control={form.control}
@@ -72,17 +65,15 @@ export function CreateOrderForm() {
                                 "absolute -left-6 top-0 bottom-0 w-1.5 rounded-full transition-all duration-500",
                                 fieldState.invalid ? "bg-red-500" : (description.length > 0 ? "bg-blue-600" : "bg-slate-100")
                             )} />
-
                             <textarea
                                 {...field}
                                 autoFocus
                                 placeholder="ОПИШИТЕ ЗАДАЧУ ЗДЕСЬ..."
                                 className={cn(
                                     "w-full bg-transparent text-4xl md:text-7xl font-black uppercase italic tracking-tighter outline-none resize-none min-h-[220px] transition-all leading-[0.9] overflow-y-auto no-scrollbar",
-                                    fieldState.invalid ? "text-red-500 placeholder:text-red-200" : "text-slate-900 placeholder:text-slate-100"
+                                    fieldState.invalid ? "text-red-500 placeholder:text-red-100" : "text-slate-900 placeholder:text-slate-100"
                                 )}
                             />
-
                             {fieldState.error && (
                                 <p className="text-[10px] font-black uppercase text-red-500 mt-4 flex items-center gap-2 italic tracking-widest">
                                     <AlertCircle size={14} /> {fieldState.error.message}
@@ -91,53 +82,74 @@ export function CreateOrderForm() {
                         </>
                     )}
                 />
-
-                {description.length === 0 && !form.formState.errors.description && (
-                    <div className="flex items-center gap-2 text-slate-300 mt-4">
-                        <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-100 border-t-blue-600 animate-spin" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">Ждем вашего ввода...</span>
-                    </div>
-                )}
             </div>
 
-            {/* 2. ПАРАМЕТРЫ (КОМПАКТНЫЕ) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+            {/* ПАРАМЕТРЫ */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+
+                {/* КНОПКА ЛОКАЦИИ */}
                 <div className="space-y-3">
                     <div className="flex items-center gap-2 ml-2">
                         <MapPin className="w-3.5 h-3.5 text-blue-600" />
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Локация</span>
                     </div>
+
                     <Controller
                         control={form.control}
                         name="address"
                         render={({ field, fieldState }) => (
                             <>
-                                <div className={cn(
-                                    "bg-slate-50 rounded-2xl p-1 border-2 transition-all shadow-inner",
-                                    fieldState.invalid ? "border-red-500 bg-red-50/20" : "border-transparent focus-within:border-blue-100 focus-within:bg-white"
-                                )}>
-                                    <AddressInput
-                                        placeholder="Город или адрес..."
-                                        defaultValue={field.value}
-                                        onSelect={(data) => {
-                                            // 2. Теперь сохраняем все 4 параметра, включая uri
-                                            form.setValue("address", data.address, { shouldValidate: true })
-                                            form.setValue("lat", data.lat, { shouldValidate: true })
-                                            form.setValue("lng", data.lng, { shouldValidate: true })
-                                            form.setValue("yandexUri", data.uri, { shouldValidate: true }) // <-- Сохраняем URI
+                                <button
+                                    type="button"
+                                    onClick={() => setIsGeoOpen(true)}
+                                    className={cn(
+                                        "w-full h-20 px-8 flex items-center justify-between bg-slate-50 rounded-[2rem] border-2 transition-all shadow-inner group",
+                                        fieldState.invalid ? "border-red-500 bg-red-50/20" : "border-transparent hover:border-blue-100 hover:bg-white"
+                                    )}
+                                >
+                                    <div className="flex flex-col items-start min-w-0">
+                                        <span className="text-2xl font-black uppercase italic tracking-tighter truncate leading-none text-slate-900">
+                                            {field.value || "УКАЗАТЬ МЕСТО..."}
+                                        </span>
+                                        <span className="text-[8px] font-black uppercase tracking-[0.2em] text-blue-600 mt-2">
+                                            Нажмите, чтобы изменить
+                                        </span>
+                                    </div>
+                                    <MapPin className="w-6 h-6 text-blue-600 group-hover:scale-110 transition-transform" />
+                                </button>
 
-                                            setClientLocation(data.address, data.lat, data.lng)
-                                        }}
-                                    />
-                                </div>
-                                {fieldState.error && (
-                                    <p className="text-[9px] font-black uppercase text-red-500 ml-2 mt-1 italic">Выберите город из списка</p>
-                                )}
+                                
+
+                                <OrderGeoModal
+                                    open={isGeoOpen}
+                                    onOpenChange={setIsGeoOpen}
+                                    initialData={{
+                                        address: form.getValues("address"),
+                                        lat: form.getValues("lat"),
+                                        lng: form.getValues("lng"),
+                                        uri: form.getValues("yandexUri")
+                                    }}
+                                    onConfirm={(data) => {
+                                        // 1. Обновляем локальный стейт формы (для валидации и отправки)
+                                        form.setValue("address", data.address, { shouldValidate: true })
+                                        form.setValue("lat", data.lat, { shouldValidate: true })
+                                        form.setValue("lng", data.lng, { shouldValidate: true })
+                                        form.setValue("yandexUri", data.uri, { shouldValidate: true })
+
+                                        // 2. СИНХРОНИЗИРУЕМ С ГЛОБАЛЬНЫМ СТОРОМ (чтобы в ленте тоже сменился город)
+                                        // Важно: нам нужен еще slug. Если data его не содержит, 
+                                        // убедись, что getOrCreateLocation возвращает его.
+                                        setLocation(data.address, data.lat, data.lng, data.slug, data.uri)
+
+                                        setIsGeoOpen(false)
+                                    }}
+                                />
                             </>
                         )}
                     />
                 </div>
 
+                {/* БЮДЖЕТ */}
                 <div className="space-y-3">
                     <div className="flex items-center gap-2 ml-2">
                         <Wallet className="w-3.5 h-3.5 text-blue-600" />
@@ -146,28 +158,27 @@ export function CreateOrderForm() {
                     <Controller
                         control={form.control}
                         name="price"
-                        render={({ field: { onChange, value, ...field } }) => (
+                        render={({ field: { onChange, value } }) => (
                             <input
                                 type="number"
-                                {...field}
                                 value={value || ""}
                                 onChange={(e) => onChange(e.target.valueAsNumber || 0)}
                                 placeholder="0"
-                                className="w-full h-16 md:h-18 px-6 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-blue-100 focus:bg-white outline-none font-black italic text-3xl tracking-tighter text-slate-900 placeholder:text-slate-200 transition-all shadow-inner"
+                                className="w-full h-20 px-8 bg-slate-50 rounded-[2rem] border-2 border-transparent focus:border-blue-100 focus:bg-white outline-none font-black italic text-4xl tracking-tighter text-slate-900 placeholder:text-slate-100 transition-all shadow-inner"
                             />
                         )}
                     />
                 </div>
             </div>
 
-            {/* 3. ВЕРНУЛИ ГИГАНТСКУЮ КНОПКУ: h-24 md:h-32 */}
+            {/* КНОПКА ОТПРАВКИ */}
             <div className="pt-6">
                 <button
                     type="submit"
                     disabled={mutation.isPending}
                     className={cn(
-                        "w-full h-24 md:h-32 rounded-[2.5rem] md:rounded-[3.5rem] flex items-center justify-between px-10 md:px-16 transition-all duration-700 active:scale-[0.97] group overflow-hidden cursor-pointer",
-                        mutation.isPending ? "bg-slate-800" : "bg-slate-900 text-white shadow-2xl shadow-slate-200 hover:bg-blue-600"
+                        "w-full h-24 md:h-32 rounded-[2.5rem] md:rounded-[3.5rem] flex items-center justify-between px-10 md:px-16 transition-all duration-700 active:scale-[0.97] group overflow-hidden",
+                        mutation.isPending ? "bg-slate-800" : "bg-slate-900 text-white shadow-2xl hover:bg-blue-600"
                     )}
                 >
                     {mutation.isPending ? (
@@ -181,10 +192,8 @@ export function CreateOrderForm() {
                                 <span className="text-3xl md:text-5xl font-black uppercase italic tracking-tighter">Опубликовать</span>
                                 <span className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-40 mt-3">Мгновенный поиск мастеров</span>
                             </div>
-                            <div className={cn(
-                                "w-14 h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center transition-all duration-500 bg-white/10 group-hover:bg-white group-hover:scale-110"
-                            )}>
-                                <ArrowRight className="w-8 h-8 md:w-10 md:h-10 text-white group-hover:text-blue-600 transition-colors" />
+                            <div className="w-14 h-14 md:w-20 md:h-20 rounded-full flex items-center justify-center bg-white/10 group-hover:bg-white transition-all">
+                                <ArrowRight className="w-8 h-8 md:w-10 md:h-10 text-white group-hover:text-blue-600" />
                             </div>
                         </>
                     )}
