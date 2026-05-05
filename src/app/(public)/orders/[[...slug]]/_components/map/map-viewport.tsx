@@ -3,14 +3,13 @@
 import * as React from "react"
 import dynamic from "next/dynamic"
 import { Map as MapIcon } from "lucide-react"
-import { cn, handleAction } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
 
-// Stores & Hooks
 import { useOrdersStore } from "@/store/use-orders-store"
 import { useUserSkills } from "@/hooks/use-user-skills"
-import { getOrders } from "@/actions/order/get"
-import { ServerLocation } from "@/lib/server-utils"
+import { FeedOrder } from "@/actions/order/get"
+import { FeedContext } from "../../page" // Импортируем тип контекста
 
 const OrdersMap = dynamic(
     () => import("./map-engine").then((mod) => mod.MapEngine),
@@ -30,48 +29,63 @@ const OrdersMap = dynamic(
 )
 
 export function MapViewport() {
-    // 1. Берем фильтры и скиллы
     const { radius } = useOrdersStore()
     const { skillIds } = useUserSkills()
 
-    // 2. Берем гео-контекст из кеша TanStack
-    const { data: location } = useQuery<ServerLocation>({
+    // 1. Достаем гео-контекст из кеша
+    const { data: location } = useQuery<FeedContext>({
         queryKey: ['current-location'],
-        enabled: false
+        queryFn: () => { throw new Error("Location cache missing") },
+        enabled: false,
+        staleTime: Infinity
     })
 
-    // 3. Подписываемся на те же заказы, что и Feed
-    const activeFilters = React.useMemo(() => ({
-        locationId: location?.id,
-        radius: radius,
-    }), [location?.id, radius])
+    // 2. Формируем ключ. ВАЖНО: он должен на 100% совпадать с ключом в Feed и PageClient
+    // включая categoryId, даже если карта его не использует для фильтрации внутри себя.
+    const activeParams = React.useMemo(() => {
+        if (!location) return null
+        return {
+            ...location,
+            radius: radius,
+            categoryId: location.categoryId || null 
+        }
+    }, [location, radius])
 
-    const { data: orders = [], isFetching } = useQuery({
-        queryKey: ["orders", activeFilters],
-        queryFn: () => handleAction(getOrders(activeFilters)),
-        enabled: !!location?.id,
-        staleTime: 1000 * 60 * 5,
+    // 3. Подписываемся на данные ленты
+    const { data: orders = [], isFetching } = useQuery<FeedOrder[]>({
+        queryKey: ["orders", activeParams],
+        enabled: !!activeParams,
+        queryFn: () => { throw new Error("Observer query should not fetch") },
+        staleTime: Infinity
     })
 
     return (
         <div className="relative h-[650px] w-full">
             <div className={cn(
-                "w-full h-full rounded-[3rem] border border-slate-200 bg-slate-50 overflow-hidden relative z-10 transition-all duration-500",
-                isFetching ? "opacity-60 grayscale-[0.2]" : "opacity-100",
+                "w-full h-full rounded-[3rem] border border-slate-200 bg-slate-50 overflow-hidden relative z-10 transition-all duration-700",
+                isFetching ? "opacity-60 blur-[2px] grayscale-[0.5]" : "opacity-100",
             )}>
-                {/* 
-                   Если location еще не загружен (теоретически), 
-                   не рендерим карту, чтобы не было дефолтных координат 
-                */}
                 {location && (
                     <OrdersMap
                         orders={orders}
+                        // Центрируем карту по выбранному городу из SSR контекста
                         center={[location.lat, location.lng]}
                         mySkillIds={skillIds}
                         isFetching={isFetching}
                     />
                 )}
             </div>
+
+            {/* Оверлей загрузки для карты */}
+            {isFetching && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                     <div className="bg-white/80 backdrop-blur-md px-6 py-3 rounded-full border border-slate-100 shadow-xl">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 animate-pulse">
+                            Обновление эфира...
+                        </p>
+                     </div>
+                </div>
+            )}
         </div>
     )
 }
