@@ -6,16 +6,15 @@ import { createAction } from "@/lib/server-utils"
 import { slugify } from "@/lib/utils"
 
 
-export async function getOrCreateLocation(uri: string, name: string) {
+export async function getOrCreateLocation(uri: string) {
     return createAction(async () => {
-        // 1. Сначала ищем в своей базе, чтобы сэкономить лимиты Яндекса
+        // 1. Поиск в базе (единственный источник истины — URI)
         const existing = await prisma.location.findUnique({
             where: { yandexUri: uri }
         })
-
         if (existing) return existing
 
-        // 2. Если в базе нет — идем к Яндексу (копируем логику твоего роута)
+        // 2. Запрос к Яндексу
         const params = new URLSearchParams({
             apikey: process.env.YANDEX_GEOCODE_KEY || "",
             format: "json",
@@ -24,31 +23,30 @@ export async function getOrCreateLocation(uri: string, name: string) {
         });
 
         const response = await fetch(`${process.env.YANDEX_GEOCODE_URI}?${params.toString()}`);
-        if (!response.ok) throw new Error("Yandex Geocode API error");
+        if (!response.ok) throw new Error("Yandex API Error");
 
         const data = await response.json();
-        const feature = data.response?.GeoObjectCollection?.featureMember?.[0];
+        const geoObject = data.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
 
-        if (!feature) throw new Error("Location not found");
+        if (!geoObject) throw new Error("Локация не найдена");
 
-        const pos = feature.GeoObject.Point.pos;
-        const [lng, lat] = pos.split(" ").map(Number);
+        // Достаем координаты
+        const [lng, lat] = geoObject.Point.pos.split(" ").map(Number);
 
-        // 3. Создаем запись в нашей БД
-        const slug = slugify(name)
+        // Достаем нормальное название (например, "Ангарск" вместо того, что ввел юзер)
+        const officialName = geoObject.name;
 
-        // Проверка на дубликат слага (на всякий случай)
-        const slugExists = await prisma.location.findUnique({ where: { slug } })
-        const finalSlug = slugExists ? `${slug}-${Date.now().toString().slice(-4)}` : slug
+        // 3. Создаем запись с автоматическим слагом
+        const slug = slugify(officialName);
 
         return await prisma.location.create({
             data: {
-                name,
+                name: officialName,
                 yandexUri: uri,
-                slug: finalSlug,
+                slug: `${slug}-${Math.random().toString(36).substring(2, 5)}`, // Короткий хвост для уникальности
                 lat,
                 lng
             }
-        })
-    })
+        });
+    });
 }

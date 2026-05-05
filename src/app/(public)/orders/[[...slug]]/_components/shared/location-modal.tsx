@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
 import { useLocationStore } from "@/store/use-location-store"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -8,31 +10,30 @@ import { Search, MapPin, Loader2, Target } from "lucide-react"
 import { handleAction, handleApi } from "@/lib/utils"
 import { toast } from "sonner"
 import { getOrCreateLocation } from "@/actions/location/manage"
-import { useRouter } from "next/navigation"
+import { FeedContext } from "../../page"
 
-// --- ТИПИЗАЦИЯ ЯНДЕКС API ---
+
 
 interface YandexSuggestItem {
   title: { text: string }
   subtitle?: { text: string }
   uri: string
-  distance?: { value: number; text: string }
 }
-
-interface GeocodeResponse {
-  lat: number
-  lng: number
-}
-
-// ----------------------------
 
 export function LocationModal() {
-
   const router = useRouter()
-  const { isModalOpen, closeModal, setLocation, city: currentCity } = useLocationStore()
+  const { isModalOpen, closeModal, setGlobalLocation } = useLocationStore()
+
   const [query, setQuery] = React.useState("")
-  const [suggestions, setSuggestions] = React.useState<YandexSuggestItem[]>([]) // Без any
+  const [suggestions, setSuggestions] = React.useState<YandexSuggestItem[]>([])
   const [isLoading, setIsLoading] = React.useState(false)
+
+  // Достаем данные города из кеша, который наполнил OrdersPageClient
+  const { data: currentContext } = useQuery<FeedContext>({
+    queryKey: ['current-location'],
+    enabled: false, // Используем только как хранилище
+    queryFn: () => { throw new Error("Query data not found in cache") },
+  })
 
   const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -45,14 +46,12 @@ export function LocationModal() {
 
     setIsLoading(true)
     try {
-      // Типизируем вызов handleApi
       const data = await handleApi<YandexSuggestItem[]>(
         fetch(`/api/geo/suggest?text=${encodeURIComponent(value)}`)
       )
-      setSuggestions(data)
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Ошибка поиска"
-      console.error("ZWORK_GEO_ERROR:", message)
+      setSuggestions(data || [])
+    } catch (err) {
+      console.error("ZWORK_GEO_ERROR:", err)
     } finally {
       setIsLoading(false)
     }
@@ -61,33 +60,31 @@ export function LocationModal() {
   const handleSelect = async (item: YandexSuggestItem) => {
     setIsLoading(true)
     try {
-      // handleAction — твой хелпер для обработки ActionResponse
-      const location = await handleAction(
-        getOrCreateLocation(item.uri, item.title.text)
-      )
+      const location = await handleAction(getOrCreateLocation(item.uri))
 
-      // Обновляем клиентский Zustand стор
-      setLocation(location.name, location.lat, location.lng, location.slug, "yandexuri")
+      // 1. Обновляем ID в Zustand (и в куках через middleware)
+      setGlobalLocation(location.id)
 
-      // Делаем красивый редирект на SEO-роут
-      router.push(`/orders/${location.slug}`)
-
+      // 2. Закрываем UI
+      closeModal()
       setQuery("")
       setSuggestions([])
-      closeModal()
+
+      // 3. SSR переход — страница OrdersPage подтянет новые данные в ['current-location']
+      router.push(`/orders/${location.slug}`)
+
       toast.success(`Локация: ${location.name}`)
-    } catch (err: any) {
-      toast.error(err.message || "Ошибка калибровки")
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Ошибка калибровки"
+      toast.error(msg)
     } finally {
       setIsLoading(false)
     }
   }
 
-
   return (
     <Dialog open={isModalOpen} onOpenChange={(open) => !open && closeModal()}>
       <DialogContent className="sm:max-w-[520px] p-0 border-none bg-white rounded-[3.5rem] shadow-2xl overflow-hidden">
-
         <div className="p-8 pb-4">
           <DialogTitle className="text-4xl font-black italic tracking-tighter uppercase text-slate-900 leading-none mb-2">
             Где ищем<span className="text-blue-600">?</span>
@@ -119,6 +116,7 @@ export function LocationModal() {
                   key={i}
                   onClick={() => handleSelect(s)}
                   className="w-full flex items-center gap-5 p-5 hover:bg-slate-900 rounded-[2rem] transition-all group text-left"
+                  disabled={isLoading}
                 >
                   <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center group-hover:bg-white/10 transition-colors shrink-0">
                     <MapPin className="w-5 h-5 text-slate-400 group-hover:text-blue-400" />
@@ -143,10 +141,12 @@ export function LocationModal() {
               <div className="p-8 bg-blue-50/50 rounded-[2.5rem] border-2 border-blue-100/50 flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="text-[9px] font-black uppercase text-blue-400 tracking-[0.2em]">Текущий радар:</p>
-                  <p className="font-black text-2xl italic uppercase tracking-tighter text-slate-900">{currentCity}</p>
+                  <p className="font-black text-2xl italic uppercase tracking-tighter text-slate-900">
+                    {currentContext?.name || "Поиск..."}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
-                  <Target className="w-6 h-6 text-blue-600 animate-pulse" />
+                  <Target className={`w-6 h-6 text-blue-600 ${isLoading ? 'animate-spin' : 'animate-pulse'}`} />
                 </div>
               </div>
             )}

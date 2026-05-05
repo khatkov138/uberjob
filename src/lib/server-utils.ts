@@ -5,8 +5,10 @@ import { getServerSession } from "./get-session";
 import { headers } from "next/headers";
 import { auth } from "./auth";
 import { cookies } from "next/headers"
-import { DEFAULT_LOCATION, roundCoord } from "@/lib/location-config"
+
 import { cache } from "react";
+import prisma from "./prisma";
+import { LOCATION_CONFIG } from "./location-config";
 
 
 
@@ -75,36 +77,72 @@ export async function withApiAuth<T>(fn: (userId: string) => Promise<T>) {
 
 
 
-
 export const getServerLocation = cache(async () => {
-    const cookieStore = await cookies()
-    const locationRaw = cookieStore.get("user-location-storage")?.value
+    const cookieStore = await cookies();
+    const storageRaw = cookieStore.get("zwork-core-loc")?.value;
 
-    // 1. Если кук нет — отдаем дефолт
-    if (!locationRaw) return { ...DEFAULT_LOCATION }
+    let locationId: string | null = null;
 
-    try {
-        // 2. Декодируем и парсим JSON из Zustand persist
-        const parsed = JSON.parse(decodeURIComponent(locationRaw))
-        const state = parsed?.state
-
-        if (state) {
-            return {
-                city: state.city ?? DEFAULT_LOCATION.city,
-                slug: state.slug ?? DEFAULT_LOCATION.slug,
-                lat: roundCoord(state.lat ?? DEFAULT_LOCATION.lat),
-                lng: roundCoord(state.lng ?? DEFAULT_LOCATION.lng),
-                radius: Number(state.radius ?? DEFAULT_LOCATION.radius),
-                yandexUri: state.yandexUri ?? DEFAULT_LOCATION.yandexUri
-            }
+    if (storageRaw) {
+        try {
+            const parsed = JSON.parse(decodeURIComponent(storageRaw));
+            locationId = parsed?.state?.globalLocationId || null;
+        } catch (e) {
+            console.error("ZWORK_LOCATION_PARSE_ERROR:", e);
         }
-    } catch (e) {
-        console.error("ZWORK_SERVER_LOCATION_ERROR:", e)
     }
 
-    // 3. Фолбэк на дефолт при ошибке парсинга
-    return { ...DEFAULT_LOCATION }
-})
+    let dbLocation = locationId
+        ? await prisma.location.findUnique({ where: { id: locationId } })
+        : null;
+
+    if (!dbLocation) {
+        dbLocation = await prisma.location.findUnique({
+            where: { yandexUri: LOCATION_CONFIG.DEFAULT.yandexUri }
+        });
+    }
+
+    if (!dbLocation) {
+        dbLocation = await prisma.location.create({
+            data: {
+                name: LOCATION_CONFIG.DEFAULT.city,
+                slug: LOCATION_CONFIG.DEFAULT.slug,
+                yandexUri: LOCATION_CONFIG.DEFAULT.yandexUri,
+                lat: LOCATION_CONFIG.DEFAULT.lat,
+                lng: LOCATION_CONFIG.DEFAULT.lng
+            }
+        });
+    }
+
+    return {
+        id: dbLocation.id,
+        name: dbLocation.name,
+        slug: dbLocation.slug,
+        lat: dbLocation.lat,
+        lng: dbLocation.lng,
+        yandexUri: dbLocation.yandexUri,
+    };
+});
 
 export type ServerLocation = Awaited<ReturnType<typeof getServerLocation>>;
+
+
+export const getServerOrdersView = cache(async () => {
+    const cookieStore = await cookies();
+    const storageRaw = cookieStore.get("zwork-orders-view")?.value;
+
+    let radius = LOCATION_CONFIG.SETTINGS.radius;
+    let viewMode: "list" | "map" = "list";
+
+    if (storageRaw) {
+        try {
+            const parsed = JSON.parse(decodeURIComponent(storageRaw));
+            radius = parsed?.state?.radius ?? radius;
+            viewMode = parsed?.state?.viewMode ?? viewMode;
+        } catch (e) { }
+    }
+
+    return { radius, viewMode };
+});
+
 

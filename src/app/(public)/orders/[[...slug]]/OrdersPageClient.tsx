@@ -1,225 +1,141 @@
-"use client"
+'use client';
 
-import { useState, useMemo, useEffect } from "react"
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
-import { toast } from "sonner"
+import { useMemo, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
-import { DBCategory, getAllCategories, PopularCategoryResult } from "@/actions/category/get"
-import { InferActionResult } from "@/lib/types/types"
-import { Session } from "@/lib/auth"
-import { FeedOrder, getOrders } from "@/actions/order/get"
-import { FullProfile, getMyProfile } from "@/actions/profile/get"
-import { cn, handleAction } from "@/lib/utils"
-import { addSkill, removeSkill } from "@/actions/profile/manage"
+// Store & Hooks
+import { useOrdersStore } from '@/store/use-orders-store';
+import { useLocationStore } from '@/store/use-location-store';
+import { useUserSkills } from '@/hooks/use-user-skills';
 
-import { Container } from "@/components/shared/container"
-import { OrdersSidebar } from "./_components/layout/orders-sidebar"
-import { FetchingRadar } from "./_components/shared/fetching-radar"
-import { OrdersFeed } from "./_components/feed/orders-feed"
-import { MapViewport } from "./_components/map/map-viewport"
-import { LocationModal } from "./_components/shared/location-modal"
-import { CategorySearchModal } from "./_components/shared/category-search-modal"
-import { OrdersToolbar } from "./_components/layout/orders-toolbar"
-import { useLocationStore } from "@/store/use-location-store"
-import { type ServerLocation } from "@/lib/server-utils"
+// Actions & Utils
+import { handleAction, cn } from '@/lib/utils';
+import { FeedOrder, getOrders } from '@/actions/order/get';
+import { FullProfile, getMyProfile } from '@/actions/profile/get';
+import { DBCategory, PopularCategoryResult } from '@/actions/category/get';
+
+// Components
+import { Container } from '@/components/shared/container';
+import { OrdersSidebar } from './_components/layout/orders-sidebar';
+import { OrdersToolbar } from './_components/layout/orders-toolbar';
+import { FetchingRadar } from './_components/shared/fetching-radar';
+import { OrdersFeed } from './_components/feed/orders-feed';
+import { MapViewport } from './_components/map/map-viewport';
+import { CategorySearchModal } from './_components/shared/category-search-modal';
+import { LocationModal } from './_components/shared/location-modal';
+import { FeedContext } from './page';
+import { Session } from '@/lib/auth';
+
 
 interface OrdersPageClientProps {
-  session: Session | null
-  initialOrders: FeedOrder[]
-  initialProfile: FullProfile | null
-  serverLocation: ServerLocation
-  popularCategories: PopularCategoryResult[]
-  currentCategory: DBCategory | null
+  session: Session | null;
+  initialOrders: FeedOrder[];
+  initialProfile: FullProfile | null;
+  feedContext: FeedContext;
+  popularCategories: PopularCategoryResult[];
+  currentCategory: DBCategory | null;
 }
 
 export default function OrdersPageClient({
   session,
   initialOrders,
   initialProfile,
-  serverLocation,
+  feedContext,
   popularCategories,
   currentCategory
 }: OrdersPageClientProps) {
 
-  const queryClient = useQueryClient()
-  const userId = session?.user?.id
-  const queryKey = ["user-profile", userId]
+  // 1. STORES
+  const { globalLocationId, setGlobalLocation, _hasHydrated } = useLocationStore();
+  const { viewMode, radius } = useOrdersStore();
 
-  const [viewMode, setViewMode] = useState<"list" | "map">("list")
-  const [isCatModalOpen, setIsCatModalOpen] = useState(false)
+  // 2. ПАССИВНЫЙ КЕШ ЛОКАЦИИ (Для Toolbar/Sidebar/Map)
+  useQuery<FeedContext>({
+    queryKey: ['current-location'],
+    queryFn: () => { throw new Error("Cache sync only") },
+    initialData: feedContext,
+    staleTime: Infinity,
+    enabled: false,
+  });
 
-  // --- ДАННЫЕ ПРОФИЛЯ ---
-  const { data: profile } = useQuery<FullProfile | null>({
-    queryKey,
-    queryFn: async () => handleAction(getMyProfile()),
+  // 3. ГИДРАТАЦИЯ ПРОФИЛЯ (Для useUserSkills)
+  useQuery<FullProfile | null>({
+    queryKey: ["user-profile"],
+    queryFn: () => handleAction(getMyProfile()),
     initialData: initialProfile,
-    enabled: !!userId,
-  })
+    enabled: !!session?.user,
+    staleTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false
+  });
 
-  const { radius: storeRadius, _hasHydrated, slug: storeSlug, setLocation } = useLocationStore()
-
-  const activeFilters = useMemo(() => ({
-    ...serverLocation,
-    // Если стор еще не ожил, берем серверный радиус, чтобы ключ совпал с SSR
-    radius: _hasHydrated ? storeRadius : serverLocation.radius
-  }), [serverLocation, storeRadius, _hasHydrated])
-
-  // --- ДАННЫЕ ЛЕНТЫ ---
-  const { data: orders = [], isFetching: isOrdersFetching } = useQuery({
-    queryKey: ["orders", activeFilters],
-    queryFn: async () => await handleAction(getOrders(activeFilters)),
-    // Используем placeholderData вместо initialData
-    // Это позволит сохранить список заказов на экране, пока грузятся новые
-    placeholderData: (previousData) => {
-      // Если previousData существует (мы уже что-то загружали на клиенте) — оставляем его.
-      // Если нет (это самый первый переход или сброс) — подставляем серверные initialOrders.
-      return previousData ?? initialOrders;
-    },
-    initialData: () => {
-      // Если радиус в фильтрах совпадает с тем, что пришло с сервера — отдаем готовые данные
-      // Это предотвратит запрос при первой загрузке
-      if (activeFilters.radius === serverLocation.radius) {
-        return initialOrders;
-      }
-      return undefined;
-    },
-    // Теперь можно поставить нормальный staleTime
-    staleTime: 1000 * 60 * 5,
-  })
-
-  // --- СПРАВОЧНИК КАТЕГОРИЙ ---
-  const { data: allCategories = [] } = useQuery<DBCategory[]>({
-    queryKey: ["all-categories"],
-    queryFn: async () => handleAction(getAllCategories()),
-    staleTime: 1000 * 60 * 10,
-  })
-
-  const mySkillIds = useMemo(() => {
-    if (!profile?.skills) return new Set<string>()
-    return new Set(profile.skills.map((s) => s.categoryId))
-  }, [profile])
-
-  const stats = useMemo(() => ({
-    total: orders.length,
-    matched: orders.filter(o => o.categories.some(c => mySkillIds.has(c.categoryId))).length
-  }), [orders, mySkillIds])
-
+  // 4. СИНХРОНИЗАЦИЯ URL -> STORE
   useEffect(() => {
-    if (_hasHydrated && serverLocation.slug !== storeSlug) {
-      // Обновляем глобальный стор данными, которые пришли из URL (от сервера)
-      setLocation(
-        serverLocation.city,
-        serverLocation.lat,
-        serverLocation.lng,
-        serverLocation.slug,
-        serverLocation.yandexUri
-      )
+    if (_hasHydrated && feedContext.id !== globalLocationId) {
+      setGlobalLocation(feedContext.id);
     }
-  }, [_hasHydrated, serverLocation, storeSlug])
+  }, [_hasHydrated, feedContext.id, globalLocationId, setGlobalLocation]);
 
-  // --- МУТАЦИЯ С OPTIMISTIC UPDATE ---
-  const { mutate: toggleSkill } = useMutation({
-    mutationFn: async ({ id, action }: { id: string; action: 'add' | 'remove' }) => {
-      const actionFn = action === 'add' ? addSkill : removeSkill
-      return await handleAction(actionFn(id))
-    },
-    onMutate: async ({ id, action }) => {
-      await queryClient.cancelQueries({ queryKey })
-      const previousProfile = queryClient.getQueryData<FullProfile>(queryKey)
+  // 5. ОСНОВНОЙ ЗАПРОС ЛЕНТЫ
+  const activeParams = useMemo(() => ({
+    ...feedContext,
+    radius: radius, // Актуальный радиус из Zustand
+    categoryId: currentCategory?.id || null
+  }), [feedContext, radius, currentCategory]);
 
-      queryClient.setQueryData<FullProfile | null>(queryKey, (old) => {
-        if (!old) return old
-        if (action === 'remove') {
-          return { ...old, skills: old.skills.filter(s => s.categoryId !== id) }
-        }
-        const cat = allCategories.find(c => c.id === id)
-        if (!cat) return old
+  const { data: orders = [], isFetching } = useQuery({
+    queryKey: ["orders", activeParams],
+    queryFn: () => handleAction(getOrders({ ...activeParams, limit: 15 })),
+    // Важно: подхватываем SSR данные только если радиус в сторе совпал с серверным
+    initialData: radius === feedContext.radius ? initialOrders : undefined,
+    staleTime: 1000 * 60 * 5,
+  });
 
-        return {
-          ...old,
-          skills: [...old.skills, {
-            profileId: old.id,
-            categoryId: id,
-            category: { id: cat.id, name: cat.name, slug: cat.slug }
-          }]
-        }
-      })
-      return { previousProfile }
-    },
-    onSuccess: (_, variables) => {
-      // Так как экшен возвращает null, мы ориентируемся на сам факт вызова onSuccess
-      if (variables.action === 'add') {
-        const name = allCategories.find(c => c.id === variables.id)?.name
-        toast.success(`Ниша "${name}" добавлена`)
-      }
-      // Инвалидацию НЕ делаем, оставляем оптимистичные данные
-    },
-    onError: (err, variables, context) => {
-      // Если сервер ответил ошибкой, откатываем к "правде" из базы
-      if (context?.previousProfile) {
-        queryClient.setQueryData(queryKey, context.previousProfile)
-      }
-      // handleAction обычно сам кидает toast с ошибкой, но подстрахуемся
-    }
-  })
+  // 6. СТАТИСТИКА (Через наш хук)
+  const { skillIds, hasSkills } = useUserSkills();
 
-  // Теперь вызовы стали совсем элементарными
-  const onAdd = (id: string) => toggleSkill({ id, action: 'add' });
-  const onRemove = (id: string) => toggleSkill({ id, action: 'remove' });
+  const stats = useMemo(() => {
+    const total = orders.length;
+    const matched = orders.filter(o =>
+      o.categories.some(c => skillIds.has(c.categoryId))
+    ).length;
 
-
-  const displayRadius = _hasHydrated ? storeRadius : serverLocation.radius
+    return { total, matched, hasSkills };
+  }, [orders, skillIds, hasSkills]);
 
   return (
     <Container className="bg-white max-w-7xl pt-10 pb-20">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+
+        {/* SIDEBAR */}
         <aside className="lg:col-span-3 space-y-12">
           <header className="px-2 space-y-2">
             <h1 className="text-4xl font-black italic uppercase tracking-tighter text-slate-900 leading-[0.8]">
               Поиск <br /> <span className="text-blue-600">заказов</span>
             </h1>
             <div className="flex items-center gap-2 opacity-40">
-              <div className={cn("w-1 h-1 rounded-full bg-blue-600", isOrdersFetching ? "animate-ping" : "animate-pulse")} />
+              <div className={cn("w-1 h-1 rounded-full bg-blue-600", isFetching ? "animate-ping" : "animate-pulse")} />
               <span className="text-[8px] font-black uppercase tracking-[0.3em]">Live Feed</span>
             </div>
           </header>
 
-          <OrdersSidebar
-            isAuth={!!session}
-            profile={profile}
-            popularCategories={popularCategories}
-            serverLocation={serverLocation}
-            onAddClick={() => setIsCatModalOpen(true)}
-            onRemoveSkill={onRemove}
-            cityName={serverLocation.city}
-          />
+          <OrdersSidebar popularCategories={popularCategories} />
         </aside>
 
+        {/* FEED AREA */}
         <section className="lg:col-span-9">
-          {/* ЗАГОЛОВОК И СТАТИСТИКА: Теперь с фиксированным отступом снизу, чтобы не "прилипать" к блоку */}
           <div className="px-2 pt-4 pb-8 space-y-4">
             <div className="flex items-baseline gap-4 flex-wrap">
               <h2 className="text-5xl font-black italic uppercase tracking-tighter text-slate-900 leading-none">
                 {currentCategory ? (
-                  <>
-                    {currentCategory.name}{" "}
-                    <span className="text-blue-600 ml-2 whitespace-nowrap">
-                      в {serverLocation.city}
-                    </span>
-                  </>
+                  <>{currentCategory.name} <span className="text-blue-600 ml-2 whitespace-nowrap">в {feedContext.name}</span></>
                 ) : (
-                  <>
-                    Заказы{" "}
-                    <span className="text-blue-600 ml-2 whitespace-nowrap">
-                      в {serverLocation.city}
-                    </span>
-                  </>
+                  <>Заказы <span className="text-blue-600 ml-2 whitespace-nowrap">в {feedContext.name}</span></>
                 )}
               </h2>
               <div className="flex items-center gap-3">
                 <span className="text-5xl font-black italic text-slate-100">/</span>
                 <span className="text-5xl font-black italic text-slate-900 tracking-tighter">
-                  {mySkillIds.size > 0 ? stats.matched : stats.total}
+                  {hasSkills ? stats.matched : stats.total}
                 </span>
               </div>
             </div>
@@ -230,66 +146,41 @@ export default function OrdersPageClient({
                 <span>всего рядом: {stats.total}</span>
               </div>
               <span className="ml-2">
-                {mySkillIds.size > 0 ? `Подходит вам: ${stats.matched}` : "Все категории"}
-                • {displayRadius}км
+                {hasSkills ? `Подходит вам: ${stats.matched}` : "Все категории"}
+                • {radius}км
               </span>
             </div>
           </div>
 
-          {/* ЕДИНЫЙ МОНОЛИТНЫЙ БЛОК: Тулбар + Контент */}
-          <div className="flex flex-col shadow-2xl shadow-slate-200/40 rounded-[3.5rem] border border-slate-100 bg-white overflow-hidden">
+          {/* MONOLITH CONTAINER */}
+          <div className="flex flex-col shadow-2xl shadow-slate-200/40 rounded-[3.5rem] border border-slate-100 bg-white overflow-hidden relative">
+            <OrdersToolbar />
 
-            {/* TOOLBAR: Убрали внешние отступы, он теперь "крышка" контента */}
-            <div className="sticky top-0 z-30 bg-white border-b border-slate-50">
-              <OrdersToolbar
-                viewMode={viewMode}
-                setViewMode={setViewMode}
-                serverCity={serverLocation.city}
-                serverRadius={serverLocation.radius}
-              // Внутри тулбара убери закругления и тени, если передаешь такой флаг
-              />
-            </div>
-
-            {/* CONTENT AREA: Склеен с тулбаром без швов */}
             <div className={cn(
               "relative min-h-[700px] transition-all duration-500",
               viewMode === "list" ? "bg-white" : "bg-slate-50"
             )}>
-              <FetchingRadar isVisible={isOrdersFetching} />
+              {/* РАДАР ЗАГРУЗКИ */}
+              <FetchingRadar isVisible={isFetching} />
 
-              <div className={cn("h-full transition-all duration-500", isOrdersFetching && "blur-sm opacity-50")}>
+              <div className={cn("h-full transition-all duration-500", isFetching && "blur-md opacity-40 scale-[0.99]")}>
                 {viewMode === "list" ? (
                   <div className="p-4 md:p-8 animate-in fade-in slide-in-from-bottom-2">
-                    <OrdersFeed orders={orders} mySkillIds={mySkillIds} isFetching={isOrdersFetching} />
+                    <OrdersFeed />
                   </div>
                 ) : (
                   <div className="h-[750px] w-full relative">
-                    {/* Карта теперь занимает всё пространство до краев скругленного родителя */}
-                    <MapViewport
-                      orders={orders}
-                      center={[serverLocation.lat, serverLocation.lng]}
-                      radius={serverLocation.radius}
-                      mySkillIds={mySkillIds}
-                      isFetching={isOrdersFetching}
-                    />
+                    <MapViewport />
                   </div>
                 )}
               </div>
             </div>
           </div>
         </section>
-
-
       </div>
 
       <LocationModal />
-      <CategorySearchModal
-        isOpen={isCatModalOpen}
-        onClose={() => setIsCatModalOpen(false)}
-        userCategoryIds={Array.from(mySkillIds)}
-        onAdd={onAdd}
-        onRemove={onRemove}
-      />
+      <CategorySearchModal />
     </Container>
-  )
+  );
 }

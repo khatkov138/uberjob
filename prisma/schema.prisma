@@ -297,9 +297,9 @@ model Message {
 
 model Location {
   id        String   @id @default(cuid())
-  slug      String   @unique // 'irkutsk' - для URL
-  name      String // 'Иркутск' - для UI
-  yandexUri String   @unique // Тот самый URI от Яндекса
+  slug      String   @unique 
+  name      String 
+  yandexUri String   @unique 
   lat       Float
   lng       Float
   createdAt DateTime @default(now())

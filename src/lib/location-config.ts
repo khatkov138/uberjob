@@ -1,18 +1,25 @@
-// src/lib/location-config.ts
+export const LOCATION_CONFIG = {
+    // Данные для инициализации базы и фолбэка в SSR
+    DEFAULT: {
+        city: "Москва",
+        slug: "moskva",
+        lat: 55.755819,
+        lng: 37.617644,
+        yandexUri: "ymapsbm1://geo?data=Cgg1MzE2NjM5MxIa0KDQvtGB0YHQuNGPLCDQnNC-0YHQutCy0LA,",
+    },
 
-export const DEFAULT_LOCATION = {
-  city: "Москва",
-  slug: "moskva", // Добавляем слаг для дефолтной навигации
-  lat: 55.755819,
-  lng: 37.617644,
-  radius: 100,
-  yandexUri: "ymapsbm1://geo?data=Cgg1MzE2NjM5MxIa0KDQvtGB0YHQuNGPLCDQnNC-0YHQutCy0LA,"
-}
-// Функция для нормализации координат (4 знака = точность ~11 метров)
-export const roundCoord = (n: number | string | undefined | null): number => {
-  const num = parseFloat(String(n))
-  if (isNaN(num)) return 0
-  // Умножаем на 10000, округляем до целого и делим обратно
-  // Это гарантирует одинаковый результат везде
-  return Math.round(num * 10000) / 10000
-}
+    // Настройки фильтров по умолчанию
+    SETTINGS: {
+        radius: 100,
+        radiusOptions: [10, 30, 50, 100],
+    },
+
+    // Утилиты
+    utils: {
+        // Округление до 6 знаков (точность ~10см)
+        roundCoord: (num: number) => Math.round(num * 1000000) / 1000000,
+    }
+} as const;
+
+// Типизация для использования в приложении
+export type LocationConfig = typeof LOCATION_CONFIG;

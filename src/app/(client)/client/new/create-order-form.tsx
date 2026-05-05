@@ -28,8 +28,7 @@ export function CreateOrderForm({ initialLocation }: CreateOrderFormProps) {
         resolver: zodResolver(createOrderSchema),
         defaultValues: {
             description: "",
-            // Защищаемся через опциональную цепочку или оператор ??
-            address: initialLocation?.city ?? "",
+            city: initialLocation?.city ?? "",
             lat: initialLocation?.lat ?? 0,
             lng: initialLocation?.lng ?? 0,
             yandexUri: initialLocation?.yandexUri ?? "",
@@ -96,7 +95,7 @@ export function CreateOrderForm({ initialLocation }: CreateOrderFormProps) {
 
                     <Controller
                         control={form.control}
-                        name="address"
+                        name="city"
                         render={({ field, fieldState }) => (
                             <>
                                 <button
@@ -118,20 +117,21 @@ export function CreateOrderForm({ initialLocation }: CreateOrderFormProps) {
                                     <MapPin className="w-6 h-6 text-blue-600 group-hover:scale-110 transition-transform" />
                                 </button>
 
-                                
+
 
                                 <OrderGeoModal
                                     open={isGeoOpen}
                                     onOpenChange={setIsGeoOpen}
                                     initialData={{
-                                        address: form.getValues("address"),
+                                        city: form.getValues("city"),
                                         lat: form.getValues("lat"),
                                         lng: form.getValues("lng"),
-                                        uri: form.getValues("yandexUri")
+                                        uri: form.getValues("yandexUri"),
+                                       
                                     }}
                                     onConfirm={(data) => {
                                         // 1. Обновляем локальный стейт формы (для валидации и отправки)
-                                        form.setValue("address", data.address, { shouldValidate: true })
+                                        form.setValue("city", data.city, { shouldValidate: true })
                                         form.setValue("lat", data.lat, { shouldValidate: true })
                                         form.setValue("lng", data.lng, { shouldValidate: true })
                                         form.setValue("yandexUri", data.uri, { shouldValidate: true })
@@ -139,8 +139,8 @@ export function CreateOrderForm({ initialLocation }: CreateOrderFormProps) {
                                         // 2. СИНХРОНИЗИРУЕМ С ГЛОБАЛЬНЫМ СТОРОМ (чтобы в ленте тоже сменился город)
                                         // Важно: нам нужен еще slug. Если data его не содержит, 
                                         // убедись, что getOrCreateLocation возвращает его.
-                                        setLocation(data.address, data.lat, data.lng, data.slug, data.uri)
-
+                                        setLocation(data.city, data.lat, data.lng, data.slug, data.uri)
+                                        console.log(data.city, data.lat, data.lng, data.slug, data.uri)
                                         setIsGeoOpen(false)
                                     }}
                                 />

@@ -3,19 +3,20 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware'
 import { getCookie, setCookie, deleteCookie } from 'cookies-next'
-import { DEFAULT_LOCATION, roundCoord } from '@/lib/location-config'
 
 interface LocationState {
-  city: string
-  slug: string
-  lat: number
-  lng: number
-  yandexUri: string // <--- Добавили "паспорт" локации
+  // КЛЮЧИ (Источники истины)
+  globalLocationId: string | null    // Для фильтрации ленты /orders
+  lastOrderLocationId: string | null  // Для дефолта в форме создания заказа
   radius: number
+
+  // UI СОСТОЯНИЕ
   isModalOpen: boolean
   _hasHydrated: boolean
-  // Теперь принимает 5 аргументов для полной синхронизации
-  setLocation: (city: string, lat: number, lng: number, slug: string, yandexUri: string) => void
+
+  // МЕТОДЫ
+  setGlobalLocation: (id: string) => void
+  setLastOrderLocation: (id: string) => void
   setRadius: (radius: number) => void
   openModal: () => void
   closeModal: () => void
@@ -31,37 +32,28 @@ const cookieStorage: StateStorage = {
 export const useLocationStore = create<LocationState>()(
   persist(
     (set) => ({
-      ...DEFAULT_LOCATION,
-      yandexUri: DEFAULT_LOCATION.yandexUri, // Убедись, что в конфиге есть дефолт
+      globalLocationId: null,
+      lastOrderLocationId: null,
+      radius: 100,
       isModalOpen: false,
       _hasHydrated: false,
 
-      setLocation: (city, lat, lng, slug, yandexUri) => set({
-        city,
-        slug,
-        lat: roundCoord(lat),
-        lng: roundCoord(lng),
-        yandexUri // Сохраняем URI
-      }),
-
+      setGlobalLocation: (id) => set({ globalLocationId: id }),
+      setLastOrderLocation: (id) => set({ lastOrderLocationId: id }),
       setRadius: (radius) => set({ radius }),
+
       openModal: () => set({ isModalOpen: true }),
       closeModal: () => set({ isModalOpen: false }),
       setHasHydrated: (state) => set({ _hasHydrated: state }),
     }),
     {
-      name: 'user-location-storage',
+      name: 'zwork-core-loc',
       storage: createJSONStorage(() => cookieStorage),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true)
-      },
+      onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
       partialize: (state) => ({
-        city: state.city,
-        slug: state.slug,
-        lat: state.lat,
-        lng: state.lng,
+        globalLocationId: state.globalLocationId,
+        lastOrderLocationId: state.lastOrderLocationId,
         radius: state.radius,
-        yandexUri: state.yandexUri, // <--- Важно: сохраняем в куки для SSR
       }),
     }
   )

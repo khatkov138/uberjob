@@ -12,7 +12,7 @@ export const passwordSchema = z
 
 export const createOrderSchema = z.object({
   description: z.string().min(10, "Опишите задачу подробнее"),
-  address: z.string().min(1, "Укажите населенный пункт"),
+  city: z.string().min(1, "Укажите населенный пункт"),
   yandexUri: z.string().min(1, "Ошибка идентификатора локации"),
   lat: z.number().refine(n => n !== 0, "Укажите место на карте"),
   lng: z.number().refine(n => n !== 0, "Укажите место на карте"),

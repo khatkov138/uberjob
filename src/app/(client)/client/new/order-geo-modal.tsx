@@ -12,7 +12,10 @@ import { toast } from "sonner"
 interface OrderGeoModalProps {
     open: boolean
     onOpenChange: (open: boolean) => void
-    initialData: { address: string; lat: number; lng: number; uri: string; locationId?: string }
+    initialData: {
+        city: string; lat: number; lng: number;
+        uri: string; locationId?: string
+    }
     onConfirm: (data: any) => void
 }
 
@@ -34,11 +37,12 @@ export function OrderGeoModal({ open, onOpenChange, initialData, onConfirm }: Or
             )
 
             setTemp({
-                address: location.name,
+                city: location.name,
                 lat: location.lat,
                 lng: location.lng,
                 uri: location.yandexUri,
-                locationId: location.id // Передаем ID из базы для связи с заказом
+                locationId: location.id,
+                slug: location.slug
             })
         } catch (err) {
             toast.error("Ошибка калибровки локации")
@@ -62,7 +66,7 @@ export function OrderGeoModal({ open, onOpenChange, initialData, onConfirm }: Or
                             1. Найти населенный пункт
                         </p>
                         <AddressInput
-                            defaultValue={temp.address}
+                            defaultValue={temp.city}
                             onSelect={handleLocationSelect}
                         />
                     </div>
@@ -81,7 +85,7 @@ export function OrderGeoModal({ open, onOpenChange, initialData, onConfirm }: Or
                                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
                                     <MapPin className="w-8 h-8 text-blue-600 mb-2 animate-bounce" />
                                     <p className="text-[10px] font-black uppercase italic text-slate-400 max-w-[200px]">
-                                        {temp.address || "Место не выбрано"}
+                                        {temp.city || "Место не выбрано"}
                                         <br />
                                         <span className="text-blue-500/50">[Карта готова к пину]</span>
                                     </p>
@@ -92,7 +96,7 @@ export function OrderGeoModal({ open, onOpenChange, initialData, onConfirm }: Or
 
                     <button
                         onClick={() => onConfirm(temp)}
-                        disabled={isCalibrating || !temp.address}
+                        disabled={isCalibrating || !temp.city}
                         className="w-full h-20 bg-slate-900 hover:bg-blue-600 disabled:bg-slate-200 text-white rounded-[2rem] flex items-center justify-center gap-3 transition-all active:scale-95 group"
                     >
                         <span className="text-xl font-black uppercase italic tracking-tighter">
