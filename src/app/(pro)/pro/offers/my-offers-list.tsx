@@ -75,7 +75,7 @@ export function MyOffersList({ initialOffers }: MyOffersListProps) {
               <div className="flex items-center gap-6 text-slate-400 pt-2">
                 <div className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-blue-500" />
-                  <span className="text-[10px] font-bold uppercase italic text-slate-500">{offer.order.address}</span>
+                  <span className="text-[10px] font-bold uppercase italic text-slate-500">placeholerd</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5" />

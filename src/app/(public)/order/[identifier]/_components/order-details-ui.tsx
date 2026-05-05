@@ -7,13 +7,13 @@ import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
 import { cn, handleAction } from "@/lib/utils"
-import { getOrderByIdOrSlug, type OrderByIdResponse } from "@/actions/order/get"
+import { getOrderByIdOrSlug, type OrderByIdOrSlugResponse } from "@/actions/order/get"
 import { OffersList } from "./offers-list"
 import { OfferForm } from "./offer-form"
 
 interface OrderDetailsUIProps {
   orderId: string
-  initialData: OrderByIdResponse
+  initialData: OrderByIdOrSlugResponse
   context: {
     userId: string | null
     isOwner: boolean
@@ -26,7 +26,7 @@ export function OrderDetailsUI({ orderId, initialData, context }: OrderDetailsUI
   const { data } = useQuery({
     queryKey: ["order-details", orderId],
     queryFn: async () => await handleAction(getOrderByIdOrSlug(orderId)),
-    initialData, // Гидратация: юзер видит данные сразу, без лоадера
+    initialData: initialData, // Гидратация: юзер видит данные сразу, без лоадера
     staleTime: 1000 * 60 * 5, // 5 минут считаем данные свежими
   })
 

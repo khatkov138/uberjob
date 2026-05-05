@@ -220,7 +220,7 @@ export async function getOrderByIdOrSlug(identifier: string) {
       }
     })
 
-    if (!order) return null; // Просто возвращаем null
+    if (!order) throw new Error("Not found");
 
     const existingOffer = userId
       ? await prisma.offer.findFirst({ where: { orderId: order.id, workerId: userId } })
@@ -301,6 +301,6 @@ export type FeedOrder = Omit<Order, "price"> & {
 }
 
 export type ClientOrder = InferActionResult<typeof getClientOrders>
-export type OrderByIdResponse = InferActionResult<typeof getOrderByIdOrSlug>
+export type OrderByIdOrSlugResponse = InferActionResult<typeof getOrderByIdOrSlug>
 
 

@@ -7,12 +7,12 @@ import { toast } from "sonner"
 import Link from "next/link"
 
 import { cn, handleAction } from "@/lib/utils"
-import { type OrderByIdResponse } from "@/actions/order/get"
+import { type OrderByIdOrSlugResponse } from "@/actions/order/get"
 import { ConfirmOfferModal } from "./confirm-offer-modal"
 import { acceptOffer } from "@/actions/offer/manage"
 
 interface OffersListProps {
-  order: OrderByIdResponse["order"]
+  order: OrderByIdOrSlugResponse["order"]
 }
 
 export function OffersList({ order }: OffersListProps) {
@@ -70,7 +70,7 @@ export function OffersList({ order }: OffersListProps) {
                   </div>
                 </div>
               </div>
-              
+
               <div className="text-right">
                 <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.3em] mb-1">Предложил</p>
                 <p className="text-4xl font-black italic text-blue-600 tracking-tighter leading-none">
@@ -128,7 +128,7 @@ export function OffersList({ order }: OffersListProps) {
                 <MessageSquare className="w-4 h-4" />
                 <span>Чат</span>
               </Link>
-            </div> 
+            </div>
           </div>
         )
       })}

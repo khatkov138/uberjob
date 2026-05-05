@@ -15,7 +15,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-import { OrderStatusCard } from "@/components/dashboard/order-status-card"
+
 import { getActiveWorkSummary, getProStats } from "@/actions/profile/get"
 import { unwrap } from "@/lib/utils"
 import { redirect } from "next/navigation"
@@ -113,7 +113,8 @@ export default async function ProDashboardPage() {
                 {activeWorks.map((order) => (
                   <Link key={order.id} href={`/orders/${order.id}`} className="group block">
                     <div className="bg-slate-50 hover:bg-white border border-slate-100 rounded-3xl p-6 transition-all hover:shadow-lg group-hover:-translate-y-0.5">
-                      <OrderStatusCard order={order} showPrice={true} />
+                      активные работы
+                      {/*<OrderStatusCard order={order} showPrice={true} />*/}
                     </div>
                   </Link>
                 ))}

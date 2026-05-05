@@ -20,7 +20,7 @@ export const ourFileRouter = {
     .onUploadComplete(async ({ metadata, file }) => {
       // Этот код выполнится на сервере после успешной загрузки
       console.log("Upload complete for userId:", metadata.userId);
-      return { url: file.ufsUrl };
+      return { url: file.url };
     }),
 } satisfies FileRouter;
  

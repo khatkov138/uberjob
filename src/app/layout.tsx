@@ -6,10 +6,12 @@ import TanstackProvider from "@/providers/TanstackProvider";
 
 import { Toaster } from "@/components/ui/sonner";
 import { Footer } from "@/components/footer";
-import { LivePulseMarquee } from "@/components/shared/live-pulse-marquee";
+import { LivePulseMarquee, LivePulseSkeleton } from "@/components/shared/live-pulse-marquee";
 import { RoleAutoswitcher } from "@/components/shared/role-autoswitcher";
 import { Heartbeat } from "@/components/shared/heartbeat";
 import Navbar from "@/components/navbar/navbar";
+import { Suspense } from "react";
+import { NavbarSkeleton } from "@/components/navbar/navbar-skeleton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -54,8 +56,13 @@ export default function RootLayout({
           <Heartbeat />
           {/* HEADER: Занимает ровно столько, сколько нужно контенту */}
           <header className="flex-none z-50">
-            <Navbar />
-            <LivePulseMarquee />
+            <Suspense fallback={<NavbarSkeleton />}>
+              <Navbar />
+            </Suspense>
+
+            <Suspense fallback={<LivePulseSkeleton />}>
+              <LivePulseMarquee />
+            </Suspense>
           </header>
 
           {/* 
@@ -79,7 +86,10 @@ export default function RootLayout({
 
           </main>
 
-          <RoleAutoswitcher />
+          <Suspense fallback={null}>
+            <RoleAutoswitcher />
+          </Suspense>
+
           <Toaster richColors closeButton />
 
         </TanstackProvider>
