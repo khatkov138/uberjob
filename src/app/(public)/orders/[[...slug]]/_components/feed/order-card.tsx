@@ -13,10 +13,10 @@ import { FeedOrder } from "@/actions/order/get"
 
 interface OrderCardProps {
   order: FeedOrder
-  isMatched: boolean
+  isMatch: boolean
 }
 
-export function OrderCard({ order, isMatched }: OrderCardProps) {
+export function OrderCard({ order, isMatch }: OrderCardProps) {
   const isNegotiable = order.price === 0
 
   const timeAgo = order.createdAt
@@ -33,7 +33,7 @@ export function OrderCard({ order, isMatched }: OrderCardProps) {
   return (
     <div className="relative group">
       {/* 1. БЕЙДЖ ПОДБОРА */}
-      {isMatched && (
+      {isMatch && (
         <div className="absolute -top-2.5 left-6 md:left-8 z-20 bg-blue-600 text-white text-[8px] font-black px-3 py-1 rounded-full shadow-lg flex items-center gap-1 uppercase tracking-wider animate-in fade-in zoom-in duration-300">
           <Sparkles className="w-2.5 h-2.5 fill-current text-blue-200" /> Подходит вам
         </div>
@@ -42,7 +42,7 @@ export function OrderCard({ order, isMatched }: OrderCardProps) {
       <Card className={cn(
         "overflow-hidden border-2 transition-all duration-500 rounded-[2.5rem] bg-white relative",
         "hover:shadow-[0_20px_50px_rgba(0,0,0,0.06)]",
-        isMatched ? "border-blue-500/20 shadow-blue-500/5" : "border-slate-100"
+        isMatch ? "border-blue-500/20 shadow-blue-500/5" : "border-slate-100"
       )}>
         <CardContent className="p-6 md:p-8">
 
@@ -61,7 +61,7 @@ export function OrderCard({ order, isMatched }: OrderCardProps) {
                     key={catObj.categoryId}
                     className={cn(
                       "text-[9px] font-black uppercase tracking-widest transition-all",
-                      isMatched ? "text-blue-600" : "text-slate-400"
+                      isMatch ? "text-blue-600" : "text-slate-400"
                     )}
                   >
                     #{catObj.category.name}

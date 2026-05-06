@@ -1,9 +1,8 @@
 'use client';
 
 import { useOrdersStore } from '@/store/use-orders-store';
-import { useQuery } from '@tanstack/react-query';
+import { useIsFetching } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
-import { FeedContext } from '../../page';
 import { FetchingRadar } from '../shared/fetching-radar';
 import { OrdersFeed } from '../feed/orders-feed';
 import { MapViewport } from '../map/map-viewport';
@@ -12,34 +11,21 @@ export function ViewRenderer({ initialViewMode }: { initialViewMode: "map" | "li
     const viewMode = useOrdersStore((state) => state.viewMode);
     const isReady = useOrdersStore((state) => state._hasHydrated);
 
-    const { data: context } = useQuery<FeedContext>({
-        queryKey: ['feed-context'],
-        queryFn: () => { throw new Error("Observer: feed-context is missing") },
-        enabled: false
-    });
-
-    // Подписка на бесконечный список
-    const infiniteQuery = useQuery({
-        queryKey: ["orders", "list", context],
-        queryFn: () => { throw new Error("Observer: infinite orders data is missing") },
-        enabled: false,
-    });
-
-    // Подписка на карту
-    const mapQuery = useQuery({
-        queryKey: ["orders", "map", context],
-        queryFn: () => { throw new Error("Observer: map orders data is missing") },
-        enabled: false,
+    // Подсчитываем ЛЮБЫЕ активные фетчинги, ключ которых начинается с "orders"
+    // Это поймает и ["orders", "list", ...] и ["orders", "map", ...]
+    const isFetchingCount = useIsFetching({
+        queryKey: ["orders"]
     });
 
     const activeViewMode = isReady ? viewMode : initialViewMode;
-    const isAnyFetching = infiniteQuery.isFetching || mapQuery.isFetching;
+    const isAnyFetching = isFetchingCount > 0;
 
     return (
         <div className={cn(
             "relative min-h-[700px] transition-all duration-500",
             activeViewMode === "list" ? "bg-white" : "bg-slate-50"
         )}>
+            {/* Радар крутится, если в системе идет подгрузка любых заказов */}
             <FetchingRadar isVisible={isAnyFetching} />
 
             {activeViewMode === "list" ? (

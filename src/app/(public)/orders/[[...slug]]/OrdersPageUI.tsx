@@ -36,7 +36,6 @@ interface OrdersPageUIProps {
   feedContext: FeedContext;
   popularCategories: PopularCategoryResult[];
   currentCategory: DBCategory | null;
-  initialViewMode: 'list' | 'map';
 }
 
 export default function OrdersPageUI({
@@ -46,7 +45,6 @@ export default function OrdersPageUI({
   feedContext,
   popularCategories,
   currentCategory,
-  initialViewMode
 }: OrdersPageUIProps) {
   const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
@@ -58,7 +56,7 @@ export default function OrdersPageUI({
 
   useEffect(() => { setMounted(true); }, []);
 
-  // 1. ПРОФИЛЬ (Строгий тип FullProfile)
+  // 1. ПРОФИЛЬ
   const { data: currentProfile } = useQuery<FullProfile | null>({
     queryKey: ["user-profile"],
     queryFn: () => handleAction(getMyProfile()),
@@ -67,19 +65,22 @@ export default function OrdersPageUI({
     staleTime: 1000 * 60 * 30,
   });
 
-  // 2. АКТИВНЫЙ КОНТЕКСТ
+  // 2. АКТИВНЫЙ КОНТЕКСТ (Теперь с viewMode по твоей логике)
   const activeContext = useMemo((): FeedContext => {
-    if (!isReady) return feedContext;
+    if (!isReady) return { ...feedContext };
+
     const currentSkills = currentProfile?.skills?.map(s => s.categoryId) || feedContext.skillIds;
 
     return {
       ...feedContext,
       locationId: globalLocationId || feedContext.locationId,
       radius: radius || feedContext.radius,
+      // ТАК ЖЕ КАК РАДИУС: если стор готов - берем из него, если нет - из сервера
+      viewMode: viewMode || feedContext.viewMode,
       skillIds: currentSkills,
       categoryId: currentCategory?.id || null
     };
-  }, [isReady, globalLocationId, radius, currentProfile, currentCategory, feedContext]);
+  }, [isReady, globalLocationId, radius, viewMode, currentProfile, currentCategory, feedContext]);
 
   // 3. ШИНА ДАННЫХ
   useEffect(() => {
@@ -87,49 +88,54 @@ export default function OrdersPageUI({
     queryClient.setQueryData(['feed-context'], activeContext);
   }, [activeContext, queryClient, isReady]);
 
+  // 4. ПРОВЕРКА НАЧАЛЬНОГО СОСТОЯНИЯ (Для блокировки SSR запроса)
   const isInitialState = useMemo(() => {
     return (
       activeContext.locationId === feedContext.locationId &&
       activeContext.radius === feedContext.radius &&
+      // Добавляем проверку режима в инишиал стейт
+      activeContext.viewMode === feedContext.viewMode &&
       JSON.stringify(activeContext.skillIds.sort()) === JSON.stringify(feedContext.skillIds.sort())
     );
   }, [activeContext, feedContext]);
 
-  // 4. INFINITE QUERY (mode: 'list')
+  // 5. INFINITE QUERY (mode: 'list')
   const infiniteQuery = useInfiniteQuery<GetOrdersResponse<'list'>>({
     queryKey: ["orders", "list", activeContext],
     queryFn: ({ pageParam }) =>
       handleAction(getOrders({
         ...activeContext,
         cursor: pageParam as string,
-        mode: 'list', // Явно 'list'
+        mode: 'list',
       })),
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    initialData: (isInitialState && initialViewMode === 'list') ? {
-      pages: [initialOrders as GetOrdersResponse<'list'>], // Кастуем к list для гидратации
+    initialData: (isInitialState && feedContext.viewMode === 'list') ? {
+      pages: [initialOrders as GetOrdersResponse<'list'>],
       pageParams: [undefined]
     } : undefined,
-    enabled: isReady,
+    // УПРОСТИЛИ: включаем просто по режиму. Если это инишиал стейт - сработает initialData
+    enabled: isReady && viewMode === 'list',
     staleTime: 1000 * 60 * 5,
   });
 
-  // 5. MAP QUERY (mode: 'map')
+  // 6. MAP QUERY (mode: 'map')
   const mapQuery = useQuery<GetOrdersResponse<'map'>>({
     queryKey: ["orders", "map", activeContext],
     queryFn: () =>
       handleAction(getOrders({
         ...activeContext,
-        mode: 'map' // Явно 'map'
+        mode: 'map'
       })),
-    initialData: (isInitialState && initialViewMode === 'map')
+    initialData: (isInitialState && feedContext.viewMode === 'map')
       ? (initialOrders as GetOrdersResponse<'map'>)
       : undefined,
-    enabled: isReady && (viewMode === 'map' || !isInitialState),
+    // УПРОСТИЛИ: включаем просто по режиму.
+    enabled: isReady && viewMode === 'map',
     staleTime: 1000 * 60 * 5,
   });
 
-  // 6. СИНХРОНИЗАЦИЯ URL -> ZUSTAND
+  // 7. СИНХРОНИЗАЦИЯ URL -> ZUSTAND
   const syncRef = useRef<string | null>(null);
   useEffect(() => {
     if (isReady && feedContext.locationId !== globalLocationId && syncRef.current !== feedContext.locationId) {
@@ -155,7 +161,7 @@ export default function OrdersPageUI({
 
           <div className="flex flex-col shadow-2xl shadow-slate-200/40 rounded-[3.5rem] border border-slate-100 bg-white overflow-hidden relative">
             <OrdersToolbar />
-            <ViewRenderer initialViewMode={initialViewMode} />
+            <ViewRenderer initialViewMode={feedContext.viewMode} />
           </div>
         </section>
       </div>

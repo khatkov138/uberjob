@@ -10,7 +10,7 @@ export function useUserSkills() {
     enabled: false, 
     // Заглушка для TS, так как данные поставляет OrdersPageClient через initialData
     queryFn: () => { throw new Error("Profile must be hydrated in OrdersPageClient") },
-    staleTime: Infinity,
+    
   });
 
   const skillIds = useMemo(() =>

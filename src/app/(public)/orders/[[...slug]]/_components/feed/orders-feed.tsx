@@ -19,7 +19,6 @@ import { FeedContext } from "../../page"
 import { GetOrdersResponse } from "@/actions/order/get"
 
 export function OrdersFeed() {
-    const { isMatched } = useUserSkills()
 
     const { data: context } = useQuery<FeedContext>({
         queryKey: ['feed-context'],
@@ -93,8 +92,7 @@ export function OrdersFeed() {
                     <OrderCard
                         key={order.id}
                         order={order}
-                        isMatched={isMatched(order.categories?.map(c => c.categoryId) ?? [])}
-                    />
+                        isMatch={order.isMatch} />
                 ))}
             </div>
 

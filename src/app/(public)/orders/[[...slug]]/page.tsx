@@ -22,8 +22,9 @@ export interface FeedContext {
   slug: string;
   categoryId: string | null;
   skillIds: string[];
+  // Добавляем режим отображения в ядро контекста
+  viewMode: 'list' | 'map';
 }
-
 interface Props {
   params: Promise<{ slug?: string[] }>;
 }
@@ -61,6 +62,11 @@ export default async function OrdersPage({ params }: Props) {
   const initialProfile = unwrap(profileRes, null);
   const skillIds = initialProfile?.skills.map(s => s.categoryId) || [];
 
+
+
+  // 4. ДИНАМИЧЕСКИЙ ФЕТЧ (Фиксируем mode для стабильной типизации)
+  const mode = ordersView.viewMode; // Тип: 'list' | 'map'
+
   const feedContext: FeedContext = {
     locationId: dbLocation.id,
     name: dbLocation.name,
@@ -69,11 +75,9 @@ export default async function OrdersPage({ params }: Props) {
     lng: dbLocation.lng,
     radius: ordersView.radius,
     categoryId: currentCategory?.id || null,
-    skillIds
+    skillIds,
+    viewMode: mode
   };
-
-  // 4. ДИНАМИЧЕСКИЙ ФЕТЧ (Фиксируем mode для стабильной типизации)
-  const mode = ordersView.viewMode; // Тип: 'list' | 'map'
 
   // Чтобы TS не ругался на несовместимость, мы явно типизируем результат запроса
   const [ordersRes, popularRes] = await Promise.all([
@@ -103,7 +107,7 @@ export default async function OrdersPage({ params }: Props) {
       feedContext={feedContext}
       popularCategories={unwrap(popularRes, [])}
       currentCategory={currentCategory}
-      initialViewMode={mode}
+
     />
   );
 }
