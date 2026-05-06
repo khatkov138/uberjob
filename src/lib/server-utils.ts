@@ -76,24 +76,31 @@ export async function withApiAuth<T>(fn: (userId: string) => Promise<T>) {
 }
 
 
-
-export const getServerLocation = cache(async () => {
+export const getServerLocation = cache(async (
+    preference: 'global' | 'lastOrder' = 'global'
+) => {
     const cookieStore = await cookies();
     const storageRaw = cookieStore.get("zwork-core-loc")?.value;
 
-    let locationId: string | null = null;
+    let globalId: string | null = null;
+    let lastOrderId: string | null = null;
 
     if (storageRaw) {
         try {
             const parsed = JSON.parse(decodeURIComponent(storageRaw));
-            locationId = parsed?.state?.globalLocationId || null;
+            globalId = parsed?.state?.globalLocationId || null;
+            lastOrderId = parsed?.state?.lastOrderLocationId || null;
         } catch (e) {
             console.error("ZWORK_LOCATION_PARSE_ERROR:", e);
         }
     }
 
-    let dbLocation = locationId
-        ? await prisma.location.findUnique({ where: { id: locationId } })
+    const targetId = preference === 'lastOrder'
+        ? (lastOrderId || globalId)
+        : (globalId || lastOrderId);
+
+    let dbLocation = targetId
+        ? await prisma.location.findUnique({ where: { id: targetId } })
         : null;
 
     if (!dbLocation) {
@@ -114,6 +121,7 @@ export const getServerLocation = cache(async () => {
         });
     }
 
+    // Возвращаем объект. TypeScript сам выведет его форму.
     return {
         id: dbLocation.id,
         name: dbLocation.name,

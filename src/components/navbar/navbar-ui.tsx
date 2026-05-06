@@ -26,15 +26,11 @@ export function NavbarUI({ user }: NavbarUIProps) {
     const { mode } = useRoleModeStore()
     const pathname = usePathname()
 
-    const { slug, _hasHydrated } = useLocationStore()
+
     const [navHref, setNavHref] = React.useState("/orders")
 
     // Как только стор "ожил" и мы узнали слаг, меняем ссылку
-    React.useEffect(() => {
-        if (_hasHydrated && slug) {
-            setNavHref(`/orders/${slug}`)
-        }
-    }, [_hasHydrated, slug])
+
 
 
     const [mounted, setMounted] = React.useState(false)

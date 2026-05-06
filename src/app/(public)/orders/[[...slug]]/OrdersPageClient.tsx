@@ -23,8 +23,9 @@ import { OrdersFeed } from './_components/feed/orders-feed';
 import { MapViewport } from './_components/map/map-viewport';
 import { CategorySearchModal } from './_components/shared/category-search-modal';
 import { LocationModal } from './_components/shared/location-modal';
-import { FeedContext } from './page';
+
 import { Session } from '@/lib/auth';
+import { FeedContext } from './page';
 
 
 interface OrdersPageClientProps {

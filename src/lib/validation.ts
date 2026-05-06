@@ -10,17 +10,28 @@ export const passwordSchema = z
 
 
 
+// @/lib/validation.ts
+
+// 1. Базовая схема (для сервера)
 export const createOrderSchema = z.object({
   description: z.string().min(10, "Опишите задачу подробнее"),
-  city: z.string().min(1, "Укажите населенный пункт"),
-  yandexUri: z.string().min(1, "Ошибка идентификатора локации"),
-  lat: z.number().refine(n => n !== 0, "Укажите место на карте"),
-  lng: z.number().refine(n => n !== 0, "Укажите место на карте"),
-  // Просто число, без coerce. Валидация пройдет, так как в инпуте valueAsNumber
-  price: z.number().min(0, "Цена не может быть отрицательной"),
+  locationId: z.string().min(1, "Локация не определена"),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  price: z.coerce.number().min(0, "Цена не может быть отрицательной"),
   dateType: z.enum(["ASAP", "SCHEDULED"]),
+  scheduledDate: z.date().optional(),
 });
+
+// 2. Схема для формы (добавляем city)
+export const createOrderFormSchema = createOrderSchema.extend({
+  city: z.string().optional(),
+});
+
+// 3. Генерируем типы ТОЛЬКО из схем (это критично для типизации RHF)
 export type CreateOrderValues = z.infer<typeof createOrderSchema>;
+export type CreateOrderFormValues = z.infer<typeof createOrderFormSchema>;
+
 
 
 

@@ -1,51 +1,55 @@
-// components/modals/OrderGeoModal.tsx
 "use client"
 
 import * as React from "react"
+import { useFormContext } from "react-hook-form"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { MapPin, Check, Loader2 } from "lucide-react"
 import { AddressInput } from "./address-input"
-import { handleAction } from "@/lib/utils"
+import { cn, handleAction } from "@/lib/utils"
 import { getOrCreateLocation } from "@/actions/location/manage"
 import { toast } from "sonner"
+import { CreateOrderFormValues } from "@/lib/validation"
+import { useLocationStore } from "@/store/use-location-store"
+
+interface YandexSuggestItem {
+    title: { text: string }
+    uri: string
+    subtitle?: { text: string }
+}
 
 interface OrderGeoModalProps {
     open: boolean
     onOpenChange: (open: boolean) => void
-    initialData: {
-        city: string; lat: number; lng: number;
-        uri: string; locationId?: string
-    }
-    onConfirm: (data: any) => void
 }
 
-export function OrderGeoModal({ open, onOpenChange, initialData, onConfirm }: OrderGeoModalProps) {
-    const [temp, setTemp] = React.useState(initialData)
+export function OrderGeoModal({ open, onOpenChange }: OrderGeoModalProps) {
+    // 1. Подключаемся к контексту расширенной формы
+    const { setValue, watch } = useFormContext<CreateOrderFormValues>()
+    const { setLastOrderLocation } = useLocationStore()
+
     const [isCalibrating, setIsCalibrating] = React.useState(false)
 
-    React.useEffect(() => {
-        if (open) setTemp(initialData)
-    }, [initialData, open])
+    // 2. Наблюдаем за полями в реальном времени (вместо локального стейта preview)
+    const [currentCity, currentLat] = watch(["city", "lat"])
 
-    // Функция, которая вызывается при выборе из выпадающего списка
-    const handleLocationSelect = async (item: any) => {
+    const handleLocationSelect = async (item: YandexSuggestItem) => {
         setIsCalibrating(true)
         try {
-            // Вызываем твой серверный экшен (он проверит базу или сходит в Яндекс)
-            const location = await handleAction(
-                getOrCreateLocation(item.uri, item.title.text)
-            )
+            const location = await handleAction(getOrCreateLocation(item.uri))
 
-            setTemp({
-                city: location.name,
-                lat: location.lat,
-                lng: location.lng,
-                uri: location.yandexUri,
-                locationId: location.id,
-                slug: location.slug
-            })
+            // 3. Синхронно обновляем все поля формы
+            setValue("locationId", location.id, { shouldValidate: true })
+            setValue("city", location.name, { shouldValidate: true })
+            setValue("lat", location.lat)
+            setValue("lng", location.lng)
+
+            // 4. Синхроним Zustand для сохранения "черновика" локации (для F5)
+            setLastOrderLocation(location.id)
+
+            toast.success(`Радар откалиброван: ${location.name}`)
+            onOpenChange(false)
         } catch (err) {
-            toast.error("Ошибка калибровки локации")
+            toast.error("Ошибка калибровки")
         } finally {
             setIsCalibrating(false)
         }
@@ -61,48 +65,62 @@ export function OrderGeoModal({ open, onOpenChange, initialData, onConfirm }: Or
                 </div>
 
                 <div className="px-8 pb-8 space-y-6">
+                    {/* ПОИСК */}
                     <div className="space-y-2">
                         <p className="ml-2 text-[9px] font-black uppercase text-slate-400 tracking-widest italic">
                             1. Найти населенный пункт
                         </p>
                         <AddressInput
-                            defaultValue={temp.city}
+                            defaultValue={currentCity}
                             onSelect={handleLocationSelect}
                         />
                     </div>
 
+                    {/* ВИЗУАЛИЗАЦИЯ (КАРТА) */}
                     <div className="space-y-2">
                         <p className="ml-2 text-[9px] font-black uppercase text-slate-400 tracking-widest italic">
-                            2. Уточнить точку на карте
+                            2. Точка на карте
                         </p>
-                        <div className="h-[300px] w-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 relative overflow-hidden group">
+                        <div className="h-[280px] w-full bg-slate-50 rounded-[2.5rem] border-2 border-slate-100 relative overflow-hidden group">
                             {isCalibrating ? (
                                 <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-10 flex flex-col items-center justify-center gap-3">
                                     <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
-                                    <span className="text-[10px] font-black uppercase italic text-blue-600 animate-pulse">Калибровка...</span>
+                                    <span className="text-[10px] font-black uppercase italic text-blue-600 animate-pulse">
+                                        Синхронизация...
+                                    </span>
                                 </div>
                             ) : (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
-                                    <MapPin className="w-8 h-8 text-blue-600 mb-2 animate-bounce" />
-                                    <p className="text-[10px] font-black uppercase italic text-slate-400 max-w-[200px]">
-                                        {temp.city || "Место не выбрано"}
-                                        <br />
-                                        <span className="text-blue-500/50">[Карта готова к пину]</span>
+                                    <MapPin className={cn(
+                                        "w-8 h-8 mb-2 transition-all duration-500",
+                                        currentCity ? "text-blue-600 animate-bounce" : "text-slate-200"
+                                    )} />
+                                    <p className="text-[10px] font-black uppercase italic text-slate-400 max-w-[240px] leading-tight">
+                                        {currentCity || "Выберите город в поиске выше"}
+                                        {currentLat && (
+                                            <span className="block text-blue-500/50 mt-1 uppercase">
+                                                [Координаты в базе]
+                                            </span>
+                                        )}
                                     </p>
                                 </div>
                             )}
                         </div>
                     </div>
 
+                    {/* ПОДТВЕРЖДЕНИЕ */}
                     <button
-                        onClick={() => onConfirm(temp)}
-                        disabled={isCalibrating || !temp.city}
-                        className="w-full h-20 bg-slate-900 hover:bg-blue-600 disabled:bg-slate-200 text-white rounded-[2rem] flex items-center justify-center gap-3 transition-all active:scale-95 group"
+                        type="button"
+                        onClick={() => onOpenChange(false)}
+                        disabled={isCalibrating || !currentCity}
+                        className="w-full h-20 bg-slate-900 hover:bg-blue-600 disabled:bg-slate-100 disabled:text-slate-300 text-white rounded-[2rem] flex items-center justify-center gap-3 transition-all active:scale-95 group"
                     >
                         <span className="text-xl font-black uppercase italic tracking-tighter">
-                            {isCalibrating ? "Синхронизация..." : "Подтвердить адрес"}
+                            {isCalibrating ? "Минутку..." : "Подтвердить адрес"}
                         </span>
-                        {!isCalibrating && <Check className="w-6 h-6 group-hover:scale-125 transition-transform" />}
+                        {!isCalibrating && currentCity && (
+                            <Check className="w-6 h-6 group-hover:scale-125 transition-transform" />
+                        )}
                     </button>
                 </div>
             </DialogContent>

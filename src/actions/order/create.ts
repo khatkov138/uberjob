@@ -7,60 +7,57 @@ import { createAuthAction } from "@/lib/server-utils"
 import { analyzeTask } from "./lib/analyze"
 import { createOrderSchema, type CreateOrderValues } from "@/lib/validation"
 import { getOrCreateLocation } from "@/actions/location/manage" // Импортируем наш умный экшен
-import { slugify } from "@/lib/utils"
+import { slugify, unwrap } from "@/lib/utils"
 import { createId } from '@paralleldrive/cuid2';
 /**
  * ГЛАВНЫЙ ЭКШЕН: Создание заказа ZWORK с привязкой к локации
  */
-import { nanoid } from "nanoid"; // Если нет nanoid, можно использовать Math.random
-
-export async function createOrder(values: CreateOrderValues) {
+export async function createOrder(values: unknown) {
   return createAuthAction(async (userId) => {
-
-    // 1. Валидация
+    // 1. Валидация входных данных
     const validated = createOrderSchema.parse(values);
 
-    // 2. РАБОТА С ЛОКАЦИЕЙ
-    await getOrCreateLocation(validated.yandexUri, validated.address);
-
+    // 2. Берем эталонную локацию из БД (она там уже 100% есть благодаря модалке)
     const dbLocation = await prisma.location.findUnique({
-      where: { yandexUri: validated.yandexUri },
-      select: { id: true, slug: true } // Обязательно берем slug города
+      where: { id: validated.locationId },
+      select: { id: true, name: true, slug: true, lat: true, lng: true }
     });
 
-    // 3. ИИ-Классификация
+    if (!dbLocation) throw new Error("Локация не найдена в базе");
+
+    // 3. ИИ-Анализ описания (категории и заголовок)
+    // Передаем dbLocation.name, чтобы ИИ мог учитывать контекст города
     const aiResponse = await analyzeTask(validated.description);
+
     const aiCategories = aiResponse.categories?.length
       ? aiResponse.categories
       : [{ name: "Разное", keywords: [] }];
 
-    // 4. Синхронизация категорий
+    // 4. Синхронизация категорий (Upsert вне транзакции)
     const categoryIds = await Promise.all(
-      aiCategories.map(async (cat: any) => {
-        const generatedSlug = slugify(cat.name);
-        const dbCategory = await prisma.category.upsert({
-          where: { slug: generatedSlug },
+      aiCategories.map(async (cat: { name: string; keywords?: string[] }) => {
+        const slug = slugify(cat.name);
+        const dbCat = await prisma.category.upsert({
+          where: { slug },
           update: { keywords: { set: cat.keywords || [] } },
-          create: { name: cat.name, slug: generatedSlug, keywords: cat.keywords || [] },
+          create: { name: cat.name, slug, keywords: cat.keywords || [] },
           select: { id: true },
         });
-        return dbCategory.id;
+        return dbCat.id;
       })
     );
 
-    // 1. Генерируем ID заранее
+    // 5. Подготовка метаданных заказа
     const id = createId();
-    // 2. Берем последние 6-8 символов для слага (они самые уникальные)
-    const shortId = id.slice(0, 8);
-
     const orderTitle = aiResponse.title || validated.description.slice(0, 50);
-    const titlePart = slugify(orderTitle);
-    const cityPart = dbLocation?.slug || "russia";
+    // Слаг: заголовок + город + короткий ID
+    const orderSlug = `${slugify(orderTitle)}-${dbLocation.slug}-${id.slice(0, 8)}`;
 
-    const orderSlug = `${titlePart}-${cityPart}-${shortId}`;
-    // -----------------------------------------
+    // Координаты: уточненные пользователем или центр города по умолчанию
+    const finalLat = validated.lat ?? dbLocation.lat;
+    const finalLng = validated.lng ?? dbLocation.lng;
 
-    // 5. ТРАНЗАКЦИЯ
+    // 6. ТРАНЗАКЦИЯ: Создание заказа и уведомления
     const result = await prisma.$transaction(async (tx) => {
       const newOrder = await tx.order.create({
         data: {
@@ -68,26 +65,23 @@ export async function createOrder(values: CreateOrderValues) {
           slug: orderSlug,
           title: orderTitle,
           description: validated.description,
-          price: Math.round(validated.price * 100),
+          price: Math.round(validated.price * 100), // Копейки
           status: OrderStatus.PENDING,
           clientId: userId,
-          lat: validated.lat,
-          lng: validated.lng,
+          lat: finalLat,
+          lng: finalLng,
           dateType: validated.dateType,
-          locationId: dbLocation?.id,
-
+          scheduledDate: validated.scheduledDate,
+          locationId: dbLocation.id,
           categories: {
-            create: categoryIds.map((id) => ({
-              categoryId: id,
+            create: categoryIds.map((catId) => ({
+              categoryId: catId,
             })),
           },
         },
-        include: {
-          categories: { include: { category: true } }
-        }
       });
 
-      // Поиск подходящих мастеров
+      // 7. Поиск мастеров для уведомлений
       const matchingWorkers = await tx.profile.findMany({
         where: {
           skills: { some: { categoryId: { in: categoryIds } } },
@@ -96,24 +90,23 @@ export async function createOrder(values: CreateOrderValues) {
         select: { userId: true },
       });
 
-      // Уведомления (теперь ведут на слаг)
       if (matchingWorkers.length > 0) {
         await tx.notification.createMany({
           data: matchingWorkers.map((worker) => ({
             userId: worker.userId,
-            title: `ZWORK: ${newOrder.title}`,
-            message: `Новый заказ в вашей нише!`,
+            title: `Новый заказ: ${newOrder.title}`,
+            message: `В городе ${dbLocation.name} появилась работа для вас!`,
             type: "NEW_ORDER",
-            link: `/order/${newOrder.slug}`, // Ведем на красивый URL
+            link: `/order/${newOrder.slug}`,
           })),
         });
       }
 
-      return { newOrder };
+      return newOrder;
     });
 
-    // Возвращаем слаг для редиректа на клиенте
-    return { id: result.newOrder.id, slug: result.newOrder.slug };
+    // Возвращаем только слаг для редиректа. 
+    // locationId в сторе уже обновлен клиентом в модалке.
+    return { slug: result.slug };
   });
 }
-
