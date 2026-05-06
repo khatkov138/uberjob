@@ -8,6 +8,7 @@ import { InferActionResult } from "@/lib/types/types"
 
 import { Category, Location, Order, OrderStatus, Prisma } from "@prisma/client"
 
+
 interface RawSQL extends Order {
   distance: number | null
   total_p: number
@@ -17,22 +18,19 @@ interface RawSQL extends Order {
   loc_slug: string | null
 }
 
-export async function getOrders(params: FeedContext & { page?: number; limit?: number }) { // <--- ПРИНИМАЕМ ТИП ЦЕЛИКОМ
-
-
+export async function getOrders(params: FeedContext & {
+  page?: number;
+  limit?: number;
+  skillIds?: string[]
+}) {
   return createAction<FeedOrder[]>(async () => {
-    // 1. Деструктуризация 
-
     const {
-      lat,
-      lng,
-      radius,
-      categoryId,
+      lat, lng, radius, categoryId,
+      skillIds = [],
       page = 0,
-      limit = 15 // Теперь переменная определена здесь
+      limit = 15
     } = params;
 
-    // 2. Формула дистанции
     const distSql = Prisma.raw(`
       (6371 * acos(
         cos(radians(${lat})) * cos(radians(o.lat)) * 
@@ -41,8 +39,24 @@ export async function getOrders(params: FeedContext & { page?: number; limit?: n
       ))
     `);
 
-    // 3. Запрос через безопасную интерполяцию
-    // ВАЖНО: categoryId передаем как параметр, а не через Prisma.raw
+    // Генерируем условие фильтрации динамически
+    let categoryCondition = Prisma.raw('TRUE'); // По умолчанию показываем всё
+
+    if (categoryId) {
+      // Если есть категория в URL — фильтруем строго по ней
+      categoryCondition = Prisma.raw(`EXISTS (
+        SELECT 1 FROM "order_category" oc 
+        WHERE oc."orderId" = o.id AND oc."categoryId" = '${categoryId}'
+      )`);
+    } else if (skillIds.length > 0) {
+      // Если категории в URL нет, но есть навыки — фильтруем по массиву навыков
+      categoryCondition = Prisma.raw(`EXISTS (
+        SELECT 1 FROM "order_category" oc 
+        WHERE oc."orderId" = o.id 
+        AND oc."categoryId" = ANY(ARRAY[${skillIds.map(id => `'${id}'`).join(',')}]::text[])
+      )`);
+    }
+
     const raw = await prisma.$queryRaw<RawSQL[]>`
       SELECT 
         o.*, 
@@ -56,17 +70,15 @@ export async function getOrders(params: FeedContext & { page?: number; limit?: n
       LEFT JOIN "location" l ON l.id = o."locationId"
       WHERE o.status = 'PENDING'
         AND ${distSql} <= ${radius}
-        AND (${categoryId}::text IS NULL OR EXISTS (
-          SELECT 1 FROM "order_category" oc 
-          WHERE oc."orderId" = o.id AND oc."categoryId" = ${categoryId}
-        ))
+        AND ${categoryCondition}
       ORDER BY o."createdAt" DESC 
       LIMIT ${limit}
+      OFFSET ${page * limit}
     `;
 
     if (!raw.length) return [];
 
-    // 4. Пакетная загрузка связей
+    // ... (пакетная загрузка категорий и клиентов как была раньше) ...
     const ids = raw.map(o => o.id);
     const [categories, clients] = await Promise.all([
       prisma.orderCategory.findMany({
@@ -79,28 +91,34 @@ export async function getOrders(params: FeedContext & { page?: number; limit?: n
       })
     ]);
 
-    // 5. Маппинг в FeedOrder
-    return raw.map((o): FeedOrder => ({
-      ...o,
-      price: Number(o.price),
-      distance: o.distance ? Math.round(o.distance * 10) / 10 : null,
-      isMatch: false,
-      offersCount: Number(o.off_c),
-      location: o.loc_name ? { name: o.loc_name, slug: o.loc_slug || "" } : null,
-      client: clients.find(c => c.id === o.clientId) || null,
-      clientStats: {
-        projects: Number(o.total_p),
-        hireRate: o.total_p > 0 ? Math.round((o.comp_p / o.total_p) * 100) : 0
-      },
-      categories: categories
-        .filter(c => c.orderId === o.id)
-        .map(c => ({
-          categoryId: c.categoryId,
-          category: { id: c.category.id, name: c.category.name, slug: c.category.slug }
-        }))
-    }));
+    return raw.map((o): FeedOrder => {
+      const orderCatIds = categories.filter(c => c.orderId === o.id).map(c => c.categoryId);
+      // isMatch теперь просто проверяет пересечение с массивом skillIds
+      const isMatch = skillIds.length > 0 && orderCatIds.some(id => skillIds.includes(id));
+
+      return {
+        ...o,
+        price: Number(o.price),
+        distance: o.distance ? Math.round(o.distance * 10) / 10 : null,
+        isMatch,
+        offersCount: Number(o.off_c),
+        location: o.loc_name ? { name: o.loc_name, slug: o.loc_slug || "" } : null,
+        client: clients.find(c => c.id === o.clientId) || null,
+        clientStats: {
+          projects: Number(o.total_p),
+          hireRate: o.total_p > 0 ? Math.round((o.comp_p / o.total_p) * 100) : 0
+        },
+        categories: categories
+          .filter(c => c.orderId === o.id)
+          .map(c => ({
+            categoryId: c.categoryId,
+            category: { id: c.category.id, name: c.category.name, slug: c.category.slug }
+          }))
+      };
+    });
   });
 }
+
 
 export async function getClientOrders() {
   return createAuthAction(async (userId) => {

@@ -135,9 +135,9 @@ export const getServerLocation = cache(async (
 export type ServerLocation = Awaited<ReturnType<typeof getServerLocation>>;
 
 
-export const getServerOrdersView = cache(async () => {
+export const getServerOrdersState = cache(async () => {
     const cookieStore = await cookies();
-    const storageRaw = cookieStore.get("zwork-orders-view")?.value;
+    const storageRaw = cookieStore.get("zwork-orders-state")?.value;
 
     let radius = LOCATION_CONFIG.SETTINGS.radius;
     let viewMode: "list" | "map" = "list";

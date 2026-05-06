@@ -6,32 +6,33 @@ import { cn } from "@/lib/utils"
 
 import { useLocationStore } from "@/store/use-location-store"
 import { useQuery } from "@tanstack/react-query"
-import { ServerLocation } from "@/lib/server-utils"
 import { useOrdersStore } from "@/store/use-orders-store"
 import { LOCATION_CONFIG } from "@/lib/location-config"
+import { FeedContext } from "../../page"
 
 const RADIUS_OPTIONS = LOCATION_CONFIG.SETTINGS.radiusOptions;
 
 export function OrdersToolbar() {
-  // 1. Берем настройки отображения и фильтров
-  const { viewMode, setViewMode, radius, setRadius } = useOrdersStore()
-
-  // 2. Берем глобальный метод открытия модалки локаций
+  // 1. Сторы используем только для ЗАПИСИ (действий) и viewMode
+  const { viewMode, setViewMode, setRadius } = useOrdersStore()
   const { openModal } = useLocationStore()
 
-  // 3. Берем актуальную локацию из кеша TanStack (инжектится в OrdersPageClient)
-  const { data: location } = useQuery<ServerLocation>({
-    queryKey: ['current-location'],
-    enabled: false,
-    queryFn: () => { throw new Error("Location should be provided by parent") },
+  // 2. ЧИТАЕМ всё из единого источника истины — feed-context
+  const { data: context } = useQuery<FeedContext>({
+    queryKey: ['feed-context'],
+    staleTime: Infinity,
+    // Оставляем заглушку для TS, хотя данные уже в кеше
+    queryFn: () => { throw new Error("Context missing") },
   })
 
-  const activeCity = location?.name || "Загрузка..."
+  // Берем значения из контекста, чтобы UI был синхронен с лентой и заголовком
+  const activeCity = context?.name || "Загрузка..."
+  const activeRadius = context?.radius || LOCATION_CONFIG.SETTINGS.radius
 
   return (
     <div className="bg-white px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-100 sticky top-0 z-30">
 
-      {/* ЛЕВАЯ ЧАСТЬ: ПЕРЕКЛЮЧАТЕЛЬ ВИДА (LIST / MAP) */}
+      {/* ЛЕВАЯ ЧАСТЬ: ПЕРЕКЛЮЧАТЕЛЬ ВИДА */}
       <div className="flex bg-slate-50 p-1.5 rounded-[1.25rem] border border-slate-100/80 shadow-inner w-full md:w-auto">
         <button
           onClick={() => setViewMode("list")}
@@ -65,7 +66,7 @@ export function OrdersToolbar() {
         {/* КНОПКА СМЕНЫ ГОРОДА */}
         <button
           onClick={openModal}
-          className="flex items-center gap-3 group transition-all text-left group"
+          className="flex items-center gap-3 group transition-all text-left"
         >
           <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white group-hover:rotate-12 transition-all duration-300 shadow-sm">
             <MapPin size={18} strokeWidth={2.5} />
@@ -75,7 +76,7 @@ export function OrdersToolbar() {
               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest italic">Регион</span>
               <ChevronDown size={8} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
             </div>
-            <p className="text-[13px] font-black uppercase italic text-slate-900 leading-none truncate max-w-[120px] md:max-w-[180px]">
+            <p className="text-[13px] font-black uppercase italic text-slate-900 leading-none truncate max-w-[120px] md:md:max-w-[180px]">
               {activeCity}
             </p>
           </div>
@@ -88,10 +89,12 @@ export function OrdersToolbar() {
           {RADIUS_OPTIONS.map((r) => (
             <button
               key={r}
-              onClick={() => setRadius(r)}
+              onClick={() => setRadius(r)} // Меняет Zustand -> триггерит PageUI -> обновляет Context
               className={cn(
                 "px-3 py-2 rounded-xl text-[9px] font-black uppercase transition-all",
-                radius === r
+                // Используем activeRadius из кеша, чтобы кнопка подсвечивалась 
+                // одновременно с обновлением ленты
+                activeRadius === r
                   ? "bg-slate-900 text-white shadow-md scale-105"
                   : "text-slate-400 hover:text-slate-900"
               )}

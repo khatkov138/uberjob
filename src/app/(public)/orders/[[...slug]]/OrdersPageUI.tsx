@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Store & Hooks
 import { useOrdersStore } from '@/store/use-orders-store';
@@ -27,8 +27,7 @@ import { LocationModal } from './_components/shared/location-modal';
 import { Session } from '@/lib/auth';
 import { FeedContext } from './page';
 
-
-interface OrdersPageClientProps {
+interface OrdersPageUIProps {
   session: Session | null;
   initialOrders: FeedOrder[];
   initialProfile: FullProfile | null;
@@ -37,71 +36,98 @@ interface OrdersPageClientProps {
   currentCategory: DBCategory | null;
 }
 
-export default function OrdersPageClient({
+export default function OrdersPageUI({
   session,
   initialOrders,
   initialProfile,
   feedContext,
   popularCategories,
   currentCategory
-}: OrdersPageClientProps) {
+}: OrdersPageUIProps) {
+  const queryClient = useQueryClient();
+
+  // 0. Флаг монтажа для безопасной гидратации UI
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // 1. STORES
-  const { globalLocationId, setGlobalLocation, _hasHydrated } = useLocationStore();
-  const { viewMode, radius } = useOrdersStore();
+  const { globalLocationId, setGlobalLocation, _hasHydrated: locHydrated } = useLocationStore();
+  const { viewMode, radius, _hasHydrated: ordersHydrated } = useOrdersStore();
+  const isReady = locHydrated && ordersHydrated;
 
-  // 2. ПАССИВНЫЙ КЕШ ЛОКАЦИИ (Для Toolbar/Sidebar/Map)
-  useQuery<FeedContext>({
-    queryKey: ['current-location'],
-    queryFn: () => { throw new Error("Cache sync only") },
-    initialData: feedContext,
-    staleTime: Infinity,
-    enabled: false,
-  });
-
-  // 3. ГИДРАТАЦИЯ ПРОФИЛЯ (Для useUserSkills)
-  useQuery<FullProfile | null>({
+  // 2. ПРОФИЛЬ (Прямое чтение из кеша для стабильности activeContext)
+  const { data: currentProfile } = useQuery<FullProfile | null>({
     queryKey: ["user-profile"],
     queryFn: () => handleAction(getMyProfile()),
     initialData: initialProfile,
     enabled: !!session?.user,
     staleTime: 1000 * 60 * 30,
-    refetchOnWindowFocus: false
   });
 
-  // 4. СИНХРОНИЗАЦИЯ URL -> STORE
+  // 3. ФОРМИРОВАНИЕ АКТИВНОГО КОНТЕКСТА (Single Source of Truth)
+  const stableSkillIds = useMemo(() => {
+    if (!mounted || !currentProfile) return feedContext.skillIds;
+    return currentProfile.skills.map(s => s.categoryId);
+    // Используем JSON.stringify для глубокого сравнения, чтобы массив пересоздавался 
+    // только когда реально изменился состав скиллов
+  }, [mounted, currentProfile?.skills, feedContext.skillIds]);
+
+  // 2. Формируем контекст
+  const activeContext = useMemo((): FeedContext => {
+    // Теперь используем уже стабильный stableSkillIds
+    const currentRadius = isReady ? radius : feedContext.radius;
+    const currentLocationId = isReady ? (globalLocationId || feedContext.locationId) : feedContext.locationId;
+
+    return {
+      ...feedContext,
+      locationId: currentLocationId,
+      radius: currentRadius,
+      skillIds: stableSkillIds,
+      categoryId: currentCategory?.id || null
+    };
+  }, [feedContext, isReady, radius, globalLocationId, stableSkillIds, currentCategory]);
+  
+  // 4. ШИНА ДАННЫХ (Observer Bus)
+  useQuery<FeedContext>({
+    queryKey: ['feed-context'],
+    queryFn: () => undefined as any,
+    initialData: activeContext,
+    staleTime: Infinity,
+  });
+
   useEffect(() => {
-    if (_hasHydrated && feedContext.id !== globalLocationId) {
-      setGlobalLocation(feedContext.id);
-    }
-  }, [_hasHydrated, feedContext.id, globalLocationId, setGlobalLocation]);
+    queryClient.setQueryData(['feed-context'], activeContext);
+  }, [activeContext, queryClient]);
 
   // 5. ОСНОВНОЙ ЗАПРОС ЛЕНТЫ
-  const activeParams = useMemo(() => ({
-    ...feedContext,
-    radius: radius, // Актуальный радиус из Zustand
-    categoryId: currentCategory?.id || null
-  }), [feedContext, radius, currentCategory]);
+  const isInitialState = useMemo(() => {
+    return (
+      activeContext.locationId === feedContext.locationId &&
+      activeContext.radius === feedContext.radius &&
+      JSON.stringify(activeContext.skillIds) === JSON.stringify(feedContext.skillIds)
+    );
+  }, [activeContext, feedContext]);
 
-  const { data: orders = [], isFetching } = useQuery({
-    queryKey: ["orders", activeParams],
-    queryFn: () => handleAction(getOrders({ ...activeParams, limit: 15 })),
-    // Важно: подхватываем SSR данные только если радиус в сторе совпал с серверным
-    initialData: radius === feedContext.radius ? initialOrders : undefined,
+  const { data: orders = [], isFetching } = useQuery<FeedOrder[]>({
+    queryKey: ["orders", activeContext],
+    queryFn: () => handleAction(getOrders({ ...activeContext, limit: 15 })),
+    initialData: isInitialState ? initialOrders : undefined,
     staleTime: 1000 * 60 * 5,
   });
 
-  // 6. СТАТИСТИКА (Через наш хук)
-  const { skillIds, hasSkills } = useUserSkills();
+  // 6. UI HELPERS
+  const { hasSkills } = useUserSkills(); // Используем для текстовых подписей
+  const safeIsFetching = mounted && isFetching;
+  const displayOrdersCount = mounted ? orders.length : initialOrders.length;
 
-  const stats = useMemo(() => {
-    const total = orders.length;
-    const matched = orders.filter(o =>
-      o.categories.some(c => skillIds.has(c.categoryId))
-    ).length;
-
-    return { total, matched, hasSkills };
-  }, [orders, skillIds, hasSkills]);
+  // 7. СИНХРОНИЗАЦИЯ URL -> ZUSTAND
+  const syncRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (isReady && feedContext.locationId !== globalLocationId && syncRef.current !== feedContext.locationId) {
+      setGlobalLocation(feedContext.locationId);
+      syncRef.current = feedContext.locationId;
+    }
+  }, [isReady, feedContext.locationId, globalLocationId, setGlobalLocation]);
 
   return (
     <Container className="bg-white max-w-7xl pt-10 pb-20">
@@ -114,11 +140,15 @@ export default function OrdersPageClient({
               Поиск <br /> <span className="text-blue-600">заказов</span>
             </h1>
             <div className="flex items-center gap-2 opacity-40">
-              <div className={cn("w-1 h-1 rounded-full bg-blue-600", isFetching ? "animate-ping" : "animate-pulse")} />
-              <span className="text-[8px] font-black uppercase tracking-[0.3em]">Live Feed</span>
+              <div className={cn(
+                "w-1 h-1 rounded-full bg-blue-600",
+                safeIsFetching ? "animate-ping" : "animate-pulse"
+              )} />
+              <span className="text-[8px] font-black uppercase tracking-[0.3em]">
+                {safeIsFetching ? "Обновление..." : "Live Feed"}
+              </span>
             </div>
           </header>
-
           <OrdersSidebar popularCategories={popularCategories} />
         </aside>
 
@@ -136,7 +166,7 @@ export default function OrdersPageClient({
               <div className="flex items-center gap-3">
                 <span className="text-5xl font-black italic text-slate-100">/</span>
                 <span className="text-5xl font-black italic text-slate-900 tracking-tighter">
-                  {hasSkills ? stats.matched : stats.total}
+                  {safeIsFetching && orders.length === 0 ? "..." : displayOrdersCount}
                 </span>
               </div>
             </div>
@@ -144,16 +174,15 @@ export default function OrdersPageClient({
             <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase italic">
               <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded-md border border-emerald-100 text-emerald-600">
                 <div className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />
-                <span>всего рядом: {stats.total}</span>
+                <span>Найдено: {displayOrdersCount}</span>
               </div>
               <span className="ml-2">
-                {hasSkills ? `Подходит вам: ${stats.matched}` : "Все категории"}
-                • {radius}км
+                {!currentCategory && hasSkills ? "Ваши ниши" : "Все категории"}
+                • {activeContext.radius}км
               </span>
             </div>
           </div>
 
-          {/* MONOLITH CONTAINER */}
           <div className="flex flex-col shadow-2xl shadow-slate-200/40 rounded-[3.5rem] border border-slate-100 bg-white overflow-hidden relative">
             <OrdersToolbar />
 
@@ -161,10 +190,12 @@ export default function OrdersPageClient({
               "relative min-h-[700px] transition-all duration-500",
               viewMode === "list" ? "bg-white" : "bg-slate-50"
             )}>
-              {/* РАДАР ЗАГРУЗКИ */}
-              <FetchingRadar isVisible={isFetching} />
+              <FetchingRadar isVisible={safeIsFetching} />
 
-              <div className={cn("h-full transition-all duration-500", isFetching && "blur-md opacity-40 scale-[0.99]")}>
+              <div className={cn(
+                "h-full transition-all duration-500",
+                safeIsFetching && orders.length === 0 && "blur-md opacity-40 scale-[0.99]"
+              )}>
                 {viewMode === "list" ? (
                   <div className="p-4 md:p-8 animate-in fade-in slide-in-from-bottom-2">
                     <OrdersFeed />
