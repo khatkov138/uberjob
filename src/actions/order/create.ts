@@ -71,7 +71,7 @@ export async function createOrder(values: unknown) {
           lat: finalLat,
           lng: finalLng,
           dateType: validated.dateType,
-          scheduledDate: validated.scheduledDate,
+          scheduledDate: validated.scheduledDate ?? null,
           locationId: dbLocation.id,
           categories: {
             create: categoryIds.map((catId) => ({

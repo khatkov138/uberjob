@@ -5,121 +5,162 @@ import { getServerSession } from "@/lib/get-session"
 import prisma from "@/lib/prisma"
 import { createAction, createAuthAction } from "@/lib/server-utils"
 import { InferActionResult } from "@/lib/types/types"
+import { delay } from "@/lib/utils"
 
-import { Category, Location, Order, OrderStatus, Prisma } from "@prisma/client"
+import { Category, Location, Order, OrderCategory, OrderStatus, Prisma, User } from "@prisma/client"
 
 
 interface RawSQL extends Order {
-  distance: number | null
-  total_p: number
-  comp_p: number
-  off_c: number
-  loc_name: string | null
-  loc_slug: string | null
+  distance: number | null;
+  total_p: number;
+  comp_p: number;
+  off_c: number;
+  loc_name: string | null;
+  loc_slug: string | null;
+  is_match_sql: boolean; // Флаг из БД
 }
 
-export async function getOrders(params: FeedContext & {
-  page?: number;
+type FullOrderCategory = OrderCategory & {
+  category: Pick<Category, "id" | "name" | "slug">;
+};
+
+// Вспомогательный тип для пакетной загрузки клиентов
+type SimpleClient = Pick<User, "id" | "name" | "image">;
+
+export async function getOrders<T extends 'list' | 'map'>(params: FeedContext & {
+  cursor?: string | null;
   limit?: number;
-  skillIds?: string[]
+  mode: T;
 }) {
-  return createAction<FeedOrder[]>(async () => {
+  return createAction<GetOrdersResponse<T>>(async () => {
     const {
       lat, lng, radius, categoryId,
       skillIds = [],
-      page = 0,
-      limit = 15
+      cursor,
+      limit = 20,
+      mode
     } = params;
 
-    const distSql = Prisma.raw(`
-      (6371 * acos(
-        cos(radians(${lat})) * cos(radians(o.lat)) * 
-        cos(radians(o.lng) - radians(${lng})) + 
-        sin(radians(${lat})) * sin(radians(o.lat))
-      ))
-    `);
+    const isList = mode === 'list';
 
-    // Генерируем условие фильтрации динамически
-    let categoryCondition = Prisma.raw('TRUE'); // По умолчанию показываем всё
+    // 1. Динамические условия (SQL)
+    const categoryCondition = categoryId
+      ? Prisma.sql`EXISTS (SELECT 1 FROM "order_category" oc WHERE oc."orderId" = o.id AND oc."categoryId" = ${categoryId})`
+      : skillIds.length > 0
+        ? Prisma.sql`EXISTS (SELECT 1 FROM "order_category" oc WHERE oc."orderId" = o.id AND oc."categoryId" = ANY(${skillIds}))`
+        : Prisma.sql`TRUE`;
 
-    if (categoryId) {
-      // Если есть категория в URL — фильтруем строго по ней
-      categoryCondition = Prisma.raw(`EXISTS (
-        SELECT 1 FROM "order_category" oc 
-        WHERE oc."orderId" = o.id AND oc."categoryId" = '${categoryId}'
-      )`);
-    } else if (skillIds.length > 0) {
-      // Если категории в URL нет, но есть навыки — фильтруем по массиву навыков
-      categoryCondition = Prisma.raw(`EXISTS (
-        SELECT 1 FROM "order_category" oc 
-        WHERE oc."orderId" = o.id 
-        AND oc."categoryId" = ANY(ARRAY[${skillIds.map(id => `'${id}'`).join(',')}]::text[])
-      )`);
-    }
+    const cursorCondition = (isList && cursor)
+      ? (() => {
+        const [cDate, cId] = cursor.split('|');
+        return Prisma.sql`(o."createdAt", o.id) < (${cDate}::timestamp, ${cId})`;
+      })()
+      : Prisma.sql`TRUE`;
 
-    const raw = await prisma.$queryRaw<RawSQL[]>`
-      SELECT 
-        o.*, 
-        l.name as loc_name, 
-        l.slug as loc_slug, 
-        ${distSql} AS distance,
-        (SELECT COUNT(*)::int FROM "order" WHERE "clientId" = o."clientId") as total_p,
-        (SELECT COUNT(*)::int FROM "order" WHERE "clientId" = o."clientId" AND "status" = 'COMPLETED') as comp_p,
-        (SELECT COUNT(*)::int FROM "offer" WHERE "orderId" = o.id) as off_c
-      FROM "order" o
-      LEFT JOIN "location" l ON l.id = o."locationId"
-      WHERE o.status = 'PENDING'
-        AND ${distSql} <= ${radius}
-        AND ${categoryCondition}
-      ORDER BY o."createdAt" DESC 
-      LIMIT ${limit}
-      OFFSET ${page * limit}
-    `;
+    const distFormula = Prisma.sql`(6371 * acos(cos(radians(${lat})) * cos(radians(o.lat)) * cos(radians(o.lng) - radians(${lng})) + sin(radians(${lat})) * sin(radians(o.lat))))`;
 
-    if (!raw.length) return [];
-
-    // ... (пакетная загрузка категорий и клиентов как была раньше) ...
-    const ids = raw.map(o => o.id);
-    const [categories, clients] = await Promise.all([
-      prisma.orderCategory.findMany({
-        where: { orderId: { in: ids } },
-        include: { category: true }
-      }),
-      prisma.user.findMany({
-        where: { id: { in: raw.map(o => o.clientId) } },
-        select: { id: true, name: true, image: true }
-      })
+    // 2. Основные запросы
+    const [raw, countResult] = await Promise.all([
+      prisma.$queryRaw<RawSQL[]>`
+        SELECT 
+          o.id, o.lat, o.lng, o.price, o."createdAt", o.status, o."clientId", o."locationId",
+          -- Считаем совпадение скиллов прямо в базе для обоих режимов
+          EXISTS (
+            SELECT 1 FROM "order_category" oc 
+            WHERE oc."orderId" = o.id AND oc."categoryId" = ANY(${skillIds})
+          ) as is_match_sql
+          ${isList ? Prisma.sql`, 
+            o.title, l.name as loc_name, l.slug as loc_slug, ${distFormula} AS distance,
+            (SELECT COUNT(*)::int FROM "order" WHERE "clientId" = o."clientId") as total_p,
+            (SELECT COUNT(*)::int FROM "order" WHERE "clientId" = o."clientId" AND "status" = 'COMPLETED') as comp_p,
+            (SELECT COUNT(*)::int FROM "offer" WHERE "orderId" = o.id) as off_c
+          ` : Prisma.empty}
+        FROM "order" o
+        ${isList ? Prisma.sql`LEFT JOIN "location" l ON l.id = o."locationId"` : Prisma.empty}
+        WHERE o.status = 'PENDING'
+          AND ${distFormula} <= ${radius}
+          AND ${categoryCondition}
+          AND ${cursorCondition}
+        ORDER BY o."createdAt" DESC, o.id DESC 
+        LIMIT ${isList ? limit : 1000}
+      `,
+      prisma.$queryRaw<{ count: number }[]>`
+        SELECT COUNT(*)::int as count 
+        FROM "order" o 
+        WHERE o.status = 'PENDING' 
+          AND ${distFormula} <= ${radius} 
+          AND ${categoryCondition}
+      `
     ]);
 
-    return raw.map((o): FeedOrder => {
-      const orderCatIds = categories.filter(c => c.orderId === o.id).map(c => c.categoryId);
-      // isMatch теперь просто проверяет пересечение с массивом skillIds
-      const isMatch = skillIds.length > 0 && orderCatIds.some(id => skillIds.includes(id));
+    const total = Number(countResult[0]?.count || 0);
+    if (!raw.length) return { orders: [], nextCursor: null, total } as unknown as GetOrdersResponse<T>;
+
+    // 3. Пакетная загрузка (только для списка)
+    let categories: FullOrderCategory[] = [];
+    let clients: SimpleClient[] = [];
+
+    if (isList) {
+      const orderIds = raw.map(o => o.id);
+      [categories, clients] = await Promise.all([
+        prisma.orderCategory.findMany({
+          where: { orderId: { in: orderIds } },
+          include: { category: { select: { id: true, name: true, slug: true } } }
+        }) as unknown as Promise<FullOrderCategory[]>,
+        prisma.user.findMany({
+          where: { id: { in: raw.map(o => o.clientId) } },
+          select: { id: true, name: true, image: true }
+        })
+      ]);
+    }
+
+    // 4. Маппинг
+    const orders = raw.map((o) => {
+      const base = {
+        id: o.id,
+        lat: o.lat,
+        lng: o.lng,
+        price: Number(o.price),
+        status: o.status,
+        createdAt: o.createdAt,
+        clientId: o.clientId,
+        locationId: o.locationId,
+        distance: o.distance ? Math.round(Number(o.distance) * 10) / 10 : null,
+        isMatch: !!o.is_match_sql, // Берем флаг из SQL
+        offersCount: Number(o.off_c || 0),
+      };
+
+      if (!isList) return base;
+
+      const orderCategories = categories.filter(c => c.orderId === o.id);
 
       return {
-        ...o,
-        price: Number(o.price),
-        distance: o.distance ? Math.round(o.distance * 10) / 10 : null,
-        isMatch,
-        offersCount: Number(o.off_c),
+        ...base,
+        title: o.title,
         location: o.loc_name ? { name: o.loc_name, slug: o.loc_slug || "" } : null,
         client: clients.find(c => c.id === o.clientId) || null,
         clientStats: {
-          projects: Number(o.total_p),
+          projects: Number(o.total_p || 0),
           hireRate: o.total_p > 0 ? Math.round((o.comp_p / o.total_p) * 100) : 0
         },
-        categories: categories
-          .filter(c => c.orderId === o.id)
-          .map(c => ({
-            categoryId: c.categoryId,
-            category: { id: c.category.id, name: c.category.name, slug: c.category.slug }
-          }))
+        categories: orderCategories.map(c => ({
+          categoryId: c.categoryId,
+          category: c.category
+        }))
       };
     });
+
+    const nextCursor = (isList && orders.length === limit)
+      ? `${raw[raw.length - 1].createdAt.toISOString()}|${raw[raw.length - 1].id}`
+      : null;
+
+    return {
+      orders: orders as GetOrdersResponse<T>['orders'],
+      nextCursor,
+      total
+    };
   });
 }
-
-
 export async function getClientOrders() {
   return createAuthAction(async (userId) => {
     return await prisma.order.findMany({
@@ -246,35 +287,36 @@ export async function getLatestPublicOrders() {
   });
 }
 
-export type FeedOrder = Omit<Order, "price"> & {
-  price: number
-  distance: number | null
-  // isMatch мы вычисляем на клиенте или передаем отдельно, 
-  // но в объекте заказа он тоже может быть
-  isMatch: boolean
-  offersCount: number
+export type BaseOrder = Omit<Order, "price"> & {
+  price: number;
+  distance: number | null;
+  isMatch: boolean;
+  offersCount: number;
+};
 
-  // Данные о локации (для вывода города/района)
-  location: Pick<Location, "name" | "slug"> | null
-
-  // Объект клиента из связи userId -> User
+// Полный тип для списка (все поля ОБЯЗАТЕЛЬНЫ)
+export type FeedOrder = BaseOrder & {
+  location: Pick<Location, "name" | "slug"> | null;
   client: {
-    name: string | null
-    image: string | null
-  } | null
-
-  // Связь OrderCategory -> Category
+    name: string | null;
+    image: string | null;
+  } | null;
   categories: {
-    categoryId: string
-    category: Pick<Category, "id" | "name" | "slug">
-  }[]
-
-  // Статистика клиента (вычисляемые поля)
+    categoryId: string;
+    category: Pick<Category, "id" | "name" | "slug">;
+  }[];
   clientStats: {
-    projects: number
-    hireRate: number
-  }
-}
+    projects: number;
+    hireRate: number;
+  };
+};
+
+// Ответ экшена теперь зависит от переданного Generic типа
+export type GetOrdersResponse<T extends 'list' | 'map' = 'list'> = {
+  orders: T extends 'list' ? FeedOrder[] : BaseOrder[];
+  nextCursor: string | null;
+  total: number;
+};
 
 export type ClientOrder = InferActionResult<typeof getClientOrders>
 export type OrderByIdOrSlugResponse = InferActionResult<typeof getOrderByIdOrSlug>

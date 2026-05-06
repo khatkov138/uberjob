@@ -156,7 +156,7 @@ export function OrderCard({ order, isMatched }: OrderCardProps) {
 
               {/* Средний блок: Пульс */}
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3 flex-1">
-            
+
 
                 <div className="flex items-center gap-2 text-slate-400">
                   <Clock className="w-4 h-4 text-slate-200" />

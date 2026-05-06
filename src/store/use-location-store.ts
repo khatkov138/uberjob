@@ -6,26 +6,29 @@ import { getCookie, setCookie, deleteCookie } from 'cookies-next'
 
 interface LocationState {
   // КЛЮЧИ (Источники истины)
-  globalLocationId: string | null    // Для фильтрации ленты /orders
-  lastOrderLocationId: string | null  // Для дефолта в форме создания заказа
-  radius: number
-
+  globalLocationId: string | null    // ID города для фильтрации ленты /orders
+  lastOrderLocationId: string | null  // Последняя локация, где юзер создавал заказ
+  
   // UI СОСТОЯНИЕ
   isModalOpen: boolean
   _hasHydrated: boolean
 
   // МЕТОДЫ
-  setGlobalLocation: (id: string) => void
-  setLastOrderLocation: (id: string) => void
-  setRadius: (radius: number) => void
+  setGlobalLocation: (id: string | null) => void
+  setLastOrderLocation: (id: string | null) => void
   openModal: () => void
   closeModal: () => void
   setHasHydrated: (state: boolean) => void
 }
 
+// Кастомное хранилище для работы с куками (важно для SSR и Next.js)
 const cookieStorage: StateStorage = {
   getItem: (name) => (getCookie(name) as string) ?? null,
-  setItem: (name, value) => setCookie(name, value, { maxAge: 60 * 60 * 24 * 30, path: '/' }),
+  setItem: (name, value) => setCookie(name, value, { 
+    maxAge: 60 * 60 * 24 * 30, // 30 дней
+    path: '/',
+    sameSite: 'lax' 
+  }),
   removeItem: (name) => deleteCookie(name),
 }
 
@@ -34,26 +37,33 @@ export const useLocationStore = create<LocationState>()(
     (set) => ({
       globalLocationId: null,
       lastOrderLocationId: null,
-      radius: 100,
       isModalOpen: false,
       _hasHydrated: false,
 
+      // Методы обновления
       setGlobalLocation: (id) => set({ globalLocationId: id }),
       setLastOrderLocation: (id) => set({ lastOrderLocationId: id }),
-      setRadius: (radius) => set({ radius }),
-
+      
+      // Управление модальным окном выбора города
       openModal: () => set({ isModalOpen: true }),
       closeModal: () => set({ isModalOpen: false }),
+      
+      // Флаг гидратации (чтобы клиент понимал, что куки прочитаны)
       setHasHydrated: (state) => set({ _hasHydrated: state }),
     }),
     {
-      name: 'zwork-core-loc',
+      name: 'zwork-core-loc', // Имя ключа в куках
       storage: createJSONStorage(() => cookieStorage),
-      onRehydrateStorage: () => (state) => state?.setHasHydrated(true),
+      
+      // Вызывается автоматически, когда данные из кук попадают в Zustand
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true)
+      },
+
+      // Сохраняем в куки ТОЛЬКО ID локаций, UI-стейт (модалки) не храним
       partialize: (state) => ({
         globalLocationId: state.globalLocationId,
         lastOrderLocationId: state.lastOrderLocationId,
-        radius: state.radius,
       }),
     }
   )

@@ -91,21 +91,21 @@ model Profile {
 // --- СИСТЕМА ЗАКАЗОВ ---
 
 model Order {
-  id          String          @id @default(cuid())
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  status      OrderStatus     @default(PENDING)
-  dateType    DateType        @default(ASAP)
-  slug        String          @unique // Добавляем уникальный слаг
-  title       String
-  description String
-  categories  OrderCategory[] // Явная связь
-  price       Int // Бюджет в копейках
-  locationId  String?
-  location    Location?       @relation(fields: [locationId], references: [id])
-
-  lat Float
-  lng Float
+  id            String          @id @default(cuid())
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  status        OrderStatus     @default(PENDING)
+  dateType      DateType        @default(ASAP)
+  slug          String          @unique // Добавляем уникальный слаг
+  title         String
+  description   String
+  categories    OrderCategory[] // Явная связь
+  price         Int // Бюджет в копейках
+  locationId    String?
+  location      Location?       @relation(fields: [locationId], references: [id])
+  scheduledDate DateTime? // <--- ДОБАВЬ ЭТУ СТРОКУ
+  lat           Float
+  lng           Float
 
   // Кто создал
   clientId String
@@ -297,9 +297,9 @@ model Message {
 
 model Location {
   id        String   @id @default(cuid())
-  slug      String   @unique 
-  name      String 
-  yandexUri String   @unique 
+  slug      String   @unique
+  name      String
+  yandexUri String   @unique
   lat       Float
   lng       Float
   createdAt DateTime @default(now())
