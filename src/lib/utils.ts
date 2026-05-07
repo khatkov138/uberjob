@@ -26,13 +26,17 @@ export async function handleAction<T>(promise: Promise<ActionResponse<T>>): Prom
  */
 
 export function unwrap<T>(res: ActionResponse<T>, fallback: T): T {
-  // Если успех — отдаем данные, если ошибка — отдаем дефолтное значение
-  if (res.success && res.data !== null) {
+  if (res.success && res.data !== undefined && res.data !== null) {
     return res.data as T;
   }
+  
+  // На клиенте можно добавить лог, чтобы понимать, что пошло не так
+  if (typeof window !== 'undefined' && res.error) {
+    console.error("Action Error:", res.error);
+  }
+  
   return fallback;
 }
-
 export async function handleApi<T>(promise: Promise<Response>): Promise<T> {
   const res = await promise;
   const json = await res.json();

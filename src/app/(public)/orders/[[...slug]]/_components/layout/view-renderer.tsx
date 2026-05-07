@@ -1,34 +1,33 @@
 'use client';
 
-import { useOrdersStore } from '@/store/use-orders-store';
+import { memo } from 'react';
 import { useIsFetching } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { FetchingRadar } from '../shared/fetching-radar';
 import { OrdersFeed } from '../feed/orders-feed';
 import { MapViewport } from '../map/map-viewport';
 
-export function ViewRenderer({ initialViewMode }: { initialViewMode: "map" | "list" }) {
-    const viewMode = useOrdersStore((state) => state.viewMode);
-    const isReady = useOrdersStore((state) => state._hasHydrated);
+// Оставляем радар изолированным, это было правильное решение
+const GlobalRadar = memo(() => {
+    const isFetchingCount = useIsFetching({ queryKey: ["orders"] });
+    return <FetchingRadar isVisible={isFetchingCount > 0} />;
+});
 
-    // Подсчитываем ЛЮБЫЕ активные фетчинги, ключ которых начинается с "orders"
-    // Это поймает и ["orders", "list", ...] и ["orders", "map", ...]
-    const isFetchingCount = useIsFetching({
-        queryKey: ["orders"]
-    });
+interface ViewRendererProps {
+    viewMode: 'list' | 'map';
+}
 
-    const activeViewMode = isReady ? viewMode : initialViewMode;
-    const isAnyFetching = isFetchingCount > 0;
-
+// Оборачиваем в memo: теперь он рендерится ТОЛЬКО если изменился viewMode
+export const ViewRenderer = memo(function ViewRenderer({ viewMode }: ViewRendererProps) {
+ 
     return (
         <div className={cn(
             "relative min-h-[700px] transition-all duration-500",
-            activeViewMode === "list" ? "bg-white" : "bg-slate-50"
+            viewMode === "list" ? "bg-white" : "bg-slate-50"
         )}>
-            {/* Радар крутится, если в системе идет подгрузка любых заказов */}
-            <FetchingRadar isVisible={isAnyFetching} />
+            <GlobalRadar />
 
-            {activeViewMode === "list" ? (
+            {viewMode === "list" ? (
                 <div className="p-4 md:p-8 animate-in fade-in slide-in-from-bottom-2 duration-700">
                     <OrdersFeed />
                 </div>
@@ -39,4 +38,4 @@ export function ViewRenderer({ initialViewMode }: { initialViewMode: "map" | "li
             )}
         </div>
     );
-}
+});

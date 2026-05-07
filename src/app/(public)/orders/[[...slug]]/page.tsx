@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma";
 // Libs & Actions
 import { getServerSession } from "@/lib/get-session";
 import { unwrap } from "@/lib/utils";
-import { getOrders, GetOrdersResponse } from "@/actions/order/get";
+import { getOrders } from "@/actions/order/get";
 import { getMyProfile } from "@/actions/profile/get";
 import { getPopularCategories } from "@/actions/category/get";
 
@@ -22,9 +22,9 @@ export interface FeedContext {
   slug: string;
   categoryId: string | null;
   skillIds: string[];
-  // Добавляем режим отображения в ядро контекста
   viewMode: 'list' | 'map';
 }
+
 interface Props {
   params: Promise<{ slug?: string[] }>;
 }
@@ -35,7 +35,7 @@ export default async function OrdersPage({ params }: Props) {
 
   const session = await getServerSession();
 
-  // 1. Получаем Гео и Настройки из кук параллельно
+  // 1. Быстрые данные из кук (оставляем await, это мгновенно)
   const [currentGeo, ordersView] = await Promise.all([
     getServerLocation(),
     getServerOrdersState()
@@ -43,7 +43,7 @@ export default async function OrdersPage({ params }: Props) {
 
   if (!citySlug) return redirect(`/orders/${currentGeo.slug}`);
 
-  // 2. Поиск локации и категории
+  // 2. Поиск локации и категории (БД - тоже быстро, оставляем await)
   const [dbLocation, currentCategory] = await Promise.all([
     prisma.location.findUnique({ where: { slug: citySlug } }),
     categorySlug
@@ -57,15 +57,12 @@ export default async function OrdersPage({ params }: Props) {
   if (!dbLocation) return redirect(`/orders/${currentGeo.slug}`);
   if (categorySlug && !currentCategory) return redirect(`/orders/${citySlug}`);
 
-  // 3. Профиль и скиллы
+  // 3. Профиль (оставляем await, так как скиллы нужны для формирования контекста)
   const profileRes = await getMyProfile();
   const initialProfile = unwrap(profileRes, null);
   const skillIds = initialProfile?.skills.map(s => s.categoryId) || [];
 
-
-
-  // 4. ДИНАМИЧЕСКИЙ ФЕТЧ (Фиксируем mode для стабильной типизации)
-  const mode = ordersView.viewMode; // Тип: 'list' | 'map'
+  const mode = ordersView.viewMode;
 
   const feedContext: FeedContext = {
     locationId: dbLocation.id,
@@ -79,35 +76,29 @@ export default async function OrdersPage({ params }: Props) {
     viewMode: mode
   };
 
-  // Чтобы TS не ругался на несовместимость, мы явно типизируем результат запроса
-  const [ordersRes, popularRes] = await Promise.all([
-    getOrders({
-      ...feedContext,
-      mode,
-    }),
-    getPopularCategories(feedContext.lat, feedContext.lng, feedContext.radius)
-  ]);
+  // --- ВОТ ТУТ МАГИЯ СТРИМИНГА ---
 
-  /** 
-   * ЧИСТАЯ РАСПАКОВКА:
-   * Мы передаем GetOrdersResponse<typeof mode> в дженерик unwrap.
-   * Если ordersRes ругается, это значит, что в самом экшене getOrders 
-   * возвращаемый тип не обернут в Promise<ActionResponse<GetOrdersResponse<T>>>.
-   */
-  const ssrOrdersData = unwrap<GetOrdersResponse<typeof mode>>(
-    ordersRes,
-    { orders: [], nextCursor: null, total: 0 }
+  // 4. Создаем промисы для тяжелых данных (БЕЗ await)
+  // Мы запускаем выполнение, но не ждем результата на сервере.
+  const ordersPromise = getOrders({ ...feedContext, mode });
+  
+  const popularCategoriesPromise = getPopularCategories(
+    feedContext.lat, 
+    feedContext.lng, 
+    feedContext.radius
   );
 
   return (
+    // Передаем промисы в OrdersPageUI. 
+    // Next.js сразу отдаст HTML страницы, а данные "дотекут" позже.
     <OrdersPageUI
       session={session}
-      initialOrders={ssrOrdersData}
       initialProfile={initialProfile}
       feedContext={feedContext}
-      popularCategories={unwrap(popularRes, [])}
       currentCategory={currentCategory}
-
+      // Пробрасываем промисы
+      ordersPromise={ordersPromise}
+      popularCategoriesPromise={popularCategoriesPromise}
     />
   );
 }
