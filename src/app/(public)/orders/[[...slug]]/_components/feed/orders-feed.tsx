@@ -18,8 +18,6 @@ import { getOrders, GetOrdersResponse } from "@/actions/order/get"
 
 /**
  * ИЗОЛИРОВАННЫЙ ТРИГГЕР СКРОЛЛА
- * Этот компонент рендерится при каждом входе/выходе из вьюпорта, 
- * НЕ затрагивая основной список заказов.
  */
 const ScrollObserver = React.memo(({
     hasNextPage,
@@ -66,74 +64,72 @@ const ScrollObserver = React.memo(({
 });
 
 export const OrdersFeed = React.memo(function OrdersFeed() {
-    console.log("📦 [RENDER] OrdersFeed");
+    const renderCount = React.useRef(0);
+    renderCount.current++;
+    console.log(`📦 [RENDER #${renderCount.current}] OrdersFeed`);
 
+    // 1. ПАССИВНЫЙ ОБСЕРВЕР (Заглушка, чтобы не было ошибки No queryFn)
     const { data: context } = useQuery<FeedContext>({
         queryKey: ['feed-context'],
-        enabled: false,
-        queryFn: () => { throw new Error("Observer: feed-context is missing in cache") },
-
+        enabled: false, // Хук никогда не запустит queryFn сам
+        queryFn: () => {
+            console.warn("⚠️ [BUS] queryFn called (should not happen with enabled: false)");
+            return {} as FeedContext;
+        },
+        select: (s) => s
     });
 
+    if (context) {
+        console.log(`📡 [BUS #${renderCount.current}] Context linked:`, context.viewMode);
+    }
+
+    // 2. БОЕВОЙ INFINITE QUERY (Реальная функция)
     const {
-        data,
+        data: allOrders,
         isFetching,
         fetchNextPage,
         hasNextPage,
-        isFetchingNextPage
+        isFetchingNextPage,
     } = useInfiniteQuery({
         queryKey: ["orders", "list", context],
-        queryFn: ({ pageParam }) =>
-            handleAction(getOrders({
+        queryFn: ({ pageParam }) => {
+            console.log("🔥 [QUERY] fetchNextPage/Initial fetch triggered...");
+            return handleAction(getOrders({
                 ...context!,
                 cursor: pageParam as string,
                 mode: 'list'
-            })),
+            }));
+        },
         initialPageParam: undefined as string | undefined,
         getNextPageParam: (lastPage: GetOrdersResponse<'list'>) => lastPage.nextCursor,
         enabled: !!context,
         notifyOnChangeProps: ['data', 'isFetching', 'isFetchingNextPage'],
         placeholderData: keepPreviousData,
+        select: (data) => {
+            const orders = data.pages.flatMap((page) => page.orders);
+            console.log(`📋 [DATA #${renderCount.current}] Select: ${orders.length} orders found`);
+            return orders;
+        }
     })
 
-    const allOrders = React.useMemo(() => {
-        const orders = data?.pages.flatMap((page) => page.orders) ?? [];
-        if (orders.length > 0) console.log(`📋 [DATA] Orders displayed: ${orders.length}`);
-        return orders;
-    }, [data?.pages]);
+    const ordersCount = allOrders?.length ?? 0;
+    const isInitialLoading = isFetching && ordersCount === 0;
+    const isRefreshing = isFetching && !isFetchingNextPage && ordersCount > 0;
 
-    const isInitialLoading = isFetching && allOrders.length === 0;
-    const isRefreshing = isFetching && !isFetchingNextPage && allOrders.length > 0;
+    console.log(`📊 [STATE #${renderCount.current}] count: ${ordersCount}, fetching: ${isFetching}`);
 
-    if (allOrders.length === 0 && !isFetching) {
+    if (ordersCount === 0 && !isFetching) {
         return <EmptyState />
     }
-    console.log(isRefreshing)
+
     return (
         <div className="relative min-h-[600px]">
-            {/* Оверлей при обновлении */}
-            {isRefreshing && (
-                <div className="absolute inset-x-0 top-0 z-20 flex justify-center pointer-events-none">
-                    <div className="flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-300">
-                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                        <span className="text-xs font-medium text-slate-600">Обновление...</span>
-                    </div>
-                </div>
-            )}
-
-            {/* Скелетоны первого экрана */}
-            {isInitialLoading && (
-                <div className="space-y-10">
-                    {[1, 2, 3].map((i) => <OrderCardSkeleton key={i} />)}
-                </div>
-            )}
-
-            {/* Сетка заказов */}
+            {/* Твой UI (Overlay, Skeletons, Grid) */}
             <div className={cn(
                 "grid gap-10 transition-all duration-500",
                 isRefreshing ? "opacity-50 grayscale-[0.3] blur-[1px]" : "opacity-100 blur-0"
             )}>
-                {allOrders.map((order) => (
+                {allOrders?.map((order) => (
                     <OrderCard
                         key={order.id}
                         order={order}
@@ -141,13 +137,12 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
                 ))}
             </div>
 
-            {/* Триггер скролла вынесен в отдельный компонент */}
             <ScrollObserver
                 hasNextPage={hasNextPage}
                 fetchNextPage={fetchNextPage}
                 isFetchingNextPage={isFetchingNextPage}
                 isFetching={isFetching}
-                allOrdersLength={allOrders.length}
+                allOrdersLength={ordersCount}
             />
         </div>
     )

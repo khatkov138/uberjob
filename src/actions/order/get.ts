@@ -40,7 +40,7 @@ export async function getOrders<T extends 'list' | 'map'>(params: FeedContext & 
       limit = 3,
       mode
     } = params;
-    await delay(3000)
+   // await delay(3000)
     const isList = mode === 'list';
 
     // 1. Динамические условия (SQL)

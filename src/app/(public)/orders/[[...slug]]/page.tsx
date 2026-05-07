@@ -81,10 +81,10 @@ export default async function OrdersPage({ params }: Props) {
   // 4. Создаем промисы для тяжелых данных (БЕЗ await)
   // Мы запускаем выполнение, но не ждем результата на сервере.
   const ordersPromise = getOrders({ ...feedContext, mode });
-  
+
   const popularCategoriesPromise = getPopularCategories(
-    feedContext.lat, 
-    feedContext.lng, 
+    feedContext.lat,
+    feedContext.lng,
     feedContext.radius
   );
 

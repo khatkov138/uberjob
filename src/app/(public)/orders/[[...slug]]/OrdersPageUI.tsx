@@ -34,7 +34,6 @@ interface OrdersPageUIProps {
   initialProfile: FullProfile | null;
   feedContext: FeedContext;
   currentCategory: DBCategory | null;
-  // Строгая типизация промисов без any
   ordersPromise: Promise<ActionResponse<GetOrdersResponse<'list'> | GetOrdersResponse<'map'>>>;
   popularCategoriesPromise: Promise<ActionResponse<PopularCategoryResult[]>>;
 }
@@ -50,7 +49,9 @@ export default function OrdersPageUI({
   const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
 
-  // 1. АТОМАРНЫЕ СЕЛЕКТОРЫ
+  // ЛОГ РЕНДЕРА РОДИТЕЛЯ
+  console.log(`⚛️ [RENDER] OrdersPageUI (Mounted: ${mounted})`);
+
   const globalLocationId = useLocationStore(s => s.globalLocationId);
   const setGlobalLocation = useLocationStore(s => s.setGlobalLocation);
   const locHydrated = useLocationStore(s => s._hasHydrated);
@@ -61,9 +62,12 @@ export default function OrdersPageUI({
 
   const isReady = mounted && locHydrated && ordersHydrated;
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+    console.log("🟢 [MOUNT] OrdersPageUI mounted");
+  }, []);
 
-  // 2. ПРОФИЛЬ
+  // 2. ПРОФИЛЬ (Статичные данные юзера)
   const { data: currentProfile } = useQuery<FullProfile | null>({
     queryKey: ["user-profile"],
     queryFn: () => handleAction(getMyProfile()),
@@ -75,8 +79,11 @@ export default function OrdersPageUI({
 
   // 3. АКТИВНЫЙ КОНТЕКСТ
   const activeContext = useMemo((): FeedContext => {
+    console.log("🧩 [MEMO] Recalculating activeContext...");
     if (!isReady) return feedContext;
+
     const currentSkills = currentProfile?.skills?.map(s => s.categoryId) || feedContext.skillIds;
+
     return {
       ...feedContext,
       locationId: globalLocationId || feedContext.locationId,
@@ -87,13 +94,18 @@ export default function OrdersPageUI({
     };
   }, [isReady, globalLocationId, radius, viewMode, currentProfile, currentCategory, feedContext]);
 
-  // 4. ШИНА ДАННЫХ
+  // 4. ШИНА ДАННЫХ (Актуализация кэша при смене фильтров)
   useEffect(() => {
     if (!isReady) return;
-    queryClient.setQueryData(['feed-context'], activeContext);
+
+    const previousContext = queryClient.getQueryData(['feed-context']);
+    if (JSON.stringify(previousContext) !== JSON.stringify(activeContext)) {
+      console.log("📡 [BUS] Syncing activeContext via useEffect");
+      queryClient.setQueryData(['feed-context'], activeContext);
+    }
   }, [JSON.stringify(activeContext), isReady, queryClient]);
 
-  // 5. СИНХРОНИЗАЦИЯ URL -> ZUSTAND
+  // 5. СИНХРОНИЗАЦИЯ URL -> ZUSTAND (Локация)
   const syncRef = useRef<string | null>(null);
   useEffect(() => {
     if (isReady && feedContext.locationId !== globalLocationId && syncRef.current !== feedContext.locationId) {
@@ -143,7 +155,7 @@ export default function OrdersPageUI({
 }
 
 /**
- * ГИДРАТОР ЗАКАЗОВ 
+ * ГИДРАТОР ЗАКАЗОВ (The Ultimate Hydrator)
  */
 function OrdersInitialHydrator({
   ordersPromise,
@@ -154,11 +166,11 @@ function OrdersInitialHydrator({
   activeContext: FeedContext;
   feedContext: FeedContext;
 }) {
-
-  // Распаковка промиса (React 19)
+  // Распаковка промиса (React 19 use hook)
   const resolvedOrders = use(ordersPromise);
 
-  // Типизированная распаковка. Мы знаем, что сервер прислал данные согласно feedContext.viewMode
+  console.log("💧 [HYDRATOR] Promise resolved, priming cache...");
+
   const initialOrders = unwrap(resolvedOrders, { orders: [], nextCursor: null, total: 0 });
 
   const isInitialState = (
@@ -167,7 +179,18 @@ function OrdersInitialHydrator({
     activeContext.viewMode === feedContext.viewMode
   );
 
-  // Регистрируем Infinite Query в кэше
+  console.log(`🎯 [HYDRATOR] isInitialState: ${isInitialState}`);
+
+  // 1. ДЕКЛАРАТИВНЫЙ OBSERVER (Синхронная шина)
+  useQuery<FeedContext>({
+    queryKey: ['feed-context'],
+    queryFn: () => activeContext,
+    initialData: isInitialState ? feedContext : undefined,
+    enabled: false,
+    staleTime: Infinity,
+  });
+
+  // 2. INFINITE QUERY (LIST)
   useInfiniteQuery<GetOrdersResponse<'list'>>({
     queryKey: ["orders", "list", activeContext],
     queryFn: ({ pageParam }) => handleAction(getOrders({ ...activeContext, cursor: pageParam as string, mode: 'list' })),
@@ -179,9 +202,10 @@ function OrdersInitialHydrator({
     } : undefined,
     enabled: activeContext.viewMode === 'list',
     staleTime: 1000 * 60 * 5,
+    notifyOnChangeProps: ['data'],
   });
 
-  // Регистрируем Map Query в кэше
+  // 3. MAP QUERY
   useQuery<GetOrdersResponse<'map'>>({
     queryKey: ["orders", "map", activeContext],
     queryFn: () => handleAction(getOrders({ ...activeContext, mode: 'map' })),
@@ -190,19 +214,15 @@ function OrdersInitialHydrator({
       : undefined,
     enabled: activeContext.viewMode === 'map',
     staleTime: 1000 * 60 * 5,
+    notifyOnChangeProps: ['data'],
   });
+
+  console.log("✅ [HYDRATOR] All queries primed");
 
   return <ViewRenderer viewMode={activeContext.viewMode} />;
 }
 
-/**
- * ГИДРАТОР САЙДБАРА 
- */
-function OrdersSidebarDataWrapper({
-  promise
-}: {
-  promise: Promise<ActionResponse<PopularCategoryResult[]>>
-}) {
+function OrdersSidebarDataWrapper({ promise }: { promise: Promise<ActionResponse<PopularCategoryResult[]>> }) {
   const data = use(promise);
   const popularCategories = unwrap(data, []);
   return <OrdersSidebar popularCategories={popularCategories} />;
