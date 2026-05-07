@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
-import { FeedOrder } from "@/actions/order/get"
+import { FeedOrder } from "@/actions/order/get-feed"
 
 interface OrderCardProps {
   order: FeedOrder

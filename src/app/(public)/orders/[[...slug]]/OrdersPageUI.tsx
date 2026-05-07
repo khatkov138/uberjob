@@ -9,7 +9,7 @@ import { useLocationStore } from '@/store/use-location-store';
 
 // Actions & Utils
 import { handleAction, unwrap } from '@/lib/utils';
-import { getOrders, GetOrdersResponse } from '@/actions/order/get';
+
 import { FullProfile, getMyProfile } from '@/actions/profile/get';
 import { DBCategory, PopularCategoryResult } from '@/actions/category/get';
 
@@ -28,6 +28,7 @@ import { ViewRenderer } from './_components/layout/view-renderer';
 import { Session } from '@/lib/auth';
 import { FeedContext } from './page';
 import { ActionResponse } from '@/lib/server-utils';
+import { getOrders, GetOrdersResponse } from '@/actions/order/get-feed';
 
 interface OrdersPageUIProps {
   session: Session | null;
@@ -118,6 +119,7 @@ export default function OrdersPageUI({
 
   return (
     <Container className="bg-white max-w-7xl pt-10 pb-20">
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <aside className="lg:col-span-3 space-y-12">
           <OrdersSidebarHeader />
@@ -166,10 +168,17 @@ function OrdersInitialHydrator({
   activeContext: FeedContext;
   feedContext: FeedContext;
 }) {
-  // Распаковка промиса (React 19 use hook)
+  const queryClient = useQueryClient();
+
+  // 1. Распаковка промиса (React 19)
   const resolvedOrders = use(ordersPromise);
 
-  console.log("💧 [HYDRATOR] Promise resolved, priming cache...");
+  // 2. ПРОВЕРКА: Если в кэше уже есть данные (например, 2-я страница), 
+  // мы не должны кормить хук initialData, иначе он сбросит список.
+  const existingData = queryClient.getQueryData(["orders", "list", activeContext]);
+  const hasData = !!existingData;
+
+  console.log(`💧 [HYDRATOR] Promise resolved. hasData in cache: ${hasData}`);
 
   const initialOrders = unwrap(resolvedOrders, { orders: [], nextCursor: null, total: 0 });
 
@@ -181,22 +190,24 @@ function OrdersInitialHydrator({
 
   console.log(`🎯 [HYDRATOR] isInitialState: ${isInitialState}`);
 
-  // 1. ДЕКЛАРАТИВНЫЙ OBSERVER (Синхронная шина)
+  // 3. ДЕКЛАРАТИВНЫЙ OBSERVER (Синхронная шина)
   useQuery<FeedContext>({
     queryKey: ['feed-context'],
     queryFn: () => activeContext,
-    initialData: isInitialState ? feedContext : undefined,
+    // Если это первый маунт, даем начальный контекст
+    initialData: !hasData ? feedContext : undefined,
     enabled: false,
     staleTime: Infinity,
   });
 
-  // 2. INFINITE QUERY (LIST)
+  // 4. INFINITE QUERY (LIST)
   useInfiniteQuery<GetOrdersResponse<'list'>>({
     queryKey: ["orders", "list", activeContext],
     queryFn: ({ pageParam }) => handleAction(getOrders({ ...activeContext, cursor: pageParam as string, mode: 'list' })),
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    initialData: (isInitialState && activeContext.viewMode === 'list') ? {
+    // КРИТИЧНО: initialData даем только если в кэше ПУСТО
+    initialData: (isInitialState && activeContext.viewMode === 'list' && !hasData) ? {
       pages: [initialOrders as GetOrdersResponse<'list'>],
       pageParams: [undefined]
     } : undefined,
@@ -205,11 +216,11 @@ function OrdersInitialHydrator({
     notifyOnChangeProps: ['data'],
   });
 
-  // 3. MAP QUERY
+  // 5. MAP QUERY
   useQuery<GetOrdersResponse<'map'>>({
     queryKey: ["orders", "map", activeContext],
     queryFn: () => handleAction(getOrders({ ...activeContext, mode: 'map' })),
-    initialData: (isInitialState && activeContext.viewMode === 'map')
+    initialData: (isInitialState && activeContext.viewMode === 'map' && !hasData)
       ? (initialOrders as GetOrdersResponse<'map'>)
       : undefined,
     enabled: activeContext.viewMode === 'map',

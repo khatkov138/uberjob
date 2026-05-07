@@ -5,13 +5,14 @@ import prisma from "@/lib/prisma";
 // Libs & Actions
 import { getServerSession } from "@/lib/get-session";
 import { unwrap } from "@/lib/utils";
-import { getOrders } from "@/actions/order/get";
+
 import { getMyProfile } from "@/actions/profile/get";
 import { getPopularCategories } from "@/actions/category/get";
 
 // Серверная логика
 import { getServerLocation, getServerOrdersState } from "@/lib/server-utils";
 import OrdersPageUI from "./OrdersPageUI";
+import { getOrders } from "@/actions/order/get-feed";
 
 export interface FeedContext {
   locationId: string;
