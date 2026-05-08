@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useQuery, useInfiniteQuery, keepPreviousData, useIsFetching } from "@tanstack/react-query"
+import { useQuery, useInfiniteQuery, keepPreviousData, useIsFetching, InfiniteData } from "@tanstack/react-query"
 import { useInView } from "react-intersection-observer"
 import { ArrowUpRight, Loader2, Zap } from "lucide-react"
 
@@ -17,6 +17,7 @@ import { OrderCardSkeleton } from "../shared/order-card-skeleton"
 import { FeedContext } from "../../page"
 import { getOrders, GetOrdersResponse } from "@/actions/order/get-feed"
 import { useActiveFeed } from "../layout/feed-context-provider"
+import { useFeedDataStore } from "@/store/use-feed-data-store"
 
 /**
  * ИЗОЛИРОВАННЫЙ ТРИГГЕР СКРОЛЛА
@@ -64,78 +65,73 @@ const ScrollObserver = React.memo(({ context, hasNextPage, fetchNextPage }: {
 
 export const OrdersFeed = React.memo(function OrdersFeed() {
     const renderCount = React.useRef(0);
-    renderCount.current++;
-    console.log(`📦 [RENDER #${renderCount.current}] OrdersFeed`);
-
-    // 1. Берем контекст из React Context (стабильный объект)
     const context = useActiveFeed();
 
-    // 2. Основной запрос: только данные
-    const {
-        data: allOrders,
-        isFetching,
-        fetchNextPage,
-        hasNextPage,
-        isFetchingNextPage, // Оставляем деструктуризацию для лоджика внизу
-    } = useInfiniteQuery({
+    // 1. ПОЛНОСТЬЮ СЫРОЙ ЗАПРОС
+    const query = useInfiniteQuery<
+        GetOrdersResponse<'list'>,
+        Error,
+        InfiniteData<GetOrdersResponse<'list'>>,
+        [string, string, FeedContext],
+        string | undefined
+    >({
         queryKey: ["orders", "list", context],
         queryFn: ({ pageParam }) => handleAction(getOrders({
-            ...context!,
-            cursor: pageParam as string,
+            ...context,
+            cursor: pageParam,
             mode: 'list'
         })),
         initialPageParam: undefined,
-        getNextPageParam: (lastPage: GetOrdersResponse<'list'>) => lastPage.nextCursor,
+        getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
         enabled: !!context,
         placeholderData: keepPreviousData,
-        // СТЕРИЛЬНОСТЬ: список рендерится только когда реально пришли новые данные
-        notifyOnChangeProps: ['data'],
-
-        // В v5 structuralSharing включен по умолчанию, но для селектов лучше подтвердить
+        notifyOnChangeProps: ['data', 'hasNextPage'],
         structuralSharing: true,
-
-        select: (data) => {
-            // Проверь, не пустой ли массив приходит в промежутке
-            return data.pages.flatMap((page) => page.orders);
-        }
+        // select: убран!
     });
 
+    // 2. ТРАНСФОРМАЦИЯ ДАННЫХ ВНУТРИ РЕНДЕРА
+    // Оборачиваем в useMemo, чтобы ссылки на заказы не менялись при каждом шуме
+    const { allOrders, total } = React.useMemo(() => {
+        const pages = query.data?.pages || [];
+        return {
+            allOrders: pages.flatMap((page) => page.orders),
+            total: pages[0]?.total ?? 0
+        };
+    }, [query.data]);
 
-    const ordersCount = allOrders?.length ?? 0;
-    // Используем флаги для UI-состояний
-    const isRefreshing = isFetching && !isFetchingNextPage && ordersCount > 0;
+    // 3. СИНХРОНИЗАЦИЯ С ХЕДЕРОМ (через Zustand мост)
+    React.useEffect(() => {
+        // Пишем в стор только когда данные реально есть
+        useFeedDataStore.getState().setStats(total, query.isFetching);
+    }, [total, query.isFetching]);
 
-    if (ordersCount === 0 && !isFetching) return <EmptyState />;
+    const ordersCount = allOrders.length;
+    const isRefreshing = query.isFetching && !query.isFetchingNextPage && ordersCount > 0;
+
+    renderCount.current++;
+    console.log(`📦 [RENDER #${renderCount.current}] OrdersFeed | Total: ${total}`);
+
+    if (ordersCount === 0 && !query.isFetching) return <EmptyState />;
 
     return (
         <div className="relative min-h-[600px]">
-            {/* Основной список заказов */}
             <div className={cn(
                 "grid gap-10 transition-all duration-500",
-                isRefreshing ? "opacity-50 grayscale blur-[1px] pointer-events-none scale-[0.99]" : "opacity-100 scale-100"
+                isRefreshing ? "opacity-50 grayscale blur-[1px]" : ""
             )}>
-                {allOrders?.map((order) => (
-                    <OrderCard
-                        key={order.id}
-                        order={order}
-                        isMatch={order.isMatch} // SQL флаг
-                    />
+                {allOrders.map((order) => (
+                    <OrderCard key={order.id} order={order} isMatch={order.isMatch} />
                 ))}
             </div>
 
-            {/* 
-                ФИЗИЧЕСКИЙ ТРИГГЕР: 
-                key={ordersCount} заставляет компонент пересоздаваться при каждом изменении количества заказов.
-            */}
             <ScrollObserver
-                key={ordersCount}
-                context={context} // Прокидываем контекст, чтобы обсервер сам слушал статус
-                hasNextPage={hasNextPage}
-                fetchNextPage={fetchNextPage}
+                key={`trigger-${ordersCount}`}
+                context={context}
+                hasNextPage={query.hasNextPage}
+                fetchNextPage={query.fetchNextPage}
             />
-
-            {/* Финальный бейдж конца ленты (Твоя верстка сохранена полностью) */}
-            {!hasNextPage && ordersCount > 0 && (
+            {!query.hasNextPage && ordersCount > 0 && (
                 <div className="flex flex-col items-center gap-8 py-24 animate-in fade-in slide-in-from-bottom-10 duration-1000">
                     <div className="flex items-center gap-4">
                         <div className="h-[2px] w-12 bg-slate-900/10" />

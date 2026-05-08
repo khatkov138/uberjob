@@ -129,13 +129,17 @@ export default function OrdersPageUI({
               <OrdersSidebarDataWrapper promise={popularCategoriesPromise} />
             </Suspense>
           </aside>
+          <section className="lg:col-span-9 space-y-8">
+            {/* 1. Город виден МГНОВЕННО (т.к. вне Suspense) */}
+            <OrdersPageHeader
 
-          <section className="lg:col-span-9">
-            <OrdersPageHeader currentCategory={currentCategory} />
+              currentCategory={currentCategory} />
 
-            <div className="flex flex-col shadow-2xl shadow-slate-200/40 rounded-[3.5rem] border border-slate-100 bg-white overflow-hidden relative">
+            <div className="flex flex-col shadow-2xl rounded-[3.5rem] border border-slate-100 bg-white overflow-hidden relative">
+              {/* 2. Тулбар тоже виден сразу */}
               <OrdersToolbar />
 
+              {/* 3. Только лента заказов ждет промис */}
               <Suspense fallback={
                 <div className="p-8 space-y-8">
                   <OrderCardSkeleton />
@@ -150,8 +154,8 @@ export default function OrdersPageUI({
               </Suspense>
             </div>
           </section>
-        </div>
 
+        </div>
         <LocationModal />
         <CategorySearchModal />
       </Container>
@@ -159,33 +163,31 @@ export default function OrdersPageUI({
   );
 }
 
-/**
- * ГИДРАТОР ЗАКАЗОВ (The Ultimate Hydrator)
- */
+
+//* ГИДРАТОР ЗАКАЗОВ (The Ultimate Hydrator)
 function OrdersInitialHydrator({
   ordersPromise,
   activeContext,
-  feedContext
+  feedContext,
 }: {
   ordersPromise: Promise<ActionResponse<GetOrdersResponse<'list'> | GetOrdersResponse<'map'>>>;
   activeContext: FeedContext;
   feedContext: FeedContext;
 }) {
-     
   const queryClient = useQueryClient();
 
-  // 1. МГНОВЕННЫЙ ВЫХОД: Если данные в кэше уже есть (мы скроллим), 
-  // гидратор превращается в прозрачный прокси для ViewRenderer.
+  // 1. EARLY EXIT (Скролл/Фильтры)
   const existingData = queryClient.getQueryData(["orders", "list", activeContext]);
 
   if (existingData) {
-    // Важно: возвращаем результат ДО вызова use(promise) и useQuery
+    // Просто возвращаем контент. Header и Toolbar уже отрендерены родителем.
     return <ViewRenderer viewMode={activeContext.viewMode} />;
   }
 
-  // 2. ГИДРАТАЦИЯ: Выполняется только один раз при пустом кэше
+  // 2. ГИДРАТАЦИЯ (React 19)
+  // Компонент "замирает" здесь, пока промис не разрешится.
   const resolvedOrders = use(ordersPromise);
-   console.log("💧 [HYDRATOR] Данные получены, начинаем наполнение кэша");
+
   const initialOrders = unwrap(resolvedOrders, { orders: [], nextCursor: null, total: 0 });
 
   const isInitialState = (
@@ -194,25 +196,24 @@ function OrdersInitialHydrator({
     activeContext.viewMode === feedContext.viewMode
   );
 
-  console.log(`💧 [HYDRATOR] First Time Priming. isInitialState: ${isInitialState}`);
+  console.log("💧 [HYDRATOR] Priming cache...");
 
-  // 3. INFINITE QUERY (Priming)
+  // 3. INFINITE QUERY PRIMING
   useInfiniteQuery<GetOrdersResponse<'list'>>({
     queryKey: ["orders", "list", activeContext],
     queryFn: ({ pageParam }) => handleAction(getOrders({ ...activeContext, cursor: pageParam as string, mode: 'list' })),
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    // Даем initialData только здесь
     initialData: (isInitialState && activeContext.viewMode === 'list') ? {
       pages: [initialOrders as GetOrdersResponse<'list'>],
       pageParams: [undefined]
     } : undefined,
     enabled: activeContext.viewMode === 'list',
     staleTime: 1000 * 60 * 5,
-    notifyOnChangeProps: ['data'], // Изолируем гидратор от мета-данных
+    notifyOnChangeProps: ['data'],
   });
 
-  // 4. MAP QUERY (Priming)
+  // 4. MAP QUERY PRIMING
   useQuery<GetOrdersResponse<'map'>>({
     queryKey: ["orders", "map", activeContext],
     queryFn: () => handleAction(getOrders({ ...activeContext, mode: 'map' })),
@@ -226,8 +227,10 @@ function OrdersInitialHydrator({
 
   console.log("✅ [HYDRATOR] All queries primed");
 
+  // Возвращаем ТОЛЬКО контент (список/карту)
   return <ViewRenderer viewMode={activeContext.viewMode} />;
 }
+
 
 
 function OrdersSidebarDataWrapper({ promise }: { promise: Promise<ActionResponse<PopularCategoryResult[]>> }) {
