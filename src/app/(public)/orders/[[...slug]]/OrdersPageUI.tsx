@@ -80,7 +80,7 @@ export default function OrdersPageUI({
   });
 
   // 3. АКТИВНЫЙ КОНТЕКСТ
-  // 3. АКТИВНЫЙ КОНТЕКСТ
+
   const activeContext = useMemo((): FeedContext => {
     console.log("🧩 [MEMO] Recalculating activeContext...");
 
@@ -171,6 +171,7 @@ function OrdersInitialHydrator({
   activeContext: FeedContext;
   feedContext: FeedContext;
 }) {
+     
   const queryClient = useQueryClient();
 
   // 1. МГНОВЕННЫЙ ВЫХОД: Если данные в кэше уже есть (мы скроллим), 
@@ -184,6 +185,7 @@ function OrdersInitialHydrator({
 
   // 2. ГИДРАТАЦИЯ: Выполняется только один раз при пустом кэше
   const resolvedOrders = use(ordersPromise);
+   console.log("💧 [HYDRATOR] Данные получены, начинаем наполнение кэша");
   const initialOrders = unwrap(resolvedOrders, { orders: [], nextCursor: null, total: 0 });
 
   const isInitialState = (

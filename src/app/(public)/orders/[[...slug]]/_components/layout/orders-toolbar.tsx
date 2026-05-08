@@ -5,29 +5,31 @@ import { List, Map as MapIcon, MapPin, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import { useLocationStore } from "@/store/use-location-store"
-import { useQuery } from "@tanstack/react-query"
 import { useOrdersStore } from "@/store/use-orders-store"
 import { LOCATION_CONFIG } from "@/lib/location-config"
-import { FeedContext } from "../../page"
+import { useActiveFeed } from "../layout/feed-context-provider"
 
 const RADIUS_OPTIONS = LOCATION_CONFIG.SETTINGS.radiusOptions;
 
 export function OrdersToolbar() {
-  // 1. Сторы используем только для ЗАПИСИ (действий) и viewMode
-  const { viewMode, setViewMode, setRadius } = useOrdersStore()
-  const { openModal } = useLocationStore()
+  // ЛОГ РЕНДЕРА
+  const renderCount = React.useRef(0);
+  renderCount.current++;
+  console.log(`🛠️ [RENDER #${renderCount.current}] OrdersToolbar`);
 
-  // 2. ЧИТАЕМ всё из единого источника истины — feed-context
-  const { data: context } = useQuery<FeedContext>({
-    queryKey: ['feed-context'],
-    staleTime: Infinity,
-    // Оставляем заглушку для TS, хотя данные уже в кеше
-    queryFn: () => { throw new Error("Context missing") },
-  })
+  // 1. Сторы используем ТОЛЬКО для записи (действий)
+  // Мы не подписываемся на значения здесь, чтобы не рендериться лишний раз
+  const setViewMode = useOrdersStore(s => s.setViewMode)
+  const setRadius = useOrdersStore(s => s.setRadius)
+  const openModal = useLocationStore(s => s.openModal)
 
-  // Берем значения из контекста, чтобы UI был синхронен с лентой и заголовком
-  const activeCity = context?.name || "Загрузка..."
-  const activeRadius = context?.radius || LOCATION_CONFIG.SETTINGS.radius
+  // 2. ЧИТАЕМ всё из нашего нового стабильного Контекста
+  const context = useActiveFeed();
+
+  // Вычисляем состояние на основе контекста
+  const activeViewMode = context.viewMode;
+  const activeCity = context.name || "Загрузка...";
+  const activeRadius = context.radius || LOCATION_CONFIG.SETTINGS.radius;
 
   return (
     <div className="bg-white px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-100 sticky top-0 z-30">
@@ -35,10 +37,13 @@ export function OrdersToolbar() {
       {/* ЛЕВАЯ ЧАСТЬ: ПЕРЕКЛЮЧАТЕЛЬ ВИДА */}
       <div className="flex bg-slate-50 p-1.5 rounded-[1.25rem] border border-slate-100/80 shadow-inner w-full md:w-auto">
         <button
-          onClick={() => setViewMode("list")}
+          onClick={() => {
+            console.log("🖱️ [UI] Switch to LIST");
+            setViewMode("list");
+          }}
           className={cn(
             "flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase italic transition-all",
-            viewMode === "list"
+            activeViewMode === "list"
               ? "bg-white text-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.05)] ring-1 ring-slate-200/50"
               : "text-slate-400 hover:text-slate-600"
           )}
@@ -47,10 +52,13 @@ export function OrdersToolbar() {
           <span>Список</span>
         </button>
         <button
-          onClick={() => setViewMode("map")}
+          onClick={() => {
+            console.log("🖱️ [UI] Switch to MAP");
+            setViewMode("map");
+          }}
           className={cn(
             "flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase italic transition-all",
-            viewMode === "map"
+            activeViewMode === "map"
               ? "bg-white text-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.05)] ring-1 ring-slate-200/50"
               : "text-slate-400 hover:text-slate-600"
           )}
@@ -62,8 +70,6 @@ export function OrdersToolbar() {
 
       {/* ПРАВАЯ ЧАСТЬ: ГЕО И ФИЛЬТРЫ */}
       <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto">
-
-        {/* КНОПКА СМЕНЫ ГОРОДА */}
         <button
           onClick={openModal}
           className="flex items-center gap-3 group transition-all text-left"
@@ -76,7 +82,7 @@ export function OrdersToolbar() {
               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest italic">Регион</span>
               <ChevronDown size={8} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
             </div>
-            <p className="text-[13px] font-black uppercase italic text-slate-900 leading-none truncate max-w-[120px] md:md:max-w-[180px]">
+            <p className="text-[13px] font-black uppercase italic text-slate-900 leading-none truncate max-w-[120px]">
               {activeCity}
             </p>
           </div>
@@ -89,11 +95,12 @@ export function OrdersToolbar() {
           {RADIUS_OPTIONS.map((r) => (
             <button
               key={r}
-              onClick={() => setRadius(r)} // Меняет Zustand -> триггерит PageUI -> обновляет Context
+              onClick={() => {
+                console.log(`🖱️ [UI] Set Radius to ${r}km`);
+                setRadius(r);
+              }}
               className={cn(
                 "px-3 py-2 rounded-xl text-[9px] font-black uppercase transition-all",
-                // Используем activeRadius из кеша, чтобы кнопка подсвечивалась 
-                // одновременно с обновлением ленты
                 activeRadius === r
                   ? "bg-slate-900 text-white shadow-md scale-105"
                   : "text-slate-400 hover:text-slate-900"

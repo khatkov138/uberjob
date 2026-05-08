@@ -90,9 +90,16 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
         placeholderData: keepPreviousData,
         // СТЕРИЛЬНОСТЬ: список рендерится только когда реально пришли новые данные
         notifyOnChangeProps: ['data'],
+
+        // В v5 structuralSharing включен по умолчанию, но для селектов лучше подтвердить
         structuralSharing: true,
-        select: (data) => data.pages.flatMap((page) => page.orders)
+
+        select: (data) => {
+            // Проверь, не пустой ли массив приходит в промежутке
+            return data.pages.flatMap((page) => page.orders);
+        }
     });
+
 
     const ordersCount = allOrders?.length ?? 0;
     // Используем флаги для UI-состояний
