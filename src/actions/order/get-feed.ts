@@ -5,6 +5,7 @@ import { Prisma, Order, Location, Category, User, OrderCategory } from "@prisma/
 import prisma from "@/lib/prisma"
 import { createAction, ActionResponse } from "@/lib/server-utils";
 import { FeedContext } from "@/app/(public)/orders/[[...slug]]/page";
+import { delay } from "@/lib/utils";
 
 /** 
  * ТИПЫ ДАННЫХ
@@ -55,6 +56,7 @@ export async function getOrders<T extends 'list' | 'map'>(params: FeedContext & 
 }): Promise<ActionResponse<GetOrdersResponse<T>>> {
 
     return createAction<GetOrdersResponse<T>>(async () => {
+        await delay(2000)
         const { lat, lng, radius, categoryId, skillIds = [], cursor, limit = 3, mode } = params;
         const isList = mode === 'list';
 

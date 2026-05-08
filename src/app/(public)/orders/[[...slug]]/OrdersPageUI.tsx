@@ -29,6 +29,7 @@ import { Session } from '@/lib/auth';
 import { FeedContext } from './page';
 import { ActionResponse } from '@/lib/server-utils';
 import { getOrders, GetOrdersResponse } from '@/actions/order/get-feed';
+import { FeedProvider } from './_components/layout/feed-context-provider';
 
 interface OrdersPageUIProps {
   session: Session | null;
@@ -47,7 +48,7 @@ export default function OrdersPageUI({
   ordersPromise,
   popularCategoriesPromise
 }: OrdersPageUIProps) {
-  const queryClient = useQueryClient();
+
   const [mounted, setMounted] = useState(false);
 
   // ЛОГ РЕНДЕРА РОДИТЕЛЯ
@@ -79,32 +80,33 @@ export default function OrdersPageUI({
   });
 
   // 3. АКТИВНЫЙ КОНТЕКСТ
+  // 3. АКТИВНЫЙ КОНТЕКСТ
   const activeContext = useMemo((): FeedContext => {
     console.log("🧩 [MEMO] Recalculating activeContext...");
-    if (!isReady) return feedContext;
 
-    const currentSkills = currentProfile?.skills?.map(s => s.categoryId) || feedContext.skillIds;
+    if (!isReady) return feedContext;
 
     return {
       ...feedContext,
       locationId: globalLocationId || feedContext.locationId,
       radius: radius || feedContext.radius,
       viewMode: viewMode || feedContext.viewMode,
-      skillIds: currentSkills,
+      skillIds: currentProfile?.skills?.map(s => s.categoryId) || feedContext.skillIds,
       categoryId: currentCategory?.id || null
     };
-  }, [isReady, globalLocationId, radius, viewMode, currentProfile, currentCategory, feedContext]);
+    // Массив скиллов и ID категории — достаточные зависимости для пересчета
+  }, [
+    isReady,
+    globalLocationId,
+    radius,
+    viewMode,
+    currentProfile?.skills,
+    currentCategory?.id,
+    feedContext
+  ]);
 
   // 4. ШИНА ДАННЫХ (Актуализация кэша при смене фильтров)
-  useEffect(() => {
-    if (!isReady) return;
 
-    const previousContext = queryClient.getQueryData(['feed-context']);
-    if (JSON.stringify(previousContext) !== JSON.stringify(activeContext)) {
-      console.log("📡 [BUS] Syncing activeContext via useEffect");
-      queryClient.setQueryData(['feed-context'], activeContext);
-    }
-  }, [JSON.stringify(activeContext), isReady, queryClient]);
 
   // 5. СИНХРОНИЗАЦИЯ URL -> ZUSTAND (Локация)
   const syncRef = useRef<string | null>(null);
@@ -118,41 +120,42 @@ export default function OrdersPageUI({
   if (!mounted) return null;
 
   return (
-    <Container className="bg-white max-w-7xl pt-10 pb-20">
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-        <aside className="lg:col-span-3 space-y-12">
-          <OrdersSidebarHeader />
-          <Suspense fallback={<div className="h-40 bg-slate-50 animate-pulse rounded-3xl" />}>
-            <OrdersSidebarDataWrapper promise={popularCategoriesPromise} />
-          </Suspense>
-        </aside>
-
-        <section className="lg:col-span-9">
-          <OrdersPageHeader currentCategory={currentCategory} />
-
-          <div className="flex flex-col shadow-2xl shadow-slate-200/40 rounded-[3.5rem] border border-slate-100 bg-white overflow-hidden relative">
-            <OrdersToolbar />
-
-            <Suspense fallback={
-              <div className="p-8 space-y-8">
-                <OrderCardSkeleton />
-                <OrderCardSkeleton />
-              </div>
-            }>
-              <OrdersInitialHydrator
-                ordersPromise={ordersPromise}
-                activeContext={activeContext}
-                feedContext={feedContext}
-              />
+    <FeedProvider value={activeContext}>
+      <Container className="bg-white max-w-7xl pt-10 pb-20">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          <aside className="lg:col-span-3 space-y-12">
+            <OrdersSidebarHeader />
+            <Suspense fallback={<div className="h-40 bg-slate-50 animate-pulse rounded-3xl" />}>
+              <OrdersSidebarDataWrapper promise={popularCategoriesPromise} />
             </Suspense>
-          </div>
-        </section>
-      </div>
+          </aside>
 
-      <LocationModal />
-      <CategorySearchModal />
-    </Container>
+          <section className="lg:col-span-9">
+            <OrdersPageHeader currentCategory={currentCategory} />
+
+            <div className="flex flex-col shadow-2xl shadow-slate-200/40 rounded-[3.5rem] border border-slate-100 bg-white overflow-hidden relative">
+              <OrdersToolbar />
+
+              <Suspense fallback={
+                <div className="p-8 space-y-8">
+                  <OrderCardSkeleton />
+                  <OrderCardSkeleton />
+                </div>
+              }>
+                <OrdersInitialHydrator
+                  ordersPromise={ordersPromise}
+                  activeContext={activeContext}
+                  feedContext={feedContext}
+                />
+              </Suspense>
+            </div>
+          </section>
+        </div>
+
+        <LocationModal />
+        <CategorySearchModal />
+      </Container>
+    </FeedProvider>
   );
 }
 
@@ -170,16 +173,17 @@ function OrdersInitialHydrator({
 }) {
   const queryClient = useQueryClient();
 
-  // 1. Распаковка промиса (React 19)
-  const resolvedOrders = use(ordersPromise);
-
-  // 2. ПРОВЕРКА: Если в кэше уже есть данные (например, 2-я страница), 
-  // мы не должны кормить хук initialData, иначе он сбросит список.
+  // 1. МГНОВЕННЫЙ ВЫХОД: Если данные в кэше уже есть (мы скроллим), 
+  // гидратор превращается в прозрачный прокси для ViewRenderer.
   const existingData = queryClient.getQueryData(["orders", "list", activeContext]);
-  const hasData = !!existingData;
 
-  console.log(`💧 [HYDRATOR] Promise resolved. hasData in cache: ${hasData}`);
+  if (existingData) {
+    // Важно: возвращаем результат ДО вызова use(promise) и useQuery
+    return <ViewRenderer viewMode={activeContext.viewMode} />;
+  }
 
+  // 2. ГИДРАТАЦИЯ: Выполняется только один раз при пустом кэше
+  const resolvedOrders = use(ordersPromise);
   const initialOrders = unwrap(resolvedOrders, { orders: [], nextCursor: null, total: 0 });
 
   const isInitialState = (
@@ -188,39 +192,29 @@ function OrdersInitialHydrator({
     activeContext.viewMode === feedContext.viewMode
   );
 
-  console.log(`🎯 [HYDRATOR] isInitialState: ${isInitialState}`);
+  console.log(`💧 [HYDRATOR] First Time Priming. isInitialState: ${isInitialState}`);
 
-  // 3. ДЕКЛАРАТИВНЫЙ OBSERVER (Синхронная шина)
-  useQuery<FeedContext>({
-    queryKey: ['feed-context'],
-    queryFn: () => activeContext,
-    // Если это первый маунт, даем начальный контекст
-    initialData: !hasData ? feedContext : undefined,
-    enabled: false,
-    staleTime: Infinity,
-  });
-
-  // 4. INFINITE QUERY (LIST)
+  // 3. INFINITE QUERY (Priming)
   useInfiniteQuery<GetOrdersResponse<'list'>>({
     queryKey: ["orders", "list", activeContext],
     queryFn: ({ pageParam }) => handleAction(getOrders({ ...activeContext, cursor: pageParam as string, mode: 'list' })),
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    // КРИТИЧНО: initialData даем только если в кэше ПУСТО
-    initialData: (isInitialState && activeContext.viewMode === 'list' && !hasData) ? {
+    // Даем initialData только здесь
+    initialData: (isInitialState && activeContext.viewMode === 'list') ? {
       pages: [initialOrders as GetOrdersResponse<'list'>],
       pageParams: [undefined]
     } : undefined,
     enabled: activeContext.viewMode === 'list',
     staleTime: 1000 * 60 * 5,
-    notifyOnChangeProps: ['data'],
+    notifyOnChangeProps: ['data'], // Изолируем гидратор от мета-данных
   });
 
-  // 5. MAP QUERY
+  // 4. MAP QUERY (Priming)
   useQuery<GetOrdersResponse<'map'>>({
     queryKey: ["orders", "map", activeContext],
     queryFn: () => handleAction(getOrders({ ...activeContext, mode: 'map' })),
-    initialData: (isInitialState && activeContext.viewMode === 'map' && !hasData)
+    initialData: (isInitialState && activeContext.viewMode === 'map')
       ? (initialOrders as GetOrdersResponse<'map'>)
       : undefined,
     enabled: activeContext.viewMode === 'map',
@@ -232,6 +226,7 @@ function OrdersInitialHydrator({
 
   return <ViewRenderer viewMode={activeContext.viewMode} />;
 }
+
 
 function OrdersSidebarDataWrapper({ promise }: { promise: Promise<ActionResponse<PopularCategoryResult[]>> }) {
   const data = use(promise);

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useQuery, useInfiniteQuery, keepPreviousData } from "@tanstack/react-query"
+import { useQuery, useInfiniteQuery, keepPreviousData, useIsFetching } from "@tanstack/react-query"
 import { useInView } from "react-intersection-observer"
 import { ArrowUpRight, Loader2, Zap } from "lucide-react"
 
@@ -16,6 +16,7 @@ import { OrderCardSkeleton } from "../shared/order-card-skeleton"
 // Types
 import { FeedContext } from "../../page"
 import { getOrders, GetOrdersResponse } from "@/actions/order/get-feed"
+import { useActiveFeed } from "../layout/feed-context-provider"
 
 /**
  * ИЗОЛИРОВАННЫЙ ТРИГГЕР СКРОЛЛА
@@ -23,37 +24,37 @@ import { getOrders, GetOrdersResponse } from "@/actions/order/get-feed"
  * Это гарантирует, что если после загрузки страницы триггер всё еще в зоне видимости,
  * он сработает повторно без необходимости двигать скролл.
  */
-const ScrollObserver = React.memo(({
-    hasNextPage,
-    fetchNextPage,
-    isFetchingNextPage,
-}: {
+const ScrollObserver = React.memo(({ context, hasNextPage, fetchNextPage }: {
+    context: FeedContext | null,
     hasNextPage: boolean | undefined,
-    fetchNextPage: () => void,
-    isFetchingNextPage: boolean,
-
+    fetchNextPage: () => void
 }) => {
-    // Порог 0 и небольшой margin для мгновенной реакции
+    // 1. Просто слушаем количество активных fetch-процессов для этого ключа
+    // Это вернет 1, если идет fetchNextPage, и 0, если тишина.
+    const isFetchingCount = useIsFetching({
+        queryKey: ["orders", "list", context]
+    });
+
+    const isFetchingNextPage = isFetchingCount > 0;
+
     const { ref, inView } = useInView({
         threshold: 0,
-        rootMargin: '100px',
+        rootMargin: '200px'
     });
 
     React.useEffect(() => {
-        // Если триггер виден и есть что грузить — стреляем немедленно
         if (inView && hasNextPage && !isFetchingNextPage) {
-            console.log("🚀 [SCROLL] Triggering next page...");
             fetchNextPage();
         }
     }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
     return (
-        <div ref={ref} className="h-32 w-full flex items-center justify-center py-10">
+        <div ref={ref} className="h-32 w-full flex items-center justify-center">
             {isFetchingNextPage && (
                 <div className="flex flex-col items-center gap-4 animate-in fade-in">
                     <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                     <span className="text-[10px] font-black uppercase tracking-widest italic opacity-50">
-                        Подгрузка данных...
+                        ZWORK / LOADING...
                     </span>
                 </div>
             )}
@@ -66,52 +67,38 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
     renderCount.current++;
     console.log(`📦 [RENDER #${renderCount.current}] OrdersFeed`);
 
-    // 1. ПАССИВНЫЙ ОБСЕРВЕР ШИНЫ (С заглушкой для корректной работы v5)
-    const { data: context } = useQuery<FeedContext>({
-        queryKey: ['feed-context'],
-        enabled: false,
-        queryFn: () => ({} as FeedContext),
-    });
+    // 1. Берем контекст из React Context (стабильный объект)
+    const context = useActiveFeed();
 
-    // 2. ДЕБАУНС КОНТЕКСТА (Для стабилизации фильтров)
-    const debouncedContext = useDebounce(context, 400);
-
-    // 3. БОЕВОЙ INFINITE QUERY
+    // 2. Основной запрос: только данные
     const {
         data: allOrders,
         isFetching,
         fetchNextPage,
         hasNextPage,
-        isFetchingNextPage,
+        isFetchingNextPage, // Оставляем деструктуризацию для лоджика внизу
     } = useInfiniteQuery({
-        queryKey: ["orders", "list", debouncedContext],
-        queryFn: ({ pageParam }) => {
-            console.log("🔥 [QUERY] API Call executed", { cursor: pageParam });
-            return handleAction(getOrders({
-                ...debouncedContext!,
-                cursor: pageParam as string,
-                mode: 'list'
-            }));
-        },
-        initialPageParam: undefined as string | undefined,
+        queryKey: ["orders", "list", context],
+        queryFn: ({ pageParam }) => handleAction(getOrders({
+            ...context!,
+            cursor: pageParam as string,
+            mode: 'list'
+        })),
+        initialPageParam: undefined,
         getNextPageParam: (lastPage: GetOrdersResponse<'list'>) => lastPage.nextCursor,
-        enabled: !!debouncedContext,
+        enabled: !!context,
         placeholderData: keepPreviousData,
-        // Уведомляем только о данных и статусе подгрузки
-        notifyOnChangeProps: ['data', 'isFetchingNextPage'],
-        select: (data) => {
-            const orders = data.pages.flatMap((page) => page.orders);
-            console.log(`📋 [DATA] Select updated: ${orders.length} orders`);
-            return orders;
-        }
-    })
+        // СТЕРИЛЬНОСТЬ: список рендерится только когда реально пришли новые данные
+        notifyOnChangeProps: ['data'],
+        structuralSharing: true,
+        select: (data) => data.pages.flatMap((page) => page.orders)
+    });
 
     const ordersCount = allOrders?.length ?? 0;
+    // Используем флаги для UI-состояний
     const isRefreshing = isFetching && !isFetchingNextPage && ordersCount > 0;
 
-    if (ordersCount === 0 && !isFetching) {
-        return <EmptyState />
-    }
+    if (ordersCount === 0 && !isFetching) return <EmptyState />;
 
     return (
         <div className="relative min-h-[600px]">
@@ -120,36 +107,29 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
                 "grid gap-10 transition-all duration-500",
                 isRefreshing ? "opacity-50 grayscale blur-[1px] pointer-events-none scale-[0.99]" : "opacity-100 scale-100"
             )}>
-                {allOrders?.map((order, i) => (
-
+                {allOrders?.map((order) => (
                     <OrderCard
                         key={order.id}
                         order={order}
-                        isMatch={order.isMatch}
+                        isMatch={order.isMatch} // SQL флаг
                     />
-
                 ))}
             </div>
 
             {/* 
                 ФИЗИЧЕСКИЙ ТРИГГЕР: 
                 key={ordersCount} заставляет компонент пересоздаваться при каждом изменении количества заказов.
-                Это решает проблему "залипания" скролла, когда данные подгрузились, 
-                но пользователь всё еще видит дно ленты.
             */}
             <ScrollObserver
                 key={ordersCount}
+                context={context} // Прокидываем контекст, чтобы обсервер сам слушал статус
                 hasNextPage={hasNextPage}
                 fetchNextPage={fetchNextPage}
-                isFetchingNextPage={isFetchingNextPage}
-
             />
 
-            {/* Финальный бейдж конца ленты */}
+            {/* Финальный бейдж конца ленты (Твоя верстка сохранена полностью) */}
             {!hasNextPage && ordersCount > 0 && (
                 <div className="flex flex-col items-center gap-8 py-24 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-
-                    {/* Стандарт PRO / HUB */}
                     <div className="flex items-center gap-4">
                         <div className="h-[2px] w-12 bg-slate-900/10" />
                         <div className="flex items-center gap-2">
@@ -169,27 +149,15 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
                         </p>
                     </div>
 
-                    {/* Кнопка в стиле твоих карточек Дашборда */}
                     <button
                         onClick={(e) => {
-                            // 1. Ищем ближайший элемент, у которого включен скролл
                             const findScrollParent = (el: HTMLElement | null): HTMLElement | null => {
                                 if (!el) return null;
                                 if (el.scrollHeight > el.clientHeight) return el;
                                 return findScrollParent(el.parentElement);
                             };
-
                             const scrollParent = findScrollParent(e.currentTarget);
-
-                            if (scrollParent) {
-                                scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
-                                console.log("🚀 [UI] Нашли скролл-родителя и всплыли!");
-                            } else {
-                                // План Б: если DOM-дерево слишком сложное
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                                document.body.scrollTo({ top: 0, behavior: 'smooth' });
-                                document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
-                            }
+                            (scrollParent || window).scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                         className={cn(
                             "group flex items-center gap-6 px-10 py-6 rounded-[2.5rem] transition-all duration-500",
@@ -205,5 +173,5 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
                 </div>
             )}
         </div>
-    )
+    );
 });
