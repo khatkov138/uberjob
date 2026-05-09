@@ -117,16 +117,5 @@ export function slugify(text: string) {
     .replace(/^-|-$/g, '');     // обрезаем по краям
 }
 
-export const getOrdersKey = (context: FeedContext, mode: string) => {
-  // Вырезаем skillIds из объекта, чтобы не дублировать данные в ключе
-  const { skillIds, ...restContext } = context;
-
-  return [
-    "orders",
-    mode,
-    restContext, // Чистый объект без "тяжелого" массива
-    skillIds?.join(",") || "all" // Наша реактивная строка-триггер
-  ];
-};
 
 

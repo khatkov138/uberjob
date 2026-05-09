@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect, useRef, useState, Suspense, use } from 'react';
+import React, { useMemo, useEffect, useRef, useState, Suspense, use } from 'react';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Store & Hooks
@@ -8,7 +8,7 @@ import { useOrdersStore } from '@/store/use-orders-store';
 import { useLocationStore } from '@/store/use-location-store';
 
 // Actions & Utils
-import { getOrdersKey, handleAction, unwrap } from '@/lib/utils';
+import { handleAction, unwrap } from '@/lib/utils';
 
 import { FullProfile, getMyProfile } from '@/actions/profile/get';
 import { DBCategory, PopularCategoryResult } from '@/actions/category/get';
@@ -30,6 +30,7 @@ import { FeedContext } from './page';
 import { ActionResponse } from '@/lib/server-utils';
 import { getOrders, GetOrdersResponse } from '@/actions/order/get-feed';
 import { FeedProvider } from './_components/layout/feed-context-provider';
+import { OrderPreviewSheet } from './_components/shared/order-preview-sheet';
 
 interface OrdersPageUIProps {
   session: Session | null;
@@ -156,6 +157,8 @@ export default function OrdersPageUI({
           </section>
 
         </div>
+
+         <OrderPreviewSheet />
         <LocationModal />
         <CategorySearchModal />
       </Container>
@@ -174,63 +177,47 @@ function OrdersInitialHydrator({
   activeContext: FeedContext;
   feedContext: FeedContext;
 }) {
+
   const queryClient = useQueryClient();
 
-  // 1. EARLY EXIT (Скролл/Фильтры)
-  const existingData = queryClient.getQueryData(["orders", "list", activeContext]);
-
-  if (existingData) {
-
-    // Просто возвращаем контент. Header и Toolbar уже отрендерены родителем.
-    return <ViewRenderer viewMode={activeContext.viewMode} />;
-  }
-
-  // 2. ГИДРАТАЦИЯ (React 19)
-  // Компонент "замирает" здесь, пока промис не разрешится.
-  const resolvedOrders = use(ordersPromise);
-
-  const initialOrders = unwrap(resolvedOrders, { orders: [], nextCursor: null, total: 0 });
-
-  const isInitialState = (
+  // 1. ОПРЕДЕЛЯЕМ ТОЧКУ ВХОДА (Мемоизируем, чтобы лог не спамил)
+  const isInitialState = React.useMemo(() => (
     activeContext.locationId === feedContext.locationId &&
     activeContext.radius === feedContext.radius &&
     activeContext.viewMode === feedContext.viewMode &&
-    // ДОБАВЛЯЕМ СЮДА:
     JSON.stringify(activeContext.skillIds?.sort()) === JSON.stringify(feedContext.skillIds?.sort())
-  );
+  ), [activeContext, feedContext]);
 
-  console.log("💧 [HYDRATOR] Priming cache...");
+  // 2. ВСКРЫВАЕМ ПРОМИС (Только если это реально первый рендер страницы)
+  // В React 19 use() можно вызывать условно. Если не initial — мы не ждем сервер.
+  const resolvedOrders = isInitialState ? use(ordersPromise) : null;
 
-  // 3. INFINITE QUERY PRIMING
-  useInfiniteQuery<GetOrdersResponse<'list'>>({
-    queryKey: ['orders', 'list', activeContext],
-    queryFn: ({ pageParam }) => handleAction(getOrders({ ...activeContext, cursor: pageParam as string, mode: 'list' })),
-    initialPageParam: undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    initialData: (isInitialState && activeContext.viewMode === 'list') ? {
-      pages: [initialOrders as GetOrdersResponse<'list'>],
-      pageParams: [undefined]
-    } : undefined,
-    enabled: activeContext.viewMode === 'list',
-    staleTime: 1000 * 60 * 5,
-    notifyOnChangeProps: ['data'],
-  });
+  // 3. СИНХРОННЫЙ ПРАЙМИНГ КЭША
+  // Используем useMemo как эффект, который срабатывает ДО рендера детей
+  React.useMemo(() => {
+    if (resolvedOrders && isInitialState) {
+      const initialOrders = unwrap(resolvedOrders, { orders: [], nextCursor: null, total: 0 });
+      const queryKey = ["orders", activeContext.viewMode, activeContext];
 
-  // 4. MAP QUERY PRIMING
-  useQuery<GetOrdersResponse<'map'>>({
-    queryKey: getOrdersKey(activeContext, 'map'),
-    queryFn: () => handleAction(getOrders({ ...activeContext, mode: 'map' })),
-    initialData: (isInitialState && activeContext.viewMode === 'map')
-      ? (initialOrders as GetOrdersResponse<'map'>)
-      : undefined,
-    enabled: activeContext.viewMode === 'map',
-    staleTime: 1000 * 60 * 5,
-    notifyOnChangeProps: ['data'],
-  });
+      // Заправляем кэш, если там пусто (чтобы не перезатереть живые данные)
+      if (!queryClient.getQueryData(queryKey)) {
+        if (activeContext.viewMode === 'list') {
+          queryClient.setQueryData(queryKey, {
+            pages: [initialOrders as GetOrdersResponse<'list'>],
+            pageParams: [undefined]
+          });
+        } else {
+          queryClient.setQueryData(queryKey, initialOrders as GetOrdersResponse<'map'>);
+        }
+        console.log(`💧 [HYDRATOR] Cache primed for ${activeContext.viewMode}`);
+      }
+    }
+  }, [resolvedOrders, isInitialState, queryClient, activeContext]);
 
-  console.log("✅ [HYDRATOR] All queries primed");
+  // КОНТРОЛЬНЫЙ ЛОГ: Теперь он будет срабатывать ТОЛЬКО при смене фильтров, 
+  // но НЕ при скролле ленты, так как гидратор больше не подписан на useInfiniteQuery
+  console.log(`✅ [HYDRATOR RENDER] Initial: ${isInitialState}, Mode: ${activeContext.viewMode}`);
 
-  // Возвращаем ТОЛЬКО контент (список/карту)
   return <ViewRenderer viewMode={activeContext.viewMode} />;
 }
 

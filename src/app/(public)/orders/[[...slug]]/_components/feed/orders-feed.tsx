@@ -5,7 +5,7 @@ import { useQuery, useInfiniteQuery, keepPreviousData, useIsFetching, InfiniteDa
 import { useInView } from "react-intersection-observer"
 import { ArrowUpRight, Loader2, RefreshCcw, Zap } from "lucide-react"
 
-import { cn, getOrdersKey, handleAction } from "@/lib/utils"
+import { cn, handleAction } from "@/lib/utils"
 import { useDebounce } from "@/hooks/use-debounce"
 
 // Components
@@ -132,7 +132,7 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
     const renderCount = React.useRef(0);
     const context = useActiveFeed();
 
-    // 1. ПОЛНОСТЬЮ СЫРОЙ ЗАПРОС
+    // 1. ЧИСТЫЙ ЗАПРОС (Следит только за данными для списка)
     const query = useInfiniteQuery<GetOrdersResponse<'list'>>({
         queryKey: ['orders', 'list', context],
         queryFn: ({ pageParam }) => handleAction(getOrders({ ...context, cursor: pageParam as string, mode: 'list' })),
@@ -140,33 +140,30 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
         getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
         enabled: !!context,
         placeholderData: keepPreviousData,
+        // Оставляем только то, что реально меняет структуру списка
         notifyOnChangeProps: ['data', 'hasNextPage', 'isError'],
         structuralSharing: true,
-        // select: убран!
     });
 
-    // 2. ТРАНСФОРМАЦИЯ ДАННЫХ ВНУТРИ РЕНДЕРА
-    // Оборачиваем в useMemo, чтобы ссылки на заказы не менялись при каждом шуме
+    // 2. ТРАНСФОРМАЦИЯ (Только расчеты для отрисовки)
     const { allOrders, total } = React.useMemo(() => {
         const pages = query.data?.pages || [];
         return {
-            // Нам нужна длина этого массива для счетчика "Загружено"
             allOrders: pages.flatMap((page) => page.orders),
             total: pages[0]?.total ?? 0
         };
     }, [query.data]);
 
-    // 3. СИНХРОНИЗАЦИЯ С ХЕДЕРОМ
+    // 3. АТОМАРНАЯ СИНХРОНИЗАЦИЯ (Без query.isFetching)
+    // Рендерит хедер только когда меняется реальное количество заказов
     React.useEffect(() => {
-        // Теперь передаем три параметра:
-        // 1. total — общее число с сервера (например, 18)
-        // 2. allOrders.length — сколько реально отрисовано (например, 10)
-        // 3. query.isFetching — статус для индикации загрузки
-        useFeedDataStore.getState().setStats(total, allOrders.length, query.isFetching);
-    }, [total, allOrders.length, query.isFetching]);
+        const store = useFeedDataStore.getState();
+        if (store.totalCount !== total || store.loadedCount !== allOrders.length) {
+            store.setStats(total, allOrders.length, store.isFetching);
+        }
+    }, [total, allOrders.length]);
 
     const ordersCount = allOrders.length;
-    const isRefreshing = query.isFetching && !query.isFetchingNextPage && ordersCount > 0;
 
     renderCount.current++;
     console.log(`📦 [RENDER #${renderCount.current}] OrdersFeed | Total: ${total}`);
@@ -175,15 +172,14 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
 
     return (
         <div className="relative min-h-[600px]">
-            <div className={cn(
-                "grid gap-10 transition-all duration-500",
-                isRefreshing ? "opacity-50 grayscale blur-[1px]" : ""
-            )}>
+            {/* Список карточек */}
+            <div className="grid gap-10 transition-all duration-500">
                 {allOrders.map((order) => (
                     <OrderCard key={order.id} order={order} isMatch={order.isMatch} />
                 ))}
             </div>
 
+            {/* Бесконечный скролл */}
             <ScrollObserver
                 key={`trigger-${ordersCount}`}
                 context={context}
@@ -191,6 +187,8 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
                 fetchNextPage={query.fetchNextPage}
                 isError={query.isError}
             />
+
+            {/* Финальный блок (The End) */}
             {!query.hasNextPage && ordersCount > 0 && (
                 <div className="flex flex-col items-center gap-8 py-24 animate-in fade-in slide-in-from-bottom-10 duration-1000">
                     <div className="flex items-center gap-4">
@@ -207,29 +205,17 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
                             Поздравляем, <br />
                             <span className="text-blue-600">вы достигли дна</span>
                         </h4>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] italic">
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] italic text-slate-400">
                             Больше заказов нет. Время всплывать.
                         </p>
                     </div>
 
                     <button
-                        onClick={(e) => {
-                            const findScrollParent = (el: HTMLElement | null): HTMLElement | null => {
-                                if (!el) return null;
-                                if (el.scrollHeight > el.clientHeight) return el;
-                                return findScrollParent(el.parentElement);
-                            };
-                            const scrollParent = findScrollParent(e.currentTarget);
-                            (scrollParent || window).scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        className={cn(
-                            "group flex items-center gap-6 px-10 py-6 rounded-[2.5rem] transition-all duration-500",
-                            "bg-slate-900 text-white font-black uppercase italic tracking-tighter text-xl shadow-xl",
-                            "hover:scale-[1.02] active:scale-95 hover:bg-blue-600 hover:shadow-blue-200"
-                        )}
+                        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                        className="group flex items-center gap-6 px-10 py-6 bg-slate-900 text-white rounded-[2.5rem] hover:bg-blue-600 transition-all hover:scale-[1.02] active:scale-95 shadow-xl"
                     >
-                        <span>Наверх</span>
-                        <div className="p-2 bg-white/10 rounded-xl group-hover:bg-white/20 transition-colors">
+                        <span className="text-xl font-black uppercase italic tracking-tighter">Наверх</span>
+                        <div className="p-2 bg-white/10 rounded-xl">
                             <ArrowUpRight className="w-6 h-6" />
                         </div>
                     </button>

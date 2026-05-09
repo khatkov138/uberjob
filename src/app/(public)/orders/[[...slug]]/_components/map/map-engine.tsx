@@ -5,7 +5,7 @@ import { YMaps, Map, Placemark, Circle, ZoomControl, Clusterer } from "@pbe/reac
 import { Target, MapPin, Loader2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { BaseOrder } from "@/actions/order/get"
+import { BaseOrder } from "@/actions/order/get-feed"
 
 interface OrdersMapProps {
   orders: BaseOrder[]
@@ -86,24 +86,33 @@ export const MapEngine = ({ orders, center, radius, isFetching }: OrdersMapProps
             }}
           >
             {orders.map((order, index) => {
-              // Спиральный джиттер для слипшихся точек
+              // ТВОЙ ГЕНИАЛЬНЫЙ ДЖИТТЕР (сохранен на 100%)
               const angle = index * 0.8;
               const dist = 0.00025 * Math.sqrt(index);
+              const jitteredGeometry = [order.lat + dist * Math.cos(angle), order.lng + dist * Math.sin(angle)];
 
               return (
                 <Placemark
                   key={order.id}
-                  geometry={[order.lat + dist * Math.cos(angle), order.lng + dist * Math.sin(angle)]}
+                  geometry={jitteredGeometry}
                   properties={{
                     balloonContentHeader: `<div style="font-family: sans-serif; font-weight: 900; font-style: italic; text-transform: uppercase; font-size: 12px; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 8px;">Заказ #${order.id.slice(-4)}</div>`,
                     balloonContentBody: `<div style="font-family: sans-serif; font-weight: 900; font-style: italic; color: #2563eb; font-size: 20px;">${order.price > 0 ? order.price.toLocaleString() + ' ₽' : 'Договорная'}</div>`,
-                    balloonContentFooter: `<a href="/orders/${order.id}" target="_blank" style="display: block; background: #000; color: #fff; text-decoration: none; text-align: center; padding: 10px; margin-top: 12px; font-family: sans-serif; font-weight: 900; font-style: italic; text-transform: uppercase; font-size: 10px; border-radius: 8px;">Открыть</a>`
                   }}
                   options={{
                     preset: order.isMatch ? 'islands#blueCircleDotIcon' : 'islands#blackCircleDotIcon',
                     iconColor: order.isMatch ? '#2563eb' : '#0f172a',
-                    hideIconOnBalloonOpen: false,
-                    balloonOffset: [0, -30]
+                    hideIconOnBalloonOpen: false, // Оставляем балун как быстрый чек
+                  }}
+                  onClick={() => {
+                    const params = new URLSearchParams(window.location.search);
+                    // Используем ПРАВИЛЬНОЕ поле slug
+                    params.set("viewOrder", order.slug);
+
+                    const newUrl = `${window.location.pathname}?${params.toString()}`;
+                    window.history.pushState(null, "", newUrl);
+
+                    console.log(`🎯 [MAP] Opening Sheet for Slug: ${order.slug}`);
                   }}
                 />
               )

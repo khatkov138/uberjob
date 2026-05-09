@@ -25,8 +25,9 @@ export default function TanstackProvider({
                             staleTime: 60 * 1000, //6sec
                             //refetchOnMount: false,
                             //  refetchInterval: 30 * 1000,
-                            // refetchOnWindowFocus: true,
+                          //  refetchOnWindowFocus: true,
                             retry: false,
+                             refetchOnWindowFocus: false, // ОТКЛЮЧАЕМ. Это убьет 90% фантомных багов при переключении вкладок.
 
 
                         },

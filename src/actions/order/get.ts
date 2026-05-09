@@ -25,6 +25,7 @@ export async function getClientOrders() {
 
 
 export async function getActiveOrdersCount(role: 'CLIENT' | 'WORKER') {
+
   return createAuthAction(async (userId) => {
     // Для Клиента активные — это те, что еще не завершены и не отменены
     // Для Воркера активные — это те, где он уже утвержден и работает
@@ -53,8 +54,6 @@ export async function getOrderByIdOrSlug(identifier: string) {
     const session = await getServerSession()
     const userId = session?.user?.id || null
 
-    // Определяем, по какому полю искать
-    // Если строка начинается на 'c' и она достаточно длинная — скорее всего это CUID (ID)
     const isId = identifier.startsWith('c') && identifier.length > 20;
     const where = isId ? { id: identifier } : { slug: identifier };
 
@@ -69,9 +68,25 @@ export async function getOrderByIdOrSlug(identifier: string) {
             _count: { select: { ordersCreated: true } }
           }
         },
-        categories: { include: { category: true } },
-        location: { select: { name: true, slug: true } }, // Добавляем локацию для деталей
+        // Подтягиваем категории для бейджей в Sheet
+        categories: {
+          include: {
+            category: {
+              select: { name: true, slug: true }
+            }
+          }
+        },
+        // Подтягиваем локацию целиком для адреса
+        location: {
+          select: {
+            name: true,
+            slug: true,
+            lat: true,
+            lng: true
+          }
+        },
         _count: { select: { offers: true } },
+        // Офферы (только для владельца)
         offers: {
           where: {
             order: { clientId: userId || "guest_access" }
@@ -84,15 +99,23 @@ export async function getOrderByIdOrSlug(identifier: string) {
       }
     })
 
-    if (!order) throw new Error("Not found");
+    if (!order) throw new Error("Order not found");
 
+    // Проверяем статус мастера по отношению к заказу
     const existingOffer = userId
-      ? await prisma.offer.findFirst({ where: { orderId: order.id, workerId: userId } })
+      ? await prisma.offer.findFirst({
+        where: { orderId: order.id, workerId: userId },
+        select: { id: true, status: true }
+      })
       : null
 
     return {
-      order,
+      order: {
+        ...order,
+        isOwner: userId === order.clientId,
+      },
       existingOffer: !!existingOffer,
+      offerStatus: existingOffer?.status || null,
       userId
     }
   })

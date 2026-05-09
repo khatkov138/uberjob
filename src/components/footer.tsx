@@ -1,115 +1,107 @@
 "use client"
-import Link from "next/link";
-import {
-  Rocket,
 
-  Mail,
-  MapPin,
-  ExternalLink,
-  XIcon
-} from "lucide-react";
-import { GitHubIcon } from "./icons/GitHubIcon";
-import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import * as React from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { Rocket, Mail, MapPin, ArrowUpRight, Globe } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { GitHubIcon } from "./icons/GitHubIcon"
+import { XIcon } from "lucide-react"
 
-interface FooterProps {
-
-  className?: string
-}
-
-export function Footer({ className }: FooterProps) {
-  const currentYear = new Date().getFullYear();
-
+export function Footer({ className }: { className?: string }) {
   const pathname = usePathname()
+  const currentYear = new Date().getFullYear()
 
-  // Список страниц, где футер НЕ НУЖЕН (например, в чате)
-  const isChat = pathname.includes("/chat")
+  // Скрываем футер на страницах чата и в самой ленте (если там бесконечный скролл)
+  const isHideFooter = pathname.includes("/chat") || pathname.includes("/orders")
 
-  if (isChat) return null
+  if (isHideFooter) return null
 
   return (
-    <footer className={cn("w-full border-t bg-background mt-20", className)}>
-      <div className="max-w-7xl mx-auto px-4 py-12 md:py-16">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-8">
+    <footer className={cn("w-full bg-white border-t border-slate-100 pt-24 pb-12", className)}>
+      <div className="max-w-[1400px] mx-auto px-6">
 
-          {/* 1. БРЕНД И ОПИСАНИЕ */}
-          <div className="col-span-1 md:col-span-1 space-y-4">
-            <Link href="/" className="transition-transform hover:scale-105 active:scale-95 inline-block">
-              <span className="font-black text-2xl tracking-tighter text-blue-600">
-                Uber<span className="text-foreground">Job</span>
+        {/* ВЕРХНИЙ БЛОК: АГРЕССИВНЫЙ БРЕНДИНГ */}
+        <div className="flex flex-col lg:flex-row justify-between items-start gap-16 mb-20">
+          <div className="max-w-sm space-y-6">
+            <Link href="/" className="group">
+              <span className="text-4xl font-[1000] tracking-[ -0.08em] uppercase italic leading-none text-slate-950 group-hover:text-blue-600 transition-colors">
+                ZWORK<span className="text-blue-600">.</span>
               </span>
             </Link>
-            <p className="text-sm text-muted-foreground leading-relaxed italic">
-              Умный сервис заказа услуг. <br />
-              ИИ-классификация и Uber-механика в одном приложении.
+            <p className="text-sm font-bold uppercase italic tracking-tighter text-slate-400 leading-relaxed">
+              Умный протокол распределения задач. <br />
+              <span className="text-slate-900">AI-классификация</span> и <span className="text-slate-900">Uber-механика</span> в архитектуре Next.js 15.
             </p>
-            <div className="flex items-center gap-4 pt-2">
-              <Link href="#" className="text-muted-foreground hover:text-blue-600 transition-colors">
-                <XIcon className="w-5 h-5" />
+            <div className="flex gap-4">
+              <Link href="#" className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl hover:bg-slate-950 hover:text-white transition-all">
+                <XIcon className="w-4 h-4" />
               </Link>
-              <Link href="#" className="text-muted-foreground hover:text-blue-600 transition-colors">
-                <GitHubIcon className="w-5 h-5" />
+              <Link href="#" className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl hover:bg-slate-950 hover:text-white transition-all">
+                <GitHubIcon className="w-4 h-4" />
               </Link>
             </div>
           </div>
 
-          {/* 2. КЛИЕНТАМ */}
-          <div className="space-y-4">
-            <h4 className="font-black text-sm uppercase tracking-widest text-blue-600">Заказчикам</h4>
-            <ul className="space-y-3 text-sm font-medium">
-              <li><Link href="/client/new-order" className="hover:underline underline-offset-4">Создать задачу</Link></li>
-              <li><Link href="/client/dashboard" className="hover:underline underline-offset-4">Мои заказы</Link></li>
-              <li><Link href="/about" className="hover:underline underline-offset-4">Как это работает</Link></li>
-              <li><Link href="/help" className="hover:underline underline-offset-4 text-muted-foreground">Центр поддержки</Link></li>
-            </ul>
-          </div>
+          {/* НАВИГАЦИЯ В СТИЛЕ ТЕХНО-ТАБЛИЦЫ */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-12 sm:gap-24">
+            <div className="space-y-6">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600">Система</h4>
+              <ul className="flex flex-col gap-4 text-sm font-black uppercase italic tracking-tighter">
+                <li><Link href="/client/new-order" className="hover:translate-x-1 inline-block transition-transform">Создать таск</Link></li>
+                <li><Link href="/orders" className="hover:translate-x-1 inline-block transition-transform text-slate-400">Лента заказов</Link></li>
+                <li><Link href="/about" className="hover:translate-x-1 inline-block transition-transform">Протокол</Link></li>
+              </ul>
+            </div>
 
-          {/* 3. МАСТЕРАМ */}
-          <div className="space-y-4">
-            <h4 className="font-black text-sm uppercase tracking-widest text-blue-600">Мастерам</h4>
-            <ul className="space-y-3 text-sm font-medium">
-              <li><Link href="/pro/feed" className="hover:underline underline-offset-4">Поиск работы</Link></li>
-              <li><Link href="/pro/dashboard" className="hover:underline underline-offset-4">Панель управления</Link></li>
-              <li><Link href="/settings" className="hover:underline underline-offset-4">Настройки профиля</Link></li>
-              <li><Link href="#" className="flex items-center gap-1 hover:underline underline-offset-4 text-muted-foreground">
-                Стать партнером <ExternalLink className="w-3 h-3" />
-              </Link></li>
-            </ul>
-          </div>
+            <div className="space-y-6">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600">Партнерам</h4>
+              <ul className="flex flex-col gap-4 text-sm font-black uppercase italic tracking-tighter">
+                <li><Link href="/pro/dashboard" className="hover:translate-x-1 inline-block transition-transform">Дашборд</Link></li>
+                <li><Link href="/settings" className="hover:translate-x-1 inline-block transition-transform">Профиль</Link></li>
+                <li><Link href="#" className="flex items-center gap-1 text-slate-400 hover:text-slate-950 transition-colors">
+                  API Docs <ArrowUpRight size={12} />
+                </Link></li>
+              </ul>
+            </div>
 
-          {/* 4. КОНТАКТЫ */}
-          <div className="space-y-4">
-            <h4 className="font-black text-sm uppercase tracking-widest text-blue-600">Контакты</h4>
-            <ul className="space-y-3 text-sm font-medium">
-              <li className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-muted-foreground" />
-                <span>support@uberjob.ru</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-muted-foreground" />
-                <span className="italic">Иркутск, Россия</span>
-              </li>
-              <li className="pt-2">
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-center gap-2">
-                  <Rocket className="w-4 h-4 text-blue-600 animate-bounce" />
-                  <span className="text-[10px] font-bold text-blue-700 leading-tight">
-                    Работаем на <br /> Next.js 15 + AI
+            <div className="hidden sm:block space-y-6">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600">Связь</h4>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-xs font-black italic">
+                  <Globe size={14} className="text-slate-400" />
+                  <span>ИРКУТСК / РФ</span>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-3 group hover:border-blue-200 transition-colors cursor-pointer">
+                  <Rocket className="w-5 h-5 text-blue-600 group-hover:animate-bounce" />
+                  <span className="text-[9px] font-black uppercase leading-tight">
+                    Vercel Edge <br /> Deployment
                   </span>
                 </div>
-              </li>
-            </ul>
+              </div>
+            </div>
           </div>
-
         </div>
 
-        <div className="mt-16 pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          <p>© {currentYear} UberJob Inc. Все права защищены.</p>
-          <div className="flex gap-6">
-            <Link href="/privacy" className="hover:text-blue-600 transition-colors">Политика конфиденциальности</Link>
-            <Link href="/terms" className="hover:text-blue-600 transition-colors">Условия использования</Link>
+        {/* НИЖНЯЯ ПАНЕЛЬ */}
+        <div className="pt-12 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="flex items-center gap-6">
+            <span className="text-[10px] font-black text-slate-950 uppercase tracking-widest">
+              © {currentYear} ZWORK INC.
+            </span>
+            <div className="h-4 w-px bg-slate-200 hidden md:block" />
+            <div className="flex gap-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <Link href="/privacy" className="hover:text-slate-950 transition-colors">Privacy</Link>
+              <Link href="/terms" className="hover:text-slate-950 transition-colors">Terms</Link>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            All systems operational
           </div>
         </div>
       </div>
     </footer>
-  );
+  )
 }
