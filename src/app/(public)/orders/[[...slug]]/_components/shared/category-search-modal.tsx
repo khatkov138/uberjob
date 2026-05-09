@@ -1,152 +1,186 @@
 "use client"
 
 import * as React from "react"
-import { X, Search, Plus, Check, Loader2 } from "lucide-react"
+import { X, Search, Plus, Check, Loader2, SearchX } from "lucide-react"
 import { cn, handleAction } from "@/lib/utils"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { DBCategory, getAllCategories } from "@/actions/category/get"
-
 import { useCategoryModalStore } from "@/store/use-category-modal-store"
 import { toast } from "sonner"
 import { FullProfile } from "@/actions/profile/get"
 import { addSkill, removeSkill } from "@/actions/profile/manage"
 
-
+// ТЕХНО-СКЕЛЕТОН: Стабильная геометрия
+const CategoryItemSkeleton = () => (
+  <div className="w-full flex items-center justify-between p-5 rounded-[1.5rem] border-2 border-slate-50 bg-white/50 relative overflow-hidden">
+    <div className="h-4 bg-slate-100 rounded-md w-1/3 animate-pulse" />
+    <div className="w-8 h-8 rounded-xl bg-slate-50 animate-pulse" />
+    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-50/50 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+  </div>
+)
 
 export function CategorySearchModal() {
   const { isOpen, close } = useCategoryModalStore()
   const [query, setQuery] = React.useState("")
   const queryClient = useQueryClient()
 
+  // 1. ЗАГРУЗКА КАТЕГОРИЙ (Кэш на 1 час)
   const { data: dbCategories = [], isLoading } = useQuery<DBCategory[]>({
     queryKey: ["all-categories"],
     queryFn: async () => await handleAction(getAllCategories()),
     enabled: isOpen,
     staleTime: 1000 * 60 * 60,
-  });
+  })
 
-  // Получаем профиль из кеша: добавляем заглушку и типизацию
-  const { data: profile } = useQuery<FullProfile | null>({
+  // 2. ПРОФИЛЬ (Строгий контракт: данные обязаны быть в кэше)
+  const { data: profile } = useQuery<FullProfile>({
     queryKey: ["user-profile"],
-    queryFn: () => { throw new Error("Profile should be in cache") },
-    // Активен только когда модалка открыта, но не делает запросов сам
+    queryFn: () => {
+      const cached = queryClient.getQueryData<FullProfile>(["user-profile"])
+      if (!cached) throw new Error("CRITICAL: Profile must be pre-hydrated in cache")
+      return cached
+    },
     enabled: isOpen,
-  });
+    staleTime: Infinity,
+  })
 
   const userCategoryIds = React.useMemo(() =>
     new Set(profile?.skills?.map(s => s.categoryId) || []),
     [profile]
-  );
+  )
 
-  const { mutate: toggleSkill, variables } = useMutation({
+  // 3. МУТАЦИЯ: Оптимистичный UI + Фикс залипания лоадера через status
+  const { mutate: toggleSkill, variables, status } = useMutation({
     mutationFn: async ({ id, isSelected }: { id: string; isSelected: boolean }) => {
-      return isSelected
-        ? await handleAction(removeSkill(id))
-        : await handleAction(addSkill(id));
+      return isSelected ? await handleAction(removeSkill(id)) : await handleAction(addSkill(id))
     },
     onMutate: async ({ id, isSelected }) => {
-      await queryClient.cancelQueries({ queryKey: ["user-profile"] });
-      const previousProfile = queryClient.getQueryData<FullProfile>(["user-profile"]);
+      await queryClient.cancelQueries({ queryKey: ["user-profile"] })
+      const previousProfile = queryClient.getQueryData<FullProfile>(["user-profile"])
 
       queryClient.setQueryData<FullProfile | null>(["user-profile"], (old) => {
-        if (!old) return old;
-
+        if (!old) return old
         if (isSelected) {
-          return {
-            ...old,
-            skills: old.skills.filter((s) => s.categoryId !== id),
-          };
+          return { ...old, skills: old.skills.filter((s) => s.categoryId !== id) }
         } else {
-          const cat = dbCategories.find((c) => c.id === id);
-          if (!cat) return old;
-
-          // Формируем объект навыка без any, под структуру БД
-          const newSkill = {
-            profileId: old.id,
-            categoryId: id,
-            category: cat,
-          };
-
+          const cat = dbCategories.find((c) => c.id === id)
+          if (!cat) return old
           return {
             ...old,
-            skills: [...old.skills, newSkill as any], // as any тут допустим, так как это мок для UI
-          };
+            skills: [...old.skills, { categoryId: id, category: cat, profileId: old.id } as any],
+          }
         }
-      });
-
-      return { previousProfile };
+      })
+      return { previousProfile }
     },
     onError: (err, _, context) => {
-      if (context?.previousProfile) {
-        queryClient.setQueryData(["user-profile"], context.previousProfile);
-      }
-      toast.error("Не удалось обновить навыки");
+      if (context?.previousProfile) queryClient.setQueryData(["user-profile"], context.previousProfile)
+      toast.error("Ошибка синхронизации")
     },
     onSuccess: (_, { id, isSelected }) => {
-      const catName = dbCategories.find((c) => c.id === id)?.name;
-      toast.success(isSelected ? `Ниша "${catName}" удалена` : `Ниша "${catName}" добавлена`);
+      const catName = dbCategories.find((c) => c.id === id)?.name
+      toast.success(isSelected ? `Удалено: ${catName}` : `Добавлено: ${catName}`)
     },
-  });
+  
+  })
 
   const filtered = React.useMemo(() => {
     return dbCategories.filter((cat) =>
       cat.name.toLowerCase().includes(query.toLowerCase())
-    );
-  }, [dbCategories, query]);
+    )
+  }, [dbCategories, query])
 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={close} />
-      <div className="relative w-full max-w-lg bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300" onClick={close} />
+
+      <div className="relative w-full max-w-lg bg-white rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.25)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-8 duration-300">
         <div className="p-8 space-y-6">
+
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900">Поиск ниши</h2>
-            <button onClick={close} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-              <X className="w-6 h-6" />
+            <div>
+              <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-950 leading-none">Ниши</h2>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mt-2 italic">Выбор специализации</p>
+            </div>
+            <button onClick={close} className="w-12 h-12 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-90 group">
+              <X className="w-6 h-6 text-slate-950 group-hover:rotate-90 transition-transform" strokeWidth={3} />
             </button>
           </div>
 
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <div className="relative group">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
             <input
               autoFocus
-              placeholder="Напр: Электрика, Уборка..."
-              className="w-full h-14 pl-12 pr-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-blue-600 outline-none font-bold text-slate-900"
+              placeholder="Поиск направления..."
+              className="w-full h-16 pl-14 pr-6 bg-slate-50 border-2 border-slate-50 rounded-[1.5rem] focus:border-blue-600 focus:bg-white outline-none font-bold text-slate-950 transition-all placeholder:text-slate-300"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
 
-          <div className="max-h-[400px] overflow-y-auto pr-2 space-y-2 no-scrollbar min-h-[100px] flex flex-col">
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-10 gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-              </div>
-            ) : (
-              filtered.map((cat) => {
-                const isSelected = userCategoryIds.has(cat.id);
-                const isPending = variables?.id === cat.id;
+          <div className="relative">
+            <div className="max-h-[380px] overflow-y-auto pr-2 space-y-2 no-scrollbar min-h-[280px]">
+              {isLoading ? (
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => <CategoryItemSkeleton key={i} />)}
+                </div>
+              ) : filtered.length > 0 ? (
+                filtered.map((cat) => {
+                  const isSelected = userCategoryIds.has(cat.id)
+                  // КЛЮЧЕВОЙ ФИКС: Проверяем статус мутации, чтобы лоадер исчезал мгновенно
+                  const isPending = status === "pending" && variables?.id === cat.id
 
-                return (
-                  <button
-                    key={cat.id}
-                    disabled={isPending}
-                    onClick={() => toggleSkill({ id: cat.id, isSelected })}
-                    className={cn(
-                      "w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all active:scale-[0.98]",
-                      isSelected ? "bg-blue-50 border-blue-100 opacity-60" : "bg-white border-slate-100"
-                    )}
-                  >
-                    <span className="font-black uppercase italic text-sm text-slate-900">{cat.name}</span>
-                    {isPending ? <Loader2 className="w-4 h-4 animate-spin text-blue-600" /> :
-                      isSelected ? <Check className="w-5 h-5 text-blue-600" /> : <Plus className="w-5 h-5 text-slate-300" />}
-                  </button>
-                )
-              })
-            )}
+                  return (
+                    <button
+                      key={cat.id}
+                      disabled={isPending}
+                      onClick={() => toggleSkill({ id: cat.id, isSelected })}
+                      className={cn(
+                        "w-full flex items-center justify-between p-5 rounded-[1.5rem] border-2 transition-all active:scale-[0.98] group",
+                        isSelected
+                          ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200"
+                          : "bg-white border-slate-100 hover:border-blue-200 text-slate-950"
+                      )}
+                    >
+                      <span className="font-black uppercase italic text-sm tracking-tight">{cat.name}</span>
+                      <div className={cn(
+                        "w-8 h-8 rounded-xl flex items-center justify-center transition-all",
+                        isSelected ? "bg-white/20" : "bg-slate-50 group-hover:bg-blue-50"
+                      )}>
+                        {isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-current" strokeWidth={3} />
+                        ) : isSelected ? (
+                          <Check className="w-4 h-4 text-white" strokeWidth={4} />
+                        ) : (
+                          <Plus className="w-4 h-4 text-slate-400 group-hover:text-blue-600" strokeWidth={3} />
+                        )}
+                      </div>
+                    </button>
+                  )
+                })
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-300">
+                  <SearchX size={48} strokeWidth={1.5} className="mb-4 opacity-20" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-center leading-relaxed">
+                    Ничего не нашли по запросу <br />
+                    <span className="text-slate-950 italic">"{query}"</span>
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none" />
           </div>
+        </div>
+
+        <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between px-8">
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
+            Активно ниш: <span className="text-blue-600">{userCategoryIds.size}</span>
+          </p>
+          <button onClick={close} className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-950 hover:text-blue-600 transition-colors">
+            Закрыть
+          </button>
         </div>
       </div>
     </div>

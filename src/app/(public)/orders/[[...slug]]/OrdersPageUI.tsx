@@ -8,7 +8,7 @@ import { useOrdersStore } from '@/store/use-orders-store';
 import { useLocationStore } from '@/store/use-location-store';
 
 // Actions & Utils
-import { handleAction, unwrap } from '@/lib/utils';
+import { getOrdersKey, handleAction, unwrap } from '@/lib/utils';
 
 import { FullProfile, getMyProfile } from '@/actions/profile/get';
 import { DBCategory, PopularCategoryResult } from '@/actions/category/get';
@@ -180,6 +180,7 @@ function OrdersInitialHydrator({
   const existingData = queryClient.getQueryData(["orders", "list", activeContext]);
 
   if (existingData) {
+
     // Просто возвращаем контент. Header и Toolbar уже отрендерены родителем.
     return <ViewRenderer viewMode={activeContext.viewMode} />;
   }
@@ -193,14 +194,16 @@ function OrdersInitialHydrator({
   const isInitialState = (
     activeContext.locationId === feedContext.locationId &&
     activeContext.radius === feedContext.radius &&
-    activeContext.viewMode === feedContext.viewMode
+    activeContext.viewMode === feedContext.viewMode &&
+    // ДОБАВЛЯЕМ СЮДА:
+    JSON.stringify(activeContext.skillIds?.sort()) === JSON.stringify(feedContext.skillIds?.sort())
   );
 
   console.log("💧 [HYDRATOR] Priming cache...");
 
   // 3. INFINITE QUERY PRIMING
   useInfiniteQuery<GetOrdersResponse<'list'>>({
-    queryKey: ["orders", "list", activeContext],
+    queryKey: ['orders', 'list', activeContext],
     queryFn: ({ pageParam }) => handleAction(getOrders({ ...activeContext, cursor: pageParam as string, mode: 'list' })),
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
@@ -215,7 +218,7 @@ function OrdersInitialHydrator({
 
   // 4. MAP QUERY PRIMING
   useQuery<GetOrdersResponse<'map'>>({
-    queryKey: ["orders", "map", activeContext],
+    queryKey: getOrdersKey(activeContext, 'map'),
     queryFn: () => handleAction(getOrders({ ...activeContext, mode: 'map' })),
     initialData: (isInitialState && activeContext.viewMode === 'map')
       ? (initialOrders as GetOrdersResponse<'map'>)

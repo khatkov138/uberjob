@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { ActionResponse } from "./server-utils";
+import { FeedContext } from "@/app/(public)/orders/[[...slug]]/page";
 
 
 export function cn(...inputs: ClassValue[]) {
@@ -29,12 +30,12 @@ export function unwrap<T>(res: ActionResponse<T>, fallback: T): T {
   if (res.success && res.data !== undefined && res.data !== null) {
     return res.data as T;
   }
-  
+
   // На клиенте можно добавить лог, чтобы понимать, что пошло не так
   if (typeof window !== 'undefined' && res.error) {
     console.error("Action Error:", res.error);
   }
-  
+
   return fallback;
 }
 export async function handleApi<T>(promise: Promise<Response>): Promise<T> {
@@ -116,6 +117,16 @@ export function slugify(text: string) {
     .replace(/^-|-$/g, '');     // обрезаем по краям
 }
 
+export const getOrdersKey = (context: FeedContext, mode: string) => {
+  // Вырезаем skillIds из объекта, чтобы не дублировать данные в ключе
+  const { skillIds, ...restContext } = context;
 
+  return [
+    "orders",
+    mode,
+    restContext, // Чистый объект без "тяжелого" массива
+    skillIds?.join(",") || "all" // Наша реактивная строка-триггер
+  ];
+};
 
 
