@@ -49,14 +49,13 @@ export default function OrdersPageUI({
   ordersPromise,
   popularCategoriesPromise
 }: OrdersPageUIProps) {
-
+  console.log(feedContext)
   const [mounted, setMounted] = useState(false);
 
   // ЛОГ РЕНДЕРА РОДИТЕЛЯ
   console.log(`⚛️ [RENDER] OrdersPageUI (Mounted: ${mounted})`);
 
   const globalLocationId = useLocationStore(s => s.globalLocationId);
-  const setGlobalLocation = useLocationStore(s => s.setGlobalLocation);
   const locHydrated = useLocationStore(s => s._hasHydrated);
 
   const radius = useOrdersStore(s => s.radius);
@@ -81,24 +80,27 @@ export default function OrdersPageUI({
   });
 
   // 3. АКТИВНЫЙ КОНТЕКСТ
-
   const activeContext = useMemo((): FeedContext => {
-    console.log("🧩 [MEMO] Recalculating activeContext...");
+    console.log("🧩 [MEMO] Recalculating activeContext for:", feedContext.locationId);
 
+    // Если сторы еще не гидратированы, отдаем чистый серверный контекст
     if (!isReady) return feedContext;
 
     return {
       ...feedContext,
-      locationId: globalLocationId || feedContext.locationId,
+      // URL/Server — приоритет №1 для локации. 
+      // Zustand синхронизируется провайдером позже.
+      locationId: feedContext.locationId,
+
+      // Остальные фильтры (радиус, режим) берем из Zustand
       radius: radius || feedContext.radius,
       viewMode: viewMode || feedContext.viewMode,
       skillIds: currentProfile?.skills?.map(s => s.categoryId) || feedContext.skillIds,
       categoryId: currentCategory?.id || null
     };
-    // Массив скиллов и ID категории — достаточные зависимости для пересчета
   }, [
     isReady,
-    globalLocationId,
+    globalLocationId, // Оставляем в зависимостях для реактивности при других апдейтах
     radius,
     viewMode,
     currentProfile?.skills,
@@ -106,20 +108,12 @@ export default function OrdersPageUI({
     feedContext
   ]);
 
-  // 4. ШИНА ДАННЫХ (Актуализация кэша при смене фильтров)
 
 
-  // 5. СИНХРОНИЗАЦИЯ URL -> ZUSTAND (Локация)
-  const syncRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (isReady && feedContext.locationId !== globalLocationId && syncRef.current !== feedContext.locationId) {
-      setGlobalLocation(feedContext.locationId);
-      syncRef.current = feedContext.locationId;
-    }
-  }, [isReady, feedContext.locationId, globalLocationId, setGlobalLocation]);
+
 
   if (!mounted) return null;
-
+  console.log(activeContext)
   return (
     <FeedProvider value={activeContext}>
       <Container className="bg-white max-w-7xl pt-10 pb-20">
@@ -158,7 +152,7 @@ export default function OrdersPageUI({
 
         </div>
 
-         <OrderPreviewSheet />
+        <OrderPreviewSheet />
         <LocationModal />
         <CategorySearchModal />
       </Container>
