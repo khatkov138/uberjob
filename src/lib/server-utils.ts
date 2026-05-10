@@ -137,23 +137,25 @@ export type ServerLocation = Awaited<ReturnType<typeof getServerLocation>>;
 
 export const getServerFeedState = cache(async () => {
     const cookieStore = await cookies();
-    // Используем актуальный ключ для настроек фида
-    const storageRaw = cookieStore.get("zwork-orders-feed-state")?.value;
+
+    // 1. Используем Тот же ключ, что и в persist стора
+    const storageRaw = cookieStore.get("zwork-feed-state")?.value;
 
     let radius = LOCATION_CONFIG.SETTINGS.radius;
     let viewMode: "list" | "map" = "list";
 
     if (storageRaw) {
         try {
+            // Zustand хранит данные в формате { state: { ... }, version: 0 }
+            // Нам нужно вытащить именно state
             const parsed = JSON.parse(decodeURIComponent(storageRaw));
-            const state = parsed?.state;
 
-            if (state) {
-                radius = state.radius ?? radius;
-                viewMode = state.viewMode ?? viewMode;
+            if (parsed?.state) {
+                radius = (parsed.state.radius) || radius;
+                viewMode = parsed.state.viewMode || viewMode;
             }
         } catch (e) {
-            // Тихое игнорирование ошибок парсинга
+            console.error("❌ [SERVER FEED STATE] Parse error:", e);
         }
     }
 

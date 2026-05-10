@@ -1,20 +1,21 @@
-import { cn } from "@/lib/utils";
+'use client'
 
-import { useActiveFeed } from "./feed-context-provider";
 import React from "react";
-
+import { cn } from "@/lib/utils";
+// Твоя новая шина
 import { useFeedStatsStore } from "@/store/use-feed-stats";
+import { useActiveFeed } from "./FeedController";
 
 /**
- * 1. АТОМАРНЫЙ СЧЕТЧИК (Следит только за Zustand)
- * Он не знает про контекст, поэтому рендерится ТОЛЬКО при изменении цифр
+ * 1. АТОМАРНЫЙ СЧЕТЧИК
+ * Изолирован от контекста. Рендерится только когда Zustand меняет цифры.
  */
 const HeaderStats = React.memo(() => {
   const totalCount = useFeedStatsStore(s => s.totalCount);
   const loadedCount = useFeedStatsStore(s => s.loadedCount);
   const isFetching = useFeedStatsStore(s => s.isFetching);
 
-  console.log(`📊 [STATS RENDER] Total: ${totalCount} | Loaded: ${loadedCount}`);
+  console.log(`📊 [STATS RENDER] Total: ${totalCount}`);
 
   return (
     <div className="flex items-center gap-3">
@@ -26,7 +27,7 @@ const HeaderStats = React.memo(() => {
         {totalCount > 0 && (
           <div className="flex flex-col ml-2 translate-y-[-4px]">
             <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-0.5">
-              Loaded
+              Найдено
             </span>
             <span className="text-2xl font-black italic text-slate-300 leading-none tracking-tighter">
               / {loadedCount}
@@ -39,7 +40,7 @@ const HeaderStats = React.memo(() => {
 });
 
 /**
- * 2. ИНДИКАТОР СТАТУСА (Выделен в атом для изоляции анимаций)
+ * 2. ИНДИКАТОР СТАТУСА (Изоляция анимации)
  */
 const HeaderStatusBadge = React.memo(() => {
   const isFetching = useFeedStatsStore(s => s.isFetching);
@@ -50,46 +51,43 @@ const HeaderStatusBadge = React.memo(() => {
       isFetching ? "bg-blue-50 border-blue-100 text-blue-600" : "bg-emerald-50 border-emerald-100 text-emerald-600 shadow-sm"
     )}>
       <div className={cn("w-1.5 h-1.5 rounded-full", isFetching ? "bg-blue-500 animate-pulse" : "bg-emerald-500")} />
-      <span className="tracking-[0.1em]">{isFetching ? "Синхронизация..." : "Актуально"}</span>
+      <span className="tracking-[0.1em] text-[9px] uppercase font-bold">
+        {isFetching ? "Синхронизация..." : "Актуально"}
+      </span>
     </div>
   );
 });
 
 /**
- * 3. ОСНОВНОЙ ХЕДЕР
+ * 3. ОСНОВНОЙ ХЕДЕР (Techno-minimalism)
+ * Полностью автономен. Использует "Бетонный контекст".
  */
-export const OrdersPageHeader = React.memo(function OrdersPageHeader({
-  currentCategory
-}: {
-  currentCategory: { name: string } | null
-}) {
-  const context = useActiveFeed();
+export const OrdersPageHeader = React.memo(function OrdersPageHeader() {
+  // Достаем всё из шины. Больше никаких пропсов сверху.
+  const { name, categoryId } = useActiveFeed();
 
-  // Этот лог теперь будет срабатывать реже или проходить "вхолостую" для DOM
-  console.log(`🔝 [HEADER RENDER] City: ${context.name}`);
+  // Мы можем договориться, что в FeedController мы добавили categoryName 
+  // или просто используем проверку. Если categoryId есть — значит мы в категории.
+  // Для педантизма: предполагаем, что name категории мы либо прокинули в контекст, 
+  // либо берем из стейта. Пока оставим логику с "Заказы".
+
+  console.log(`🔝 [HEADER RENDER] City: ${name}`);
 
   return (
     <div className="px-2 pt-4 pb-8 space-y-4">
       <div className="flex items-baseline gap-4 flex-wrap">
         <h2 className="text-5xl font-black uppercase italic tracking-tighter text-slate-900 leading-none">
-          {currentCategory ? (
-            <>
-              {currentCategory.name}{" "}
-              <span className="text-blue-600 ml-2 whitespace-nowrap text-4xl font-black">
-                в {context.name}
-              </span>
-            </>
-          ) : (
-            <>
-              Заказы{" "}
-              <span className="text-blue-600 ml-2 whitespace-nowrap text-4xl font-black">
-                в {context.name}
-              </span>
-            </>
-          )}
+          Заказы{" "}
+          <span className="text-blue-600 ml-2 whitespace-nowrap text-4xl font-black">
+            в {name}
+          </span>
         </h2>
 
-        {/* Цифры изолированы в отдельный поток рендеринга */}
+        {/* 
+           Цифры рендерятся в своем потоке. 
+           Когда пользователь крутит радиус, HeaderStats обновится, 
+           а текст "Заказы в..." — НЕТ.
+        */}
         <HeaderStats />
       </div>
 

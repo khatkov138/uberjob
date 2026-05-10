@@ -16,8 +16,9 @@ import { OrderCardSkeleton } from "../shared/order-card-skeleton"
 // Types
 import { FeedContext } from "../../page"
 import { getOrders, GetOrdersResponse } from "@/actions/order/get-feed"
-import { useActiveFeed } from "../layout/feed-context-provider"
+
 import { useFeedStatsStore } from "@/store/use-feed-stats"
+import { useActiveFeed } from "../layout/FeedController"
 
 /**
  * ИЗОЛИРОВАННЫЙ ТРИГГЕР СКРОЛЛА
@@ -131,8 +132,8 @@ const ScrollObserver = React.memo(({
 export const OrdersFeed = React.memo(function OrdersFeed() {
     const renderCount = React.useRef(0);
     const context = useActiveFeed();
-    
-    // Подключаем наш изолированный стор статистики
+
+    // Достаем только экшен, чтобы сам OrdersFeed не рендерился при изменении цифр в сторе
     const setStats = useFeedStatsStore(s => s.setStats);
 
     const query = useInfiniteQuery<GetOrdersResponse<'list'>>({
@@ -144,6 +145,7 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
         placeholderData: keepPreviousData,
         notifyOnChangeProps: ['data', 'hasNextPage', 'isError'], // Добавили isFetching для индикатора
         structuralSharing: true,
+        staleTime: 1000 * 60 * 30,
     });
 
     const { allOrders, total } = React.useMemo(() => {
@@ -161,12 +163,12 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
         // Это вызовет ререндер ТОЛЬКО HeaderStats. 
         // OrdersPageUI и сам OrdersFeed (вторично) не шелохнутся.
         setStats(total, allOrders.length, query.isFetching);
-        
+
     }, [total, allOrders.length, query.isFetching, setStats]);
 
     const ordersCount = allOrders.length;
     renderCount.current++;
-    
+
     console.log(`📦 [RENDER #${renderCount.current}] OrdersFeed | Total: ${total} | Loaded: ${ordersCount}`);
 
     if (ordersCount === 0 && !query.isFetching) return <EmptyState />;

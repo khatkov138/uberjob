@@ -29,16 +29,19 @@ import { Session } from '@/lib/auth';
 import { FeedContext } from './page';
 import { ActionResponse } from '@/lib/server-utils';
 import { getOrders, GetOrdersResponse } from '@/actions/order/get-feed';
-import { FeedProvider } from './_components/layout/feed-context-provider';
+
 import { OrderPreviewSheet } from './_components/shared/order-preview-sheet';
-import { useOrdersFeedStore } from '@/store/use-orders-feed-store';
+
 import { useFeedStatsStore } from '@/store/use-feed-stats';
+import { useActiveFeed } from './_components/layout/FeedController';
 
 interface OrdersPageUIProps {
+  // Статика/Сессия (нужна только здесь для авторизации)
   session: Session | null;
   initialProfile: FullProfile | null;
-  feedContext: FeedContext;
-  currentCategory: DBCategory | null;
+
+  // Тяжелые промисы (Streaming)
+  // Мы всё еще передаем их сверху, так как они созданы в page.tsx
   ordersPromise: Promise<ActionResponse<GetOrdersResponse<'list'> | GetOrdersResponse<'map'>>>;
   popularCategoriesPromise: Promise<ActionResponse<PopularCategoryResult[]>>;
 }
@@ -46,35 +49,15 @@ interface OrdersPageUIProps {
 export default function OrdersPageUI({
   session,
   initialProfile,
-  feedContext,
-  currentCategory,
   ordersPromise,
   popularCategoriesPromise
 }: OrdersPageUIProps) {
+  // ⚛️ [RENDER] Теперь рендерится ОДИН РАЗ сразу на сервере и клиенте
+  console.log(`⚛️ [RENDER] OrdersPageUI (Techno-minimalism)`);
 
-  const [mounted, setMounted] = useState(false);
-
-  // ЛОГ РЕНДЕРА РОДИТЕЛЯ
-  console.log(`⚛️ [RENDER] OrdersPageUI (Mounted: ${mounted})`);
-
-
-  // 1. Состояние гидратации стора локации (Core)
-  const radius = useOrdersFeedStore(s => s.radius);
-  const viewMode = useOrdersFeedStore(s => s.viewMode);
-  const feedHydrated = useOrdersFeedStore(s => s._hasHydrated);
-
-  const locHydrated = useLocationStore(s => s._hasHydrated);
-
-  // 3. Общая готовность: клиент ожил + оба стора восстановили данные из кук
-  const isReady = mounted && locHydrated && feedHydrated;
-
-  useEffect(() => {
-    setMounted(true);
-    console.log("🟢 [MOUNT] OrdersPageUI mounted");
-  }, []);
-
-  // 2. ПРОФИЛЬ (Статичные данные юзера)
-  const { data: currentProfile } = useQuery<FullProfile | null>({
+ 
+  // 2. ПРОФИЛЬ (Оставляем как есть, TanStack Query отлично справляется)
+  useQuery({
     queryKey: ["user-profile"],
     queryFn: () => handleAction(getMyProfile()),
     initialData: initialProfile,
@@ -83,127 +66,90 @@ export default function OrdersPageUI({
     notifyOnChangeProps: ['data'],
   });
 
-  // 3. АКТИВНЫЙ КОНТЕКСТ
-  const activeContext = useMemo((): FeedContext => {
-    console.log("🧩 [MEMO] Recalculating activeContext for:", 'isReady:' + isReady);
-
-    // Если сторы еще не гидратированы, отдаем чистый серверный контекст
-    if (!isReady) return feedContext;
-
-    return {
-      ...feedContext,
-      // URL/Server — приоритет №1 для локации. 
-      // Zustand синхронизируется провайдером позже.
-      locationId: feedContext.locationId,
-
-      // Остальные фильтры (радиус, режим) берем из Zustand
-      radius: radius || feedContext.radius,
-      viewMode: viewMode || feedContext.viewMode,
-      skillIds: currentProfile?.skills?.map(s => s.categoryId) || feedContext.skillIds,
-      categoryId: currentCategory?.id || null
-    };
-  }, [
-    isReady,
-    radius,
-    viewMode,
-    currentProfile?.skills,
-    currentCategory?.id,
-    feedContext
-  ]);
-
-
-
-
-
-  if (!mounted) return null;
+  // 🧩 ВАЖНО: Больше никакого mounted, isReady и useMemo здесь!
+  // Вся склейка данных (skillIds, radius и т.д.) теперь происходит 
+  // в FeedController или внутри OrdersInitialHydrator, если это нужно.
 
   return (
-    <FeedProvider value={activeContext}>
-      <Container className="bg-white max-w-7xl pt-10 pb-20">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          <aside className="lg:col-span-3 space-y-12">
-            <OrdersSidebarHeader />
-            <Suspense fallback={<div className="h-40 bg-slate-50 animate-pulse rounded-3xl" />}>
-              <OrdersSidebarDataWrapper promise={popularCategoriesPromise} />
+    <Container className="bg-white max-w-7xl pt-10 pb-20">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <aside className="lg:col-span-3 space-y-12">
+          <OrdersSidebarHeader />
+          <Suspense fallback={<div className="h-40 bg-slate-50 animate-pulse rounded-3xl" />}>
+            <OrdersSidebarDataWrapper promise={popularCategoriesPromise} />
+          </Suspense>
+        </aside>
+
+        <section className="lg:col-span-9 space-y-8">
+          {/* Город виден МГНОВЕННО */}
+          <OrdersPageHeader />
+
+          <div className="flex flex-col shadow-2xl rounded-[3.5rem] border border-slate-100 bg-white overflow-hidden relative">
+            {/* Тулбар виден сразу и синхронизирован со стором через контекст */}
+            <OrdersToolbar />
+
+            <Suspense fallback={
+              <div className="p-8 space-y-8">
+                <OrderCardSkeleton />
+                <OrderCardSkeleton />
+              </div>
+            }>
+              <OrdersInitialHydrator
+               
+                ordersPromise={ordersPromise}
+              />
             </Suspense>
-          </aside>
-          <section className="lg:col-span-9 space-y-8">
-            {/* 1. Город виден МГНОВЕННО (т.к. вне Suspense) */}
-            <OrdersPageHeader
+          </div>
+        </section>
+      </div>
 
-              currentCategory={currentCategory} />
-
-            <div className="flex flex-col shadow-2xl rounded-[3.5rem] border border-slate-100 bg-white overflow-hidden relative">
-              {/* 2. Тулбар тоже виден сразу */}
-              <OrdersToolbar />
-
-              {/* 3. Только лента заказов ждет промис */}
-              <Suspense fallback={
-                <div className="p-8 space-y-8">
-                  <OrderCardSkeleton />
-                  <OrderCardSkeleton />
-                </div>
-              }>
-                <OrdersInitialHydrator
-                  key={feedContext.locationId}
-                  ordersPromise={ordersPromise}
-                  activeContext={activeContext}
-                  feedContext={feedContext}
-                />
-              </Suspense>
-            </div>
-          </section>
-
-        </div>
-
-        <OrderPreviewSheet />
-        <LocationModal />
-        <CategorySearchModal />
-      </Container>
-    </FeedProvider>
+      <OrderPreviewSheet />
+      <LocationModal />
+      <CategorySearchModal />
+    </Container>
   );
 }
 
-let renderCount = 0;
+let globalRenderCount = 0;
 
 export function OrdersInitialHydrator({
   ordersPromise,
-  activeContext,
-  feedContext,
 }: {
   ordersPromise: Promise<ActionResponse<GetOrdersResponse<'list'> | GetOrdersResponse<'map'>>>;
-  activeContext: FeedContext;
-  feedContext: FeedContext;
 }) {
   const queryClient = useQueryClient();
-  const queryKey = ["orders", activeContext.viewMode, activeContext];
+  const activeContext = useActiveFeed();
 
-  // 1. СИНХРОННЫЙ CHECK (Самая быстрая проверка)
+  // 1. ФИКСАЦИЯ НАЧАЛЬНОЙ ТОЧКИ
+  // Запоминаем контекст, который был ПРИ МАУНТЕ компонента (серверный).
+  // useRef сохраняет это значение неизменным при ререндерах этого экземпляра.
+  const initialContextRef = useRef(activeContext);
+
+  const queryKey = ["orders", activeContext.viewMode, activeContext];
   const hasData = !!queryClient.getQueryData(queryKey);
 
-  console.log(`🔥 ВХОД В ГИДРАТОР: ${++renderCount} | HasData: ${hasData}`);
+  // 2. ОПРЕДЕЛЕНИЕ СМЕЩЕНИЯ
+  // Если текущий активный контекст в шине не равен начальному — 
+  // значит пользователь УЖЕ поменял фильтры (радиус, город и т.д.)
+  const isContextShifted = initialContextRef.current !== activeContext;
 
-  // 2. ОПРЕДЕЛЯЕМ ТОЧКУ ВХОДА
-  const isInitialState = React.useMemo(() => (
-    activeContext.locationId === feedContext.locationId &&
-    activeContext.radius === feedContext.radius &&
-    activeContext.viewMode === feedContext.viewMode &&
-    JSON.stringify(activeContext.skillIds?.sort()) === JSON.stringify(feedContext.skillIds?.sort())
-  ), [activeContext, feedContext]);
+  console.log(`🔥 [HYDRATOR] Render: ${++globalRenderCount} | HasData: ${hasData} | Shifted: ${isContextShifted}`);
 
-  // 3. EARLY RETURN (Bypass)
-  // Если мы уже не в начальном состоянии или данные уже в кэше — 
-  // выходим НЕМЕДЛЕННО, не доходя до use()
-  if (!isInitialState || hasData) {
+  /**
+   * ЭТО ГЛАВНЫЙ БАРЬЕР "БЕТОНА":
+   * Мы выходим без вызова use(ordersPromise) в двух случаях:
+   * 1. Данные уже в кэше (нормальный флоу навигации).
+   * 2. Контекст изменился (пользователь покрутил радиус до того, как гидратор завершил работу).
+   */
+  if (hasData || isContextShifted) {
     return <ViewRenderer viewMode={activeContext.viewMode} />;
   }
 
-  // 4. SUSPENSE POINT
-  // Компонент уснет здесь, если данных нет
+  // 3. SUSPENSE POINT (React 19)
+  // Вскрываем промис только для ПЕРВОГО набора данных.
   const result = use(ordersPromise);
 
-  // 5. ПРАЙМИНГ КЭША
-  // Сработает только один раз, когда промис разрешится
+  // 4. ПРАЙМИНГ КЭША (Silent Priming)
   const initialOrders = unwrap(result, { orders: [], nextCursor: null, total: 0 });
 
   if (activeContext.viewMode === 'list') {
@@ -215,12 +161,10 @@ export function OrdersInitialHydrator({
     queryClient.setQueryData(queryKey, initialOrders as GetOrdersResponse<'map'>);
   }
 
-  console.log(`💧 [HYDRATOR] Cache primed via use()`);
+  console.log(`💧 [HYDRATOR] Cache primed with server data`);
 
-  // Статы здесь НЕ трогаем. Их подхватит OrdersFeed через свой useEffect.
   return <ViewRenderer viewMode={activeContext.viewMode} />;
 }
-
 
 function OrdersSidebarDataWrapper({ promise }: { promise: Promise<ActionResponse<PopularCategoryResult[]>> }) {
   const data = use(promise);

@@ -7,9 +7,10 @@ import { cn, handleAction } from "@/lib/utils"
 import { useQuery, keepPreviousData } from "@tanstack/react-query"
 
 // Хуки и экшены
-import { useActiveFeed } from "../layout/feed-context-provider"
+
 import { getOrders } from "@/actions/order/get-feed"
 import { GetOrdersResponse } from "@/actions/order/get-feed"
+import { useActiveFeed } from "../layout/FeedController"
 
 // Динамический импорт движка (Leaflet/Google/Yandex)
 const OrdersMap = dynamic(

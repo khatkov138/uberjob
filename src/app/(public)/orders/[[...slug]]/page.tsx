@@ -14,6 +14,9 @@ import { getServerFeedState, getServerLocation } from "@/lib/server-utils";
 import OrdersPageUI from "./OrdersPageUI";
 import { getOrders } from "@/actions/order/get-feed";
 
+import { FeedProvider } from "./_components/layout/FeedProvider";
+import { FeedController } from "./_components/layout/FeedController";
+
 export interface FeedContext {
   locationId: string;
   lat: number;
@@ -30,13 +33,14 @@ interface Props {
   params: Promise<{ slug?: string[] }>;
 }
 
+
 export default async function OrdersPage({ params }: Props) {
   const { slug = [] } = await params;
   const [citySlug, categorySlug] = slug;
 
   const session = await getServerSession();
 
-  // 1. Быстрые данные из кук (оставляем await, это мгновенно)
+  // 1. Быстрые данные из кук и локация
   const [currentGeo, feedState] = await Promise.all([
     getServerLocation(),
     getServerFeedState()
@@ -44,7 +48,7 @@ export default async function OrdersPage({ params }: Props) {
 
   if (!citySlug) return redirect(`/orders/${currentGeo.slug}`);
 
-  // 2. Поиск локации и категории (БД - тоже быстро, оставляем await)
+  // 2. БД Данные
   const [dbLocation, currentCategory] = await Promise.all([
     prisma.location.findUnique({ where: { slug: citySlug } }),
     categorySlug
@@ -58,13 +62,18 @@ export default async function OrdersPage({ params }: Props) {
   if (!dbLocation) return redirect(`/orders/${currentGeo.slug}`);
   if (categorySlug && !currentCategory) return redirect(`/orders/${citySlug}`);
 
-  // 3. Профиль (оставляем await, так как скиллы нужны для формирования контекста)
+  // 3. Профиль
   const profileRes = await getMyProfile();
   const initialProfile = unwrap(profileRes, null);
   const skillIds = initialProfile?.skills.map(s => s.categoryId) || [];
 
-  const mode = feedState.viewMode;
+  // ФОРМИРУЕМ ДАННЫЕ ДЛЯ ИНЪЕКЦИИ В СТОР
+  const storeInitialData = {
+    viewMode: feedState.viewMode,
+    radius: feedState.radius,
+  };
 
+  // БАЗОВЫЙ КОНТЕКСТ (Чисто серверный)
   const feedContext: FeedContext = {
     locationId: dbLocation.id,
     name: dbLocation.name,
@@ -74,15 +83,11 @@ export default async function OrdersPage({ params }: Props) {
     radius: feedState.radius,
     categoryId: currentCategory?.id || null,
     skillIds,
-    viewMode: mode
+    viewMode: feedState.viewMode
   };
 
-  // --- ВОТ ТУТ МАГИЯ СТРИМИНГА ---
-
-  // 4. Создаем промисы для тяжелых данных (БЕЗ await)
-  // Мы запускаем выполнение, но не ждем результата на сервере.
-  const ordersPromise = getOrders({ ...feedContext, mode });
-
+  // 4. ТЯЖЕЛЫЕ ПРОМИСЫ (Стриминг)
+  const ordersPromise = getOrders({ ...feedContext, mode: feedState.viewMode });
   const popularCategoriesPromise = getPopularCategories(
     feedContext.lat,
     feedContext.lng,
@@ -90,16 +95,15 @@ export default async function OrdersPage({ params }: Props) {
   );
 
   return (
-    // Передаем промисы в OrdersPageUI. 
-    // Next.js сразу отдаст HTML страницы, а данные "дотекут" позже.
-    <OrdersPageUI
-      session={session}
-      initialProfile={initialProfile}
-      feedContext={feedContext}
-      currentCategory={currentCategory}
-      // Пробрасываем промисы
-      ordersPromise={ordersPromise}
-      popularCategoriesPromise={popularCategoriesPromise}
-    />
+     <FeedProvider initialData={storeInitialData}>
+      <FeedController serverContext={feedContext} currentCategory={currentCategory}>
+        <OrdersPageUI
+          session={session}
+          initialProfile={initialProfile}
+          ordersPromise={ordersPromise}
+          popularCategoriesPromise={popularCategoriesPromise}
+        />
+      </FeedController>
+    </FeedProvider>
   );
 }

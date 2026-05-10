@@ -5,32 +5,28 @@ import { List, Map as MapIcon, MapPin, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import { useLocationStore } from "@/store/use-location-store"
-
 import { LOCATION_CONFIG } from "@/lib/location-config"
-import { useActiveFeed } from "../layout/feed-context-provider"
-import { useOrdersFeedStore } from "@/store/use-orders-feed-store"
+import { useFeedStore } from "./FeedProvider"
+import { useActiveFeed } from "./FeedController"
+// ИМПОРТ ИЗ НАШЕЙ НОВОЙ ШИНЫ
+
 
 const RADIUS_OPTIONS = LOCATION_CONFIG.SETTINGS.radiusOptions;
 
 export function OrdersToolbar() {
-  // ЛОГ РЕНДЕРА
   const renderCount = React.useRef(0);
   renderCount.current++;
-  console.log(`🛠️ [RENDER #${renderCount.current}] OrdersToolbar`);
 
-  // 1. Сторы используем ТОЛЬКО для записи (действий)
-  // Мы не подписываемся на значения здесь, чтобы не рендериться лишний раз
-  const setViewMode = useOrdersFeedStore(s => s.setViewMode)
-  const setRadius = useOrdersFeedStore(s => s.setRadius)
+  // 1. ДЕЙСТВИЯ (Берем из стора через наш новый хук-провайдер)
+  const setViewMode = useFeedStore(s => s.setViewMode)
+  const setRadius = useFeedStore(s => s.setRadius)
   const openModal = useLocationStore(s => s.openModal)
 
-  // 2. ЧИТАЕМ всё из нашего нового стабильного Контекста
-  const context = useActiveFeed();
+  // 2. ДАННЫЕ (Читаем из стабильной шины)
+  // Благодаря инъекции, здесь НИКОГДА не будет undefined
+  const { viewMode, name, radius } = useActiveFeed();
 
-  // Вычисляем состояние на основе контекста
-  const activeViewMode = context.viewMode;
-  const activeCity = context.name || "Загрузка...";
-  const activeRadius = context.radius || LOCATION_CONFIG.SETTINGS.radius;
+  console.log(`🛠️ [RENDER #${renderCount.current}] OrdersToolbar | Mode: ${viewMode} | City: ${name}`);
 
   return (
     <div className="bg-white px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-100 sticky top-0 z-30">
@@ -38,13 +34,10 @@ export function OrdersToolbar() {
       {/* ЛЕВАЯ ЧАСТЬ: ПЕРЕКЛЮЧАТЕЛЬ ВИДА */}
       <div className="flex bg-slate-50 p-1.5 rounded-[1.25rem] border border-slate-100/80 shadow-inner w-full md:w-auto">
         <button
-          onClick={() => {
-            console.log("🖱️ [UI] Switch to LIST");
-            setViewMode("list");
-          }}
+          onClick={() => setViewMode("list")}
           className={cn(
             "flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase italic transition-all",
-            activeViewMode === "list"
+            viewMode === "list"
               ? "bg-white text-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.05)] ring-1 ring-slate-200/50"
               : "text-slate-400 hover:text-slate-600"
           )}
@@ -53,13 +46,10 @@ export function OrdersToolbar() {
           <span>Список</span>
         </button>
         <button
-          onClick={() => {
-            console.log("🖱️ [UI] Switch to MAP");
-            setViewMode("map");
-          }}
+          onClick={() => setViewMode("map")}
           className={cn(
             "flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase italic transition-all",
-            activeViewMode === "map"
+            viewMode === "map"
               ? "bg-white text-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.05)] ring-1 ring-slate-200/50"
               : "text-slate-400 hover:text-slate-600"
           )}
@@ -84,7 +74,7 @@ export function OrdersToolbar() {
               <ChevronDown size={8} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
             </div>
             <p className="text-[13px] font-black uppercase italic text-slate-900 leading-none truncate max-w-[120px]">
-              {activeCity}
+              {name}
             </p>
           </div>
         </button>
@@ -96,13 +86,10 @@ export function OrdersToolbar() {
           {RADIUS_OPTIONS.map((r) => (
             <button
               key={r}
-              onClick={() => {
-                console.log(`🖱️ [UI] Set Radius to ${r}km`);
-                setRadius(r);
-              }}
+              onClick={() => setRadius(r)}
               className={cn(
                 "px-3 py-2 rounded-xl text-[9px] font-black uppercase transition-all",
-                activeRadius === r
+                radius === r
                   ? "bg-slate-900 text-white shadow-md scale-105"
                   : "text-slate-400 hover:text-slate-900"
               )}

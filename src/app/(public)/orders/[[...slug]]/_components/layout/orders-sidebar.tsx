@@ -16,7 +16,7 @@ import {
 // Hooks & Stores
 import { useUserSkills } from "@/hooks/use-user-skills"
 import { useCategoryModalStore } from "@/store/use-category-modal-store"
-import { useActiveFeed } from "./feed-context-provider" // Твой специфичный импорт
+
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 // Utils & Actions
@@ -24,6 +24,7 @@ import { cn, handleAction } from "@/lib/utils"
 import { PopularCategoryResult } from "@/actions/category/get"
 import { FullProfile } from "@/actions/profile/get"
 import { removeSkill } from "@/actions/profile/manage"
+import { useActiveFeed } from "./FeedController"
 
 interface OrdersSidebarProps {
   popularCategories: PopularCategoryResult[]

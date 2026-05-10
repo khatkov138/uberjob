@@ -9,9 +9,10 @@ import { Search, MapPin, Loader2, Target, ArrowUpRight } from "lucide-react"
 import { handleAction, handleApi, cn } from "@/lib/utils"
 
 import { getOrCreateLocation } from "@/actions/location/manage"
-import { useActiveFeed } from "../layout/feed-context-provider"
+
 import { useQueryClient } from "@tanstack/react-query"
 import { useFeedStatsStore } from "@/store/use-feed-stats"
+import { useActiveFeed } from "../layout/FeedController"
 
 export function LocationModal() {
 
