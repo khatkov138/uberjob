@@ -17,7 +17,7 @@ import { OrderCardSkeleton } from "../shared/order-card-skeleton"
 import { FeedContext } from "../../page"
 import { getOrders, GetOrdersResponse } from "@/actions/order/get-feed"
 import { useActiveFeed } from "../layout/feed-context-provider"
-import { useFeedDataStore } from "@/store/use-feed-data-store"
+import { useFeedStatsStore } from "@/store/use-feed-stats"
 
 /**
  * ИЗОЛИРОВАННЫЙ ТРИГГЕР СКРОЛЛА
@@ -131,8 +131,10 @@ const ScrollObserver = React.memo(({
 export const OrdersFeed = React.memo(function OrdersFeed() {
     const renderCount = React.useRef(0);
     const context = useActiveFeed();
+    
+    // Подключаем наш изолированный стор статистики
+    const setStats = useFeedStatsStore(s => s.setStats);
 
-    // 1. ЧИСТЫЙ ЗАПРОС (Следит только за данными для списка)
     const query = useInfiniteQuery<GetOrdersResponse<'list'>>({
         queryKey: ['orders', 'list', context],
         queryFn: ({ pageParam }) => handleAction(getOrders({ ...context, cursor: pageParam as string, mode: 'list' })),
@@ -140,12 +142,10 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
         getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
         enabled: !!context,
         placeholderData: keepPreviousData,
-        // Оставляем только то, что реально меняет структуру списка
-        notifyOnChangeProps: ['data', 'hasNextPage', 'isError'],
+        notifyOnChangeProps: ['data', 'hasNextPage', 'isError'], // Добавили isFetching для индикатора
         structuralSharing: true,
     });
 
-    // 2. ТРАНСФОРМАЦИЯ (Только расчеты для отрисовки)
     const { allOrders, total } = React.useMemo(() => {
         const pages = query.data?.pages || [];
         return {
@@ -154,19 +154,20 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
         };
     }, [query.data]);
 
-    // 3. АТОМАРНАЯ СИНХРОНИЗАЦИЯ (Без query.isFetching)
-    // Рендерит хедер только когда меняется реальное количество заказов
+    // 3. АТОМАРНАЯ СИНХРОНИЗАЦИЯ С ХЕДЕРОМ
+    // Срабатывает при получении новых данных или изменении статуса загрузки
     React.useEffect(() => {
-        const store = useFeedDataStore.getState();
-        if (store.totalCount !== total || store.loadedCount !== allOrders.length) {
-            store.setStats(total, allOrders.length, store.isFetching);
-        }
-    }, [total, allOrders.length]);
+        // Мы пушим данные в useFeedStatsStore. 
+        // Это вызовет ререндер ТОЛЬКО HeaderStats. 
+        // OrdersPageUI и сам OrdersFeed (вторично) не шелохнутся.
+        setStats(total, allOrders.length, query.isFetching);
+        
+    }, [total, allOrders.length, query.isFetching, setStats]);
 
     const ordersCount = allOrders.length;
-
     renderCount.current++;
-    console.log(`📦 [RENDER #${renderCount.current}] OrdersFeed | Total: ${total}`);
+    
+    console.log(`📦 [RENDER #${renderCount.current}] OrdersFeed | Total: ${total} | Loaded: ${ordersCount}`);
 
     if (ordersCount === 0 && !query.isFetching) return <EmptyState />;
 

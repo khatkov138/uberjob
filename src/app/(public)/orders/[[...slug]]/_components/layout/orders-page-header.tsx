@@ -1,16 +1,18 @@
 import { cn } from "@/lib/utils";
-import { useFeedDataStore } from "@/store/use-feed-data-store";
+
 import { useActiveFeed } from "./feed-context-provider";
 import React from "react";
+
+import { useFeedStatsStore } from "@/store/use-feed-stats";
 
 /**
  * 1. АТОМАРНЫЙ СЧЕТЧИК (Следит только за Zustand)
  * Он не знает про контекст, поэтому рендерится ТОЛЬКО при изменении цифр
  */
 const HeaderStats = React.memo(() => {
-  const totalCount = useFeedDataStore(s => s.totalCount);
-  const loadedCount = useFeedDataStore(s => s.loadedCount);
-  const isFetching = useFeedDataStore(s => s.isFetching);
+  const totalCount = useFeedStatsStore(s => s.totalCount);
+  const loadedCount = useFeedStatsStore(s => s.loadedCount);
+  const isFetching = useFeedStatsStore(s => s.isFetching);
 
   console.log(`📊 [STATS RENDER] Total: ${totalCount} | Loaded: ${loadedCount}`);
 
@@ -40,8 +42,8 @@ const HeaderStats = React.memo(() => {
  * 2. ИНДИКАТОР СТАТУСА (Выделен в атом для изоляции анимаций)
  */
 const HeaderStatusBadge = React.memo(() => {
-  const isFetching = useFeedDataStore(s => s.isFetching);
-  
+  const isFetching = useFeedStatsStore(s => s.isFetching);
+
   return (
     <div className={cn(
       "flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all duration-500",

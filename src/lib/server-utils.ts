@@ -135,9 +135,10 @@ export const getServerLocation = cache(async (
 export type ServerLocation = Awaited<ReturnType<typeof getServerLocation>>;
 
 
-export const getServerOrdersState = cache(async () => {
+export const getServerFeedState = cache(async () => {
     const cookieStore = await cookies();
-    const storageRaw = cookieStore.get("zwork-orders-state")?.value;
+    // Используем актуальный ключ для настроек фида
+    const storageRaw = cookieStore.get("zwork-orders-feed-state")?.value;
 
     let radius = LOCATION_CONFIG.SETTINGS.radius;
     let viewMode: "list" | "map" = "list";
@@ -145,12 +146,16 @@ export const getServerOrdersState = cache(async () => {
     if (storageRaw) {
         try {
             const parsed = JSON.parse(decodeURIComponent(storageRaw));
-            radius = parsed?.state?.radius ?? radius;
-            viewMode = parsed?.state?.viewMode ?? viewMode;
-        } catch (e) { }
+            const state = parsed?.state;
+
+            if (state) {
+                radius = state.radius ?? radius;
+                viewMode = state.viewMode ?? viewMode;
+            }
+        } catch (e) {
+            // Тихое игнорирование ошибок парсинга
+        }
     }
 
     return { radius, viewMode };
 });
-
-

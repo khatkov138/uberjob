@@ -10,7 +10,7 @@ import { getMyProfile } from "@/actions/profile/get";
 import { getPopularCategories } from "@/actions/category/get";
 
 // Серверная логика
-import { getServerLocation, getServerOrdersState } from "@/lib/server-utils";
+import { getServerFeedState, getServerLocation } from "@/lib/server-utils";
 import OrdersPageUI from "./OrdersPageUI";
 import { getOrders } from "@/actions/order/get-feed";
 
@@ -37,9 +37,9 @@ export default async function OrdersPage({ params }: Props) {
   const session = await getServerSession();
 
   // 1. Быстрые данные из кук (оставляем await, это мгновенно)
-  const [currentGeo, ordersView] = await Promise.all([
+  const [currentGeo, feedState] = await Promise.all([
     getServerLocation(),
-    getServerOrdersState()
+    getServerFeedState()
   ]);
 
   if (!citySlug) return redirect(`/orders/${currentGeo.slug}`);
@@ -63,7 +63,7 @@ export default async function OrdersPage({ params }: Props) {
   const initialProfile = unwrap(profileRes, null);
   const skillIds = initialProfile?.skills.map(s => s.categoryId) || [];
 
-  const mode = ordersView.viewMode;
+  const mode = feedState.viewMode;
 
   const feedContext: FeedContext = {
     locationId: dbLocation.id,
@@ -71,7 +71,7 @@ export default async function OrdersPage({ params }: Props) {
     slug: dbLocation.slug,
     lat: dbLocation.lat,
     lng: dbLocation.lng,
-    radius: ordersView.radius,
+    radius: feedState.radius,
     categoryId: currentCategory?.id || null,
     skillIds,
     viewMode: mode

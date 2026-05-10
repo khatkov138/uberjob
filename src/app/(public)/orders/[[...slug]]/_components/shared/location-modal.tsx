@@ -3,19 +3,23 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { useLocationStore } from "@/store/use-location-store"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Search, MapPin, Loader2, Target, ArrowUpRight } from "lucide-react"
 import { handleAction, handleApi, cn } from "@/lib/utils"
 
 import { getOrCreateLocation } from "@/actions/location/manage"
 import { useActiveFeed } from "../layout/feed-context-provider"
+import { useQueryClient } from "@tanstack/react-query"
+import { useFeedStatsStore } from "@/store/use-feed-stats"
 
 export function LocationModal() {
+
+  const queryClient = useQueryClient();
   const router = useRouter()
   const { isModalOpen, closeModal } = useLocationStore() // Убрали лишний setGlobalLocation здесь
   const currentContext = useActiveFeed()
-
+  const setGlobalLocation = useLocationStore(s => s.setGlobalLocation);
   const [query, setQuery] = React.useState("")
   const [suggestions, setSuggestions] = React.useState<any[]>([])
   const [isLoading, setIsLoading] = React.useState(false)
@@ -33,28 +37,44 @@ export function LocationModal() {
   }
 
   const handleSelect = async (item: any) => {
-    setIsLoading(true)
-    setSelectedUri(item.uri) // Фиксируем выбор визуально
+    if (isLoading) return; // Педантичный блок повторных нажатий
+
+    setIsLoading(true);
+    setSelectedUri(item.uri);
+
     try {
-      const location = await handleAction(getOrCreateLocation(item.uri))
-      
-      // UX уровня Uber: Не закрываем модалку мгновенно, 
-      // даем роутеру время инициировать переход.
-      router.push(`/orders/${location.slug}`)
-      
-      // Закроем через микро-таймаут или оставим на откуп размонтированию страницы
-      setTimeout(closeModal, 300) 
+      const location = await handleAction(getOrCreateLocation(item.uri));
+      setGlobalLocation(location.id)
+      // Просто пушим. Модалка размонтируется вместе со страницей.
+      // Если переход в Next.js будет быстрым, юзер даже не заметит,
+      // как модалка исчезла "сама".
+      //closeModal()
+      queryClient.removeQueries({ queryKey: ['orders'] });
+
+      // Сбрасываем статы
+      useFeedStatsStore.getState().reset();
+      router.push(`/orders/${location.slug}`);
+
     } catch (error) {
-      console.error("Location sync error:", error)
-      setSelectedUri(null)
-      setIsLoading(false)
+      console.error("Shift error:", error);
+      setSelectedUri(null);
+      setIsLoading(false);
     }
-  }
+  };
+
+
 
   return (
-    <Dialog open={isModalOpen} onOpenChange={(open) => !open && !isLoading && closeModal()}>
+    <Dialog
+      open={isModalOpen}
+      onOpenChange={(open) => {
+        // Блокируем закрытие, если идет процесс перехода
+        if (!open && isLoading) return;
+        if (!open) closeModal();
+      }}
+    >
       <DialogContent className="sm:max-w-[600px] p-0 border-none bg-white rounded-[3.5rem] shadow-2xl overflow-hidden">
-        
+
         <div className="px-10 pt-12 pb-8 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">LOCATION / HUB</span>
@@ -63,10 +83,14 @@ export function LocationModal() {
           <DialogTitle className="text-6xl font-black italic uppercase tracking-tighter text-slate-900 leading-[0.8]">
             Где <span className="text-blue-600">ищем?</span>
           </DialogTitle>
+
+          {/* ФИКС ОШИБКИ Accessibility: Добавляем описание (скрыто визуально) */}
+          <DialogDescription className="sr-only">
+            Выберите город для поиска актуальных заказов в системе ZWORK.
+          </DialogDescription>
         </div>
 
         <div className="px-10 pb-12 flex flex-col items-stretch">
-          
           <div className="relative mb-10 w-full">
             <Search className={cn(
               "absolute left-7 top-1/2 -translate-y-1/2 w-6 h-6 transition-colors",
@@ -92,11 +116,11 @@ export function LocationModal() {
                   <button
                     key={i}
                     disabled={!!selectedUri}
-                    onClick={() => handleSelect(s)}
+                    onClick={() => handleSelect(s)} // Внутри handleSelect теперь НЕТ closeModal()
                     className={cn(
                       "group w-full flex items-center justify-between p-7 border rounded-[2.5rem] transition-all animate-in fade-in slide-in-from-bottom-2",
-                      selectedUri === s.uri 
-                        ? "bg-blue-600 border-blue-600 shadow-xl shadow-blue-100" 
+                      selectedUri === s.uri
+                        ? "bg-blue-600 border-blue-600 shadow-xl shadow-blue-100"
                         : "bg-white hover:bg-slate-50 border-slate-100 hover:shadow-xl"
                     )}
                   >
@@ -106,9 +130,9 @@ export function LocationModal() {
                         selectedUri === s.uri ? "bg-blue-500 border-blue-400" : "bg-slate-50 border-slate-100 group-hover:bg-white"
                       )}>
                         {selectedUri === s.uri ? (
-                           <Loader2 className="w-6 h-6 text-white animate-spin" />
+                          <Loader2 className="w-6 h-6 text-white animate-spin" />
                         ) : (
-                           <MapPin className="w-6 h-6 text-blue-600" />
+                          <MapPin className="w-6 h-6 text-blue-600" />
                         )}
                       </div>
                       <div className="flex flex-col text-left">
@@ -145,5 +169,6 @@ export function LocationModal() {
         </div>
       </DialogContent>
     </Dialog>
+
   )
 }

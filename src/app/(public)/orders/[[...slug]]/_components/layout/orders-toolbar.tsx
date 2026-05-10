@@ -5,9 +5,10 @@ import { List, Map as MapIcon, MapPin, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import { useLocationStore } from "@/store/use-location-store"
-import { useOrdersStore } from "@/store/use-orders-store"
+
 import { LOCATION_CONFIG } from "@/lib/location-config"
 import { useActiveFeed } from "../layout/feed-context-provider"
+import { useOrdersFeedStore } from "@/store/use-orders-feed-store"
 
 const RADIUS_OPTIONS = LOCATION_CONFIG.SETTINGS.radiusOptions;
 
@@ -19,8 +20,8 @@ export function OrdersToolbar() {
 
   // 1. Сторы используем ТОЛЬКО для записи (действий)
   // Мы не подписываемся на значения здесь, чтобы не рендериться лишний раз
-  const setViewMode = useOrdersStore(s => s.setViewMode)
-  const setRadius = useOrdersStore(s => s.setRadius)
+  const setViewMode = useOrdersFeedStore(s => s.setViewMode)
+  const setRadius = useOrdersFeedStore(s => s.setRadius)
   const openModal = useLocationStore(s => s.openModal)
 
   // 2. ЧИТАЕМ всё из нашего нового стабильного Контекста

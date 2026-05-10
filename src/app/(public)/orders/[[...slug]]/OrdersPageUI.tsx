@@ -4,7 +4,7 @@ import React, { useMemo, useEffect, useRef, useState, Suspense, use } from 'reac
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Store & Hooks
-import { useOrdersStore } from '@/store/use-orders-store';
+
 import { useLocationStore } from '@/store/use-location-store';
 
 // Actions & Utils
@@ -31,6 +31,8 @@ import { ActionResponse } from '@/lib/server-utils';
 import { getOrders, GetOrdersResponse } from '@/actions/order/get-feed';
 import { FeedProvider } from './_components/layout/feed-context-provider';
 import { OrderPreviewSheet } from './_components/shared/order-preview-sheet';
+import { useOrdersFeedStore } from '@/store/use-orders-feed-store';
+import { useFeedStatsStore } from '@/store/use-feed-stats';
 
 interface OrdersPageUIProps {
   session: Session | null;
@@ -49,20 +51,22 @@ export default function OrdersPageUI({
   ordersPromise,
   popularCategoriesPromise
 }: OrdersPageUIProps) {
-  console.log(feedContext)
+
   const [mounted, setMounted] = useState(false);
 
   // ЛОГ РЕНДЕРА РОДИТЕЛЯ
   console.log(`⚛️ [RENDER] OrdersPageUI (Mounted: ${mounted})`);
 
-  const globalLocationId = useLocationStore(s => s.globalLocationId);
+
+  // 1. Состояние гидратации стора локации (Core)
+  const radius = useOrdersFeedStore(s => s.radius);
+  const viewMode = useOrdersFeedStore(s => s.viewMode);
+  const feedHydrated = useOrdersFeedStore(s => s._hasHydrated);
+
   const locHydrated = useLocationStore(s => s._hasHydrated);
 
-  const radius = useOrdersStore(s => s.radius);
-  const viewMode = useOrdersStore(s => s.viewMode);
-  const ordersHydrated = useOrdersStore(s => s._hasHydrated);
-
-  const isReady = mounted && locHydrated && ordersHydrated;
+  // 3. Общая готовность: клиент ожил + оба стора восстановили данные из кук
+  const isReady = mounted && locHydrated && feedHydrated;
 
   useEffect(() => {
     setMounted(true);
@@ -81,7 +85,7 @@ export default function OrdersPageUI({
 
   // 3. АКТИВНЫЙ КОНТЕКСТ
   const activeContext = useMemo((): FeedContext => {
-    console.log("🧩 [MEMO] Recalculating activeContext for:", feedContext.locationId);
+    console.log("🧩 [MEMO] Recalculating activeContext for:", 'isReady:' + isReady);
 
     // Если сторы еще не гидратированы, отдаем чистый серверный контекст
     if (!isReady) return feedContext;
@@ -100,7 +104,6 @@ export default function OrdersPageUI({
     };
   }, [
     isReady,
-    globalLocationId, // Оставляем в зависимостях для реактивности при других апдейтах
     radius,
     viewMode,
     currentProfile?.skills,
@@ -113,7 +116,7 @@ export default function OrdersPageUI({
 
 
   if (!mounted) return null;
-  console.log(activeContext)
+
   return (
     <FeedProvider value={activeContext}>
       <Container className="bg-white max-w-7xl pt-10 pb-20">
@@ -142,6 +145,7 @@ export default function OrdersPageUI({
                 </div>
               }>
                 <OrdersInitialHydrator
+                  key={feedContext.locationId}
                   ordersPromise={ordersPromise}
                   activeContext={activeContext}
                   feedContext={feedContext}
@@ -160,9 +164,9 @@ export default function OrdersPageUI({
   );
 }
 
+let renderCount = 0;
 
-//* ГИДРАТОР ЗАКАЗОВ (The Ultimate Hydrator)
-function OrdersInitialHydrator({
+export function OrdersInitialHydrator({
   ordersPromise,
   activeContext,
   feedContext,
@@ -171,10 +175,15 @@ function OrdersInitialHydrator({
   activeContext: FeedContext;
   feedContext: FeedContext;
 }) {
-
   const queryClient = useQueryClient();
+  const queryKey = ["orders", activeContext.viewMode, activeContext];
 
-  // 1. ОПРЕДЕЛЯЕМ ТОЧКУ ВХОДА (Мемоизируем, чтобы лог не спамил)
+  // 1. СИНХРОННЫЙ CHECK (Самая быстрая проверка)
+  const hasData = !!queryClient.getQueryData(queryKey);
+
+  console.log(`🔥 ВХОД В ГИДРАТОР: ${++renderCount} | HasData: ${hasData}`);
+
+  // 2. ОПРЕДЕЛЯЕМ ТОЧКУ ВХОДА
   const isInitialState = React.useMemo(() => (
     activeContext.locationId === feedContext.locationId &&
     activeContext.radius === feedContext.radius &&
@@ -182,39 +191,35 @@ function OrdersInitialHydrator({
     JSON.stringify(activeContext.skillIds?.sort()) === JSON.stringify(feedContext.skillIds?.sort())
   ), [activeContext, feedContext]);
 
-  // 2. ВСКРЫВАЕМ ПРОМИС (Только если это реально первый рендер страницы)
-  // В React 19 use() можно вызывать условно. Если не initial — мы не ждем сервер.
-  const resolvedOrders = isInitialState ? use(ordersPromise) : null;
+  // 3. EARLY RETURN (Bypass)
+  // Если мы уже не в начальном состоянии или данные уже в кэше — 
+  // выходим НЕМЕДЛЕННО, не доходя до use()
+  if (!isInitialState || hasData) {
+    return <ViewRenderer viewMode={activeContext.viewMode} />;
+  }
 
-  // 3. СИНХРОННЫЙ ПРАЙМИНГ КЭША
-  // Используем useMemo как эффект, который срабатывает ДО рендера детей
-  React.useMemo(() => {
-    if (resolvedOrders && isInitialState) {
-      const initialOrders = unwrap(resolvedOrders, { orders: [], nextCursor: null, total: 0 });
-      const queryKey = ["orders", activeContext.viewMode, activeContext];
+  // 4. SUSPENSE POINT
+  // Компонент уснет здесь, если данных нет
+  const result = use(ordersPromise);
 
-      // Заправляем кэш, если там пусто (чтобы не перезатереть живые данные)
-      if (!queryClient.getQueryData(queryKey)) {
-        if (activeContext.viewMode === 'list') {
-          queryClient.setQueryData(queryKey, {
-            pages: [initialOrders as GetOrdersResponse<'list'>],
-            pageParams: [undefined]
-          });
-        } else {
-          queryClient.setQueryData(queryKey, initialOrders as GetOrdersResponse<'map'>);
-        }
-        console.log(`💧 [HYDRATOR] Cache primed for ${activeContext.viewMode}`);
-      }
-    }
-  }, [resolvedOrders, isInitialState, queryClient, activeContext]);
+  // 5. ПРАЙМИНГ КЭША
+  // Сработает только один раз, когда промис разрешится
+  const initialOrders = unwrap(result, { orders: [], nextCursor: null, total: 0 });
 
-  // КОНТРОЛЬНЫЙ ЛОГ: Теперь он будет срабатывать ТОЛЬКО при смене фильтров, 
-  // но НЕ при скролле ленты, так как гидратор больше не подписан на useInfiniteQuery
-  console.log(`✅ [HYDRATOR RENDER] Initial: ${isInitialState}, Mode: ${activeContext.viewMode}`);
+  if (activeContext.viewMode === 'list') {
+    queryClient.setQueryData(queryKey, {
+      pages: [initialOrders as GetOrdersResponse<'list'>],
+      pageParams: [undefined]
+    });
+  } else {
+    queryClient.setQueryData(queryKey, initialOrders as GetOrdersResponse<'map'>);
+  }
 
+  console.log(`💧 [HYDRATOR] Cache primed via use()`);
+
+  // Статы здесь НЕ трогаем. Их подхватит OrdersFeed через свой useEffect.
   return <ViewRenderer viewMode={activeContext.viewMode} />;
 }
-
 
 
 function OrdersSidebarDataWrapper({ promise }: { promise: Promise<ActionResponse<PopularCategoryResult[]>> }) {
