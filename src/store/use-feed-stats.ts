@@ -10,7 +10,7 @@ interface FeedStatsState {
 }
 
 export const useFeedStatsStore = create<FeedStatsState>((set) => ({
-  totalCount: 0,
+  totalCount: -1, // Маркер "Первичный вакуум"
   loadedCount: 0,
   isFetching: false,
 

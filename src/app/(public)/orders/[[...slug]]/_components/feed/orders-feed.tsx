@@ -145,7 +145,7 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
         placeholderData: keepPreviousData,
         notifyOnChangeProps: ['data', 'hasNextPage', 'isError'], // Добавили isFetching для индикатора
         structuralSharing: true,
-        staleTime: 1000 * 60 * 30,
+        staleTime: 1000 * 60,
     });
 
     const { allOrders, total } = React.useMemo(() => {
