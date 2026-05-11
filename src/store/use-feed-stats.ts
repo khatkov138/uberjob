@@ -2,7 +2,7 @@
 import { create } from "zustand";
 
 interface FeedStatsState {
-  totalCount: number;
+  totalCount: number | null; // null — данных еще не было (даже с сервера)
   loadedCount: number;
   isFetching: boolean;
   setStats: (total: number, loaded: number, isFetching: boolean) => void;
@@ -10,24 +10,28 @@ interface FeedStatsState {
 }
 
 export const useFeedStatsStore = create<FeedStatsState>((set) => ({
-  totalCount: -1, // Маркер "Первичный вакуум"
+  totalCount: null, // Изначально "Пусто"
   loadedCount: 0,
-  isFetching: false,
+  isFetching: true,
 
   setStats: (total, loaded, isFetching) => set((state) => {
-    // Педантичная проверка, чтобы не дергать даже маленькие атомы зря
+    // Педантичный Guard Clause: исключаем лишние циклы рендеринга
     if (
       state.totalCount === total && 
       state.loadedCount === loaded && 
       state.isFetching === isFetching
     ) return state;
 
-    return { totalCount: total, loadedCount: loaded, isFetching };
+    return { 
+        totalCount: total, 
+        loadedCount: loaded, 
+        isFetching 
+    };
   }),
 
   reset: () => set({ 
-    totalCount: 0, 
+    totalCount: null, 
     loadedCount: 0, 
-    isFetching: false 
+    isFetching: true
   }),
 }));

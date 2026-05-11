@@ -55,7 +55,7 @@ export default function OrdersPageUI({
   // ⚛️ [RENDER] Теперь рендерится ОДИН РАЗ сразу на сервере и клиенте
   console.log(`⚛️ [RENDER] OrdersPageUI (Techno-minimalism)`);
 
- 
+
   // 2. ПРОФИЛЬ (Оставляем как есть, TanStack Query отлично справляется)
   useQuery({
     queryKey: ["user-profile"],
@@ -95,7 +95,7 @@ export default function OrdersPageUI({
               </div>
             }>
               <OrdersInitialHydrator
-               
+
                 ordersPromise={ordersPromise}
               />
             </Suspense>
@@ -110,13 +110,16 @@ export default function OrdersPageUI({
   );
 }
 
-let globalRenderCount = 0;
 
 export function OrdersInitialHydrator({
   ordersPromise,
 }: {
   ordersPromise: Promise<ActionResponse<GetOrdersResponse<'list'> | GetOrdersResponse<'map'>>>;
+
 }) {
+  const renderCountRef = useRef(0); // Счетчик, который живет только внутри этого экземпляра
+  renderCountRef.current++;
+
   const queryClient = useQueryClient();
   const activeContext = useActiveFeed();
 
@@ -133,7 +136,7 @@ export function OrdersInitialHydrator({
   // значит пользователь УЖЕ поменял фильтры (радиус, город и т.д.)
   const isContextShifted = initialContextRef.current !== activeContext;
 
-  console.log(`🔥 [HYDRATOR] Render: ${++globalRenderCount} | HasData: ${hasData} | Shifted: ${isContextShifted}`);
+  console.log(`🔥 [HYDRATOR] Render: ${renderCountRef.current} | HasData: ${hasData} | Shifted: ${isContextShifted}`);
 
   /**
    * ЭТО ГЛАВНЫЙ БАРЬЕР "БЕТОНА":

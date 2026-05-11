@@ -1,19 +1,28 @@
-// providers/FeedController.tsx
 'use client'
 
 import { createContext, useContext, useMemo, ReactNode } from 'react'
-
-import { useFeedStore } from './FeedProvider' // Хук от Слоя 1 (Zustand)
+import { useFeedStore } from './FeedProvider'
 import { FeedContext } from '../../page'
+import { StatsWatcher } from '../shared/stats-watcher'
 
-const ActiveContext = createContext<FeedContext | null>(null)
+// Слои данных
+const StaticContext = createContext<FeedContext | null>(null)
+const DynamicContext = createContext<FeedContext | null>(null)
 
 /**
- * Главный хук для потребления данных в UI.
- * Больше никаких проверок на undefined — данные есть всегда.
+ * АТОМАРНЫЕ ХУКИ
  */
+
+// Для заголовков, координат и города (Стабильный)
+export const useStaticFeed = () => {
+    const ctx = useContext(StaticContext)
+    if (!ctx) throw new Error('useStaticFeed must be used within FeedController')
+    return ctx
+}
+
+// Для фильтров, радиуса и логики запросов (Реактивный)
 export const useActiveFeed = () => {
-    const ctx = useContext(ActiveContext)
+    const ctx = useContext(DynamicContext)
     if (!ctx) throw new Error('useActiveFeed must be used within FeedController')
     return ctx
 }
@@ -29,24 +38,31 @@ export const FeedController = ({
     currentCategory,
     children
 }: FeedControllerProps) => {
-
-    // 1. Подписываемся на реактивные настройки из стора (уже гидрированы!)
+    // 1. Подписка на Zustand (реактивщина)
     const radius = useFeedStore(s => s.radius)
     const viewMode = useFeedStore(s => s.viewMode)
 
-    // 2. Склеиваем всё в единый "бетонный" объект контекста
-    const activeContext = useMemo((): FeedContext => ({
+    // 2. Слой ГРАНИТ (Статика из URL/БД)
+    // Рендерится только если сменился город или категория в URL
+    const staticContext = useMemo((): FeedContext => ({
         ...serverContext,
-        // Эти поля перекрывают серверные значения актуальными данными из стора
+        categoryId: currentCategory?.id || null,
+    }), [serverContext.locationId, serverContext.slug, currentCategory?.id])
+
+    // 3. Слой РТУТЬ (Динамика: гранит + настройки юзера)
+    // Рендерится при каждом движении ползунка радиуса
+    const activeContext = useMemo((): FeedContext => ({
+        ...staticContext,
         radius,
         viewMode,
-        // Актуальная категория из URL/Prisma
-        categoryId: currentCategory?.id || null,
-    }), [serverContext, radius, viewMode, currentCategory])
+    }), [staticContext, radius, viewMode])
 
     return (
-        <ActiveContext.Provider value={activeContext}>
-            {children}
-        </ActiveContext.Provider>
+        <StaticContext.Provider value={staticContext}>
+            <DynamicContext.Provider value={activeContext}>
+                <StatsWatcher />
+                {children}
+            </DynamicContext.Provider>
+        </StaticContext.Provider>
     )
 }

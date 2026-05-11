@@ -133,9 +133,7 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
     const renderCount = React.useRef(0);
     const context = useActiveFeed();
 
-    // Достаем только экшен, чтобы сам OrdersFeed не рендерился при изменении цифр в сторе
-    const setStats = useFeedStatsStore(s => s.setStats);
-
+   
     const query = useInfiniteQuery<GetOrdersResponse<'list'>>({
         queryKey: ['orders', 'list', context],
         queryFn: ({ pageParam }) => handleAction(getOrders({ ...context, cursor: pageParam as string, mode: 'list' })),
@@ -156,15 +154,7 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
         };
     }, [query.data]);
 
-    // 3. АТОМАРНАЯ СИНХРОНИЗАЦИЯ С ХЕДЕРОМ
-    // Срабатывает при получении новых данных или изменении статуса загрузки
-    React.useEffect(() => {
-        // Мы пушим данные в useFeedStatsStore. 
-        // Это вызовет ререндер ТОЛЬКО HeaderStats. 
-        // OrdersPageUI и сам OrdersFeed (вторично) не шелохнутся.
-        setStats(total, allOrders.length, query.isFetching);
-
-    }, [total, allOrders.length, query.isFetching, setStats]);
+   
 
     const ordersCount = allOrders.length;
     renderCount.current++;
