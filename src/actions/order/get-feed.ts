@@ -56,7 +56,7 @@ export async function getOrders<T extends 'list' | 'map'>(params: FeedContext & 
 }): Promise<ActionResponse<GetOrdersResponse<T>>> {
 
     return createAction<GetOrdersResponse<T>>(async () => {
-     await delay(2000)
+    //await delay(3000)
         const { lat, lng, radius, categoryId, skillIds = [], cursor, limit = 3, mode } = params;
         const isList = mode === 'list';
 

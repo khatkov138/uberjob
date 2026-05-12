@@ -19,6 +19,7 @@ import { getOrders, GetOrdersResponse } from "@/actions/order/get-feed"
 
 
 import { useActiveFeed, useOrdersStream } from "../layout/FeedController"
+import { ActionResponse } from "@/lib/server-utils"
 
 /**
  * ИЗОЛИРОВАННЫЙ ТРИГГЕР СКРОЛЛА
@@ -123,81 +124,113 @@ const ScrollObserver = React.memo(({
 });
 
 
+let connectorRenderCount = 0;
+let coreRenderCount = 0;
 
-// Выносим счетчик в глобал, чтобы он не обнулялся никогда
-let globalOrdersFeedRenderCount = 0;
 
+/**
+ * 1. КОННЕКТОР (Связующий слой)
+ */
 export const OrdersFeed = React.memo(function OrdersFeed() {
-    globalOrdersFeedRenderCount++;
-    const context = useActiveFeed();
-    const queryClient = useQueryClient();
+    connectorRenderCount++;
 
-    const ordersStream = useOrdersStream();
+    const context = useActiveFeed();
+    const ordersStream = useOrdersStream<'list'>();
     const serverDataRaw = React.use(ordersStream);
 
-    // ЗАТВОР ДЛЯ СМЕНЫ ФИЛЬТРОВ: Запоминаем самый первый контекст, с которым страница родилась на сервере
-    const initialContextRef = React.useRef(context);
+    const initialKeyRef = React.useRef(JSON.stringify(context));
+    const currentKeyStr = JSON.stringify(context);
+    const isFiltersChanged = initialKeyRef.current !== currentKeyStr;
 
-    // Если текущий контекст (радиус, slug, категория) перестал быть равен начальному — значит, юзер крутит фильтры!
-    const isFiltersChanged = initialContextRef.current !== context;
+    const queryKey = React.useMemo(() => ['orders', 'list', context] as const, [context]);
 
-    const queryKey = ['orders', 'list', context];
+    console.log(`🔌 [RENDER #${connectorRenderCount}] OrdersFeedConnector | FiltersChanged: ${isFiltersChanged}`);
 
-    const query = useInfiniteQuery<GetOrdersResponse<'list'>>({
+    return (
+        <OrdersFeedCore
+            queryKey={queryKey}
+            context={context}
+            isFiltersChanged={isFiltersChanged}
+            serverDataRaw={serverDataRaw}
+        />
+    );
+});
+
+interface OrdersFeedCoreProps {
+    queryKey: readonly ['orders', 'list', ReturnType<typeof useActiveFeed>];
+    context: ReturnType<typeof useActiveFeed>;
+    isFiltersChanged: boolean;
+    serverDataRaw: ActionResponse<GetOrdersResponse<"list">>;
+}
+
+/**
+ * 2. ЯДРО ФИДА (Слой рендеринга и работы с кэшем)
+ */
+const OrdersFeedCore = React.memo(function OrdersFeedCore({
+    queryKey,
+    context,
+    isFiltersChanged,
+    serverDataRaw
+}: OrdersFeedCoreProps) {
+    coreRenderCount++;
+    const queryClient = useQueryClient();
+
+    const query = useInfiniteQuery<GetOrdersResponse<'list'>, Error, InfiniteData<GetOrdersResponse<'list'>>, typeof queryKey>({
         queryKey,
-        queryFn: ({ pageParam }) => handleAction(getOrders({ ...context, cursor: pageParam as string, mode: 'list' })),
+        queryFn: async ({ pageParam }) => {
+            console.log('handleAction getOrders({ ...context, cursor: pageParam as string, mode: list })')
+            return handleAction(
+                getOrders({ ...context, cursor: pageParam as string, mode: 'list' })
+            );
+        },
         initialPageParam: undefined,
         getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
         enabled: !!context,
         placeholderData: keepPreviousData,
 
-        // Указываем тип возвращаемого значения с возможностью вернуть undefined для смены фильтров
+        // 🟢 Возвращаем undefined, если фильтры изменились. Это штатный сигнал для Танстека: "Иди в сеть!"
         initialData: (): InfiniteData<GetOrdersResponse<'list'>> | undefined => {
-            // 1. Если данные по этому ключу уже есть в кэше (вернулись на старый фильтр) — берем их
             const cached = queryClient.getQueryData<InfiniteData<GetOrdersResponse<'list'>>>(queryKey);
             if (cached) return cached;
 
-            // 2. ДИФФ-ЗАВОР: Если юзер изменил радиус или категорию, мы ГАРАНТИРОВАННО 
-            // возвращаем undefined. Это заставит Танстек пойти в сеть (queryFn) за новыми данными!
-            if (isFiltersChanged) return undefined;
+            if (isFiltersChanged) return undefined; // Мягкий и безопасный пропуск
 
-            // 3. Если это самый первый «холодный» запуск страницы — берем серверный стрим
             const unwrapped = unwrap(serverDataRaw, { orders: [], nextCursor: null, total: 0 });
-            const initialOrders = unwrapped as GetOrdersResponse<'list'>;
-
             return {
-                pages: [initialOrders],
+                pages: [unwrapped],
                 pageParams: [undefined]
             };
         },
 
-        // Чтобы при смене фильтров Танстек сразу давал сигнал хедерам и скелетонам через isFetching
-        notifyOnChangeProps: ['data', 'hasNextPage', 'isFetching'],
+        notifyOnChangeProps: ['data', 'hasNextPage'],
         staleTime: 1000 * 60,
         structuralSharing: true
     });
 
+    // 🟢 Безопасная деструктуризация страниц прямо на входе. 
+    // Если Танстек вернул undefined (пока сеть думает), мы за секунду подставляем пустой массив.
+    const pages = query.data?.pages || [{ orders: [], nextCursor: null, total: 0 }];
+
+    // Абсолютно чистый useMemo без внутренних if-проверок и без риска упасть в рантайме
     const { allOrders, total } = React.useMemo(() => {
-        const pages = query.data?.pages || [];
         return {
             allOrders: pages.flatMap((page) => page.orders),
-            total: pages[0]?.total ?? 0
+            total: pages[0].total
         };
-    }, [query.data]);
+    }, [pages]);
 
     const ordersCount = allOrders.length;
 
-    console.log(`📦 [RENDER #${globalOrdersFeedRenderCount}] OrdersFeed | Total: ${total} | Loaded: ${ordersCount}, isFetching: ${query.isFetching}`);
+    // В логировании мы больше не дергаем query.isFetching, чтобы не провоцировать чтение свойства
+    console.log(`📦 [RENDER #${coreRenderCount}] OrdersFeedCore | Total: ${total} | Loaded: ${ordersCount}`);
 
     if (ordersCount === 0) return <EmptyState />;
 
-
     return (
         <div className="relative min-h-[600px]">
-            {/* ГРУППИРОВКА СПИСКА ДЛЯ ИЗОЛИРОВАННОГО БЛЮРА */}
+            {/* СПИСОК С БЛЮРОМ */}
             <div className={cn(
-                "grid gap-10 transition-all duration-700 ease-in-out", // Чуть медленнее для "дорогого" эффекта
-
+                "grid gap-10 transition-all duration-700 ease-in-out",
                 "opacity-100 blur-0 grayscale-0 scale-100"
             )}>
                 {allOrders.map((order) => (
@@ -205,17 +238,17 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
                 ))}
             </div>
 
-            {/* Бесконечный скролл (ВНЕ зоны блюра) */}
-
-            <ScrollObserver
-                key={`trigger-${ordersCount}`}
-                hasNextPage={query.hasNextPage}
+            {/* 🔥 ИЗОЛИРОВАННЫЙ НАБЛЮДАТЕЛЬ СКРОЛЛА */}
+            {/* Передаем queryKey, чтобы наблюдатель сам точечно подписался на статус фетчинга */}
+            <IsolatedScrollObserver
+                queryKey={queryKey}
+                ordersCount={ordersCount}
+                hasNextPage={!!query.hasNextPage}
                 fetchNextPage={query.fetchNextPage}
-                isFetchingNextPage={query.isFetchingNextPage} // Нативный флаг TanStack
                 isError={query.isError}
             />
 
-            {/* Финальный блок (The End) — тоже не должен блюриться */}
+            {/* Финальный блок (The End) */}
             {!query.hasNextPage && ordersCount > 0 && (
                 <div className="flex flex-col items-center gap-8 py-24 animate-in fade-in slide-in-from-bottom-10 duration-1000">
                     <div className="flex items-center gap-4">
@@ -232,7 +265,7 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
                             Поздравляем, <br />
                             <span className="text-blue-600">вы достигли дна</span>
                         </h4>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] italic text-slate-400">
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] italic">
                             Больше заказов нет. Время всплывать.
                         </p>
                     </div>
@@ -248,8 +281,40 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
                     </button>
                 </div>
             )}
-
-
         </div>
+    );
+});
+
+interface IsolatedScrollObserverProps {
+    queryKey: readonly ['orders', 'list', ReturnType<typeof useActiveFeed>];
+    ordersCount: number;
+    hasNextPage: boolean;
+    fetchNextPage: () => void;
+    isError: boolean;
+}
+
+/**
+ * 3. АТОМАРНЫЙ ТРИГГЕР СКРОЛЛА
+ * Он забирает флаг фетчинга точечно через useIsFetching.
+ * При подгрузке страниц рендерится ТОЛЬКО этот маленький компонент, а ядро фида молчит.
+ */
+const IsolatedScrollObserver = React.memo(function IsolatedScrollObserver({
+    queryKey,
+    ordersCount,
+    hasNextPage,
+    fetchNextPage,
+    isError
+}: IsolatedScrollObserverProps) {
+    // Получаем количество фетчей конкретно по нашему ключу (0 или 1)
+    const isFetching = useIsFetching({ queryKey: queryKey as unknown as any[] }) > 0;
+
+    return (
+        <ScrollObserver
+            key={`trigger-${ordersCount}`}
+            hasNextPage={hasNextPage}
+            fetchNextPage={fetchNextPage}
+            isFetchingNextPage={isFetching} // Отдаем изолированный флаг
+            isError={isError}
+        />
     );
 });

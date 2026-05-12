@@ -35,10 +35,15 @@ export const useActiveFeed = () => {
 }
 
 // Хук для нативного забора промиса в фиде (Строго типизирован на выходе)
-export const useOrdersStream = (): OrdersStreamPromise => {
+export const useOrdersStream = <M extends 'list' | 'map' = 'list' | 'map'>(): Promise<
+    ActionResponse<GetOrdersResponse<M>>
+> => {
     const ctx = useContext(OrdersStreamContext)
     if (!ctx) throw new Error('useOrdersStream missing. Ensure component is under FeedController')
-    return ctx
+
+    // Безопасное приведение типа промиса внутри абстракции хука.
+    // Снаружи хука код остается абсолютно чистым, без "as".
+    return ctx as Promise<ActionResponse<GetOrdersResponse<M>>>;
 }
 
 interface FeedControllerProps {
