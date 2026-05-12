@@ -11,7 +11,7 @@ import { handleAction, handleApi, cn } from "@/lib/utils"
 import { getOrCreateLocation } from "@/actions/location/manage"
 
 import { useQueryClient } from "@tanstack/react-query"
-import { useFeedStatsStore } from "@/store/use-feed-stats"
+
 import { useActiveFeed } from "../layout/FeedController"
 
 export function LocationModal() {
@@ -53,7 +53,7 @@ export function LocationModal() {
       queryClient.removeQueries({ queryKey: ['orders'] });
 
       // Сбрасываем статы
-      useFeedStatsStore.getState().reset();
+      //useFeedStatsStore.getState().reset();
       router.push(`/orders/${location.slug}`);
 
     } catch (error) {

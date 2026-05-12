@@ -1,26 +1,50 @@
 import Pusher from "pusher-js";
 
-// Глобальная переменная, чтобы хранить один инстанс
+// Singleton инстанс, живущий вне цикла рендеринга React
 let pusherClient: Pusher | null = null;
 
 export const getPusherClient = () => {
-  if (!pusherClient) {
-    // Проверка на наличие ключей, чтобы не падало в консоли
-    const key = process.env.NEXT_PUBLIC_PUSHER_KEY;
-    const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
+  // 1. Строгая проверка среды исполнения
+  if (typeof window === 'undefined') return null;
 
-    if (!key || !cluster) {
-      console.error("PUSHER_ERROR: Ключи не найдены в .env");
-    }
+  // 2. Возвращаем существующий, если он уже инициализирован
+  if (pusherClient) return pusherClient;
 
-    pusherClient = new Pusher(key!, {
-      cluster: cluster!,
+  // 3. Ленивая инициализация при первом реальном вызове
+  const key = process.env.NEXT_PUBLIC_PUSHER_KEY;
+  const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
+
+  if (!key || !cluster) {
+    console.warn("⚠️ [PUSHER] Missing keys. Check your .env file.");
+    return null;
+  }
+
+  try {
+    pusherClient = new Pusher(key, {
+      cluster: cluster,
       forceTLS: true,
-      // Это предотвращает лишние попытки подключения, если что-то не так
       authEndpoint: "/api/pusher/auth",
+      // ws/wss — самые быстрые транспорты, исключаем медленный лонг-поллинг
+      enabledTransports: ["ws", "wss"],
+      // Отключаем логи в продакшене для чистоты консоли
+      disableStats: true, 
     });
 
-    console.log("------------------ [PUSHER] CONNECTION STARTED ------------------");
+    console.log("🛠️ [PUSHER] Instance Born & Socket Connected");
+    return pusherClient;
+  } catch (error) {
+    console.error("❌ [PUSHER] Initialization failed:", error);
+    return null;
   }
-  return pusherClient;
+};
+
+/**
+ * Дополнительный хелпер для корректного закрытия соединения (опционально)
+ */
+export const disconnectPusher = () => {
+  if (pusherClient) {
+    pusherClient.disconnect();
+    pusherClient = null;
+    console.log("🔌 [PUSHER] Disconnected");
+  }
 };

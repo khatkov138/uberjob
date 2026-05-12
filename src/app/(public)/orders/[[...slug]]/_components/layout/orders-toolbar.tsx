@@ -26,7 +26,7 @@ export function OrdersToolbar() {
   // Благодаря инъекции, здесь НИКОГДА не будет undefined
   const { viewMode, name, radius } = useActiveFeed();
 
-  console.log(`🛠️ [RENDER #${renderCount.current}] OrdersToolbar | Mode: ${viewMode} | City: ${name}`);
+  console.log(`🛠️ [RENDER #${renderCount.current}] OrdersToolbar | Mode: ${viewMode} | City: ${name} | Radius: ${radius}km`);
 
   return (
     <div className="bg-white px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-100 sticky top-0 z-30">

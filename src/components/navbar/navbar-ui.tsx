@@ -14,45 +14,30 @@ import { NotificationsBell } from "./notifications-bell"
 import { UnreadBadge } from "./unread-badge"
 import { useNotifications } from "@/hooks/use-notifications"
 import { User } from "@/lib/auth"
-import { useLocationStore } from "@/store/use-location-store"
-import { NavbarSkeleton } from "./navbar-skeleton"
 
 interface NavbarUIProps {
-    // Используем встроенный тип Better-Auth для пользователя
     user: User | null
 }
 
 export function NavbarUI({ user }: NavbarUIProps) {
-    const { mode } = useRoleModeStore()
+
+    const mode = 'CLIENT'
+    // const { mode } = useRoleModeStore()
     const pathname = usePathname()
 
-
-    const [navHref, setNavHref] = React.useState("/orders")
-
-    // Как только стор "ожил" и мы узнали слаг, меняем ссылку
-
-
-
-    const [mounted, setMounted] = React.useState(false)
-    React.useEffect(() => setMounted(true), [])
-
-    // ID пользователя теперь строго типизирован как string | undefined
+    // Ленивый Pusher сидит тихо и ждет 800мс, не мешая гидратации фида заказов
     useNotifications(user?.id)
 
-    const isAdminPage = pathname.startsWith('/admin')
+    const isAdminPage = React.useMemo(() => pathname.startsWith('/admin'), [pathname])
     if (isAdminPage) return null
 
-    const logoHref = user ? (mode === 'PRO' ? '/pro/dashboard' : '/client/dashboard') : "/"
-
-    if (!mounted) {
-        return <NavbarSkeleton />
-    }
+    const logoHref = user ? (mode ? '/pro/dashboard' : '/client/dashboard') : "/"
 
     return (
         <header className="sticky top-0 z-50 w-full h-20 bg-white/95 backdrop-blur-md border-b border-slate-100">
             <div className="max-w-5xl mx-auto h-full px-4 md:px-6 flex items-center justify-between gap-4">
 
-                {/* 1. БРЕНД */}
+                {/* 1. БРЕНД (SSR-Ready, 0ms рендера на клиенте) */}
                 <div className="flex items-center gap-8 shrink-0">
                     <Link href={logoHref} className="hover:opacity-80 transition-opacity">
                         <span className="font-black text-2xl tracking-tighter italic text-slate-900 leading-none">
@@ -63,7 +48,7 @@ export function NavbarUI({ user }: NavbarUIProps) {
                     {user && (
                         <nav className="hidden sm:flex items-center">
                             <Link
-                                href={mode === 'PRO' ? "/pro/dashboard" : "/client/dashboard"}
+                                href={mode ? "/pro/dashboard" : "/client/dashboard"}
                                 className={cn(
                                     "text-[11px] font-black uppercase tracking-[0.2em] transition-all relative py-1",
                                     pathname.includes('dashboard') ? "text-blue-600" : "text-slate-400 hover:text-slate-900"
@@ -78,7 +63,7 @@ export function NavbarUI({ user }: NavbarUIProps) {
                     )}
                 </div>
 
-                {/* 2. ЦЕНТРАЛЬНАЯ КНОПКА */}
+                {/* 2. ЦЕНТРАЛЬНАЯ КНОПКА (Статичный HTML, никаких Hydration Mismatch) */}
                 <div className="flex-1 max-w-sm">
                     {user && (
                         <div className="animate-in fade-in zoom-in-95 duration-500">
@@ -92,13 +77,12 @@ export function NavbarUI({ user }: NavbarUIProps) {
                                 </Link>
                             ) : (
                                 <Link
-                                    href={navHref} // <-- Динамическая ссылка
+                                    href="/orders"
                                     className="w-full h-12 flex items-center justify-center gap-3 bg-slate-900 hover:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] transition-all shadow-xl shadow-slate-200 active:scale-95"
                                 >
                                     <Search size={18} className="stroke-[3px]" />
                                     <span>Поиск заказов</span>
                                 </Link>
-
                             )}
                         </div>
                     )}
@@ -131,7 +115,6 @@ export function NavbarUI({ user }: NavbarUIProps) {
                                 <NotificationsBell />
                             </div>
 
-                            {/* Передаем типизированного юзера в дропдаун */}
                             <UserDropdown user={user} />
                         </>
                     ) : (
@@ -147,4 +130,3 @@ export function NavbarUI({ user }: NavbarUIProps) {
         </header>
     )
 }
-

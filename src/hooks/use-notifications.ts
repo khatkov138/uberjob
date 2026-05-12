@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { useQueryClient, InfiniteData } from "@tanstack/react-query"
 import { getPusherClient } from "@/lib/pusher-client"
@@ -12,11 +12,38 @@ const typingTimeouts: Record<string, NodeJS.Timeout> = {};
 export function useNotifications(userId: string | undefined) {
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
+  
+  // Флаг для отложенной активации Pusher, чтобы не мешать гидратации основного контента
+  const [isActivated, setIsActivated] = useState(false)
 
+  // 1. Эффект "Холодного старта": активируем сокеты только когда браузер свободен
   useEffect(() => {
     if (!userId) return
 
+    const timer = setTimeout(() => {
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        window.requestIdleCallback(() => setIsActivated(true))
+      } else {
+        setIsActivated(true)
+      }
+    }, 800);
+
+    return () => {
+      clearTimeout(timer)
+      setIsActivated(false)
+    }
+  }, [userId])
+
+  // 2. Основной эффект подписки
+  useEffect(() => {
+    // Ждем userId и завершения задержки активации
+    if (!userId || !isActivated) return
+
     const pusher = getPusherClient()
+    
+    // Type Guard для TypeScript: проверяем, что pusher не null
+    if (!pusher) return
+
     const channelName = `user-${userId}`
     const channel = pusher.subscribe(channelName)
 
@@ -24,7 +51,7 @@ export function useNotifications(userId: string | undefined) {
       const { type, contextKey, data } = payload
       if (!contextKey) return
 
-      // 1. СТАТУС ПЕЧАТИ
+      // --- 1. СТАТУС ПЕЧАТИ ---
       if (type === "USER_TYPING") {
         if (typingTimeouts[contextKey]) clearTimeout(typingTimeouts[contextKey]);
         queryClient.setQueryData(["typing", contextKey], { isTyping: true, userId: data.userId });
@@ -33,7 +60,7 @@ export function useNotifications(userId: string | undefined) {
         }, 4000);
       }
 
-      // 2. НОВОЕ СООБЩЕНИЕ
+      // --- 2. НОВОЕ СООБЩЕНИЕ ---
       if (type === "NEW_MESSAGE") {
         const { message: msg, orderId } = data
         const isMe = msg.senderId === userId
@@ -42,7 +69,6 @@ export function useNotifications(userId: string | undefined) {
         const activeUserId = searchParams.get("userId")
         const activeOrderId = searchParams.get("orderId")
 
-        // Вкладка считается "в чате", только если URL совпадает И окно активно
         const isChatRoute = orderId ? activeOrderId === orderId : activeUserId === (isMe ? msg.recipientId : msg.senderId);
         const isCurrentChat = isChatRoute && document.hasFocus();
 
@@ -51,14 +77,9 @@ export function useNotifications(userId: string | undefined) {
         // А) Обновление бабблов (Infinite Query)
         queryClient.setQueryData<InfiniteData<InfiniteMessagesResponse>>(queryKey, (old) => {
           if (!old) return isChatRoute ? (queryClient.invalidateQueries({ queryKey }), old) : old
-
           if (old.pages.flatMap(p => p.messages).some(m => m.id === msg.id)) return old
 
-          // Создаем копию сообщения для кэша
           const newMsg = { ...msg };
-
-          // Если чат открыт прямо сейчас и окно в фокусе, 
-          // мы визуально помечаем сообщение как прочитанное сразу
           if (isCurrentChat && !isMe) {
             newMsg.isRead = true;
           }
@@ -82,23 +103,17 @@ export function useNotifications(userId: string | undefined) {
 
           if (index !== -1) {
             const existing = dialogs[index]
-
-            // Если пришло подтверждение нашего оптимистичного сообщения
             const isOptimisticConfirm = isMe && existing.lastMessage?.isOptimistic && existing.lastMessage?.text === msg.text;
 
-            // Если сообщение уже обработано (те же ID)
             if (existing.lastMessage?.id === msg.id) return old
 
             if (isOptimisticConfirm) {
-              // Просто тихо обновляем последнее сообщение без перемещений и счетчиков
               const updated = [...dialogs]
               updated[index] = { ...existing, lastMessage: msg }
               return updated
             }
 
-            // РЕАЛЬНО НОВОЕ СООБЩЕНИЕ
             const [moved] = dialogs.splice(index, 1)
-
             let newUnreadCount = moved.unreadCount
             if (isCurrentChat) {
               newUnreadCount = 0
@@ -110,7 +125,6 @@ export function useNotifications(userId: string | undefined) {
             return [{ ...moved, lastMessage: msg, unreadCount: newUnreadCount }, ...dialogs]
           }
 
-          // Если диалога нет (новый контакт) - рефетчим список
           queryClient.invalidateQueries({ queryKey: ["dialogs"] });
           return old
         })
@@ -120,7 +134,7 @@ export function useNotifications(userId: string | undefined) {
         }
       }
 
-      // 3. ПРОЧТЕНИЕ
+      // --- 3. ПРОЧТЕНИЕ ---
       if (type === "MESSAGES_READ") {
         const queryKey = getMessagesQueryKey(contextKey)
         const isReadByMe = data.readerId === userId
@@ -144,5 +158,5 @@ export function useNotifications(userId: string | undefined) {
       pusher.unsubscribe(channelName)
       Object.values(typingTimeouts).forEach(clearTimeout)
     }
-  }, [userId, queryClient, searchParams])
+  }, [userId, queryClient, searchParams, isActivated]) 
 }

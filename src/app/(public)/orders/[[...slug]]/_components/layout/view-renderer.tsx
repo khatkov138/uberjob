@@ -19,7 +19,7 @@ interface ViewRendererProps {
 
 // Оборачиваем в memo: теперь он рендерится ТОЛЬКО если изменился viewMode
 export const ViewRenderer = memo(function ViewRenderer({ viewMode }: ViewRendererProps) {
- 
+
     return (
         <div className={cn(
             "relative min-h-[700px] transition-all duration-500",

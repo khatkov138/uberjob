@@ -60,11 +60,10 @@ export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
         queryClient.setQueryData(["user-profile"], ctx.previousProfile)
       }
     },
-   
+
   })
 
-  const cityName = context?.name || "Вся Россия"
-  const citySlug = context?.slug || "all"
+
 
   return (
     <div className="flex flex-col gap-6 sticky top-6">
@@ -102,7 +101,7 @@ export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
             <div className="space-y-4">
               <div className="flex justify-between text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
                 <span className="flex items-center gap-1.5 transition-colors group-hover:text-slate-300">
-                  <MapPin size={10} className="text-blue-500" /> {cityName}
+                  <MapPin size={10} className="text-blue-500" /> {context.name}
                 </span>
                 <span className="text-blue-400">{profile.exp} / 1000 XP</span>
               </div>
@@ -194,7 +193,7 @@ export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
           {popularCategories.map((cat) => (
             <Link
               key={cat.id}
-              href={`/orders/${citySlug}/${cat.slug}`}
+              href={`/orders/${context.slug}/${cat.slug}`}
               className="flex items-center justify-between group"
             >
               <div className="flex items-center gap-4">

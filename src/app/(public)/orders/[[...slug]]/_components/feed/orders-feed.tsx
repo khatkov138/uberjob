@@ -1,11 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { useQuery, useInfiniteQuery, keepPreviousData, useIsFetching, InfiniteData } from "@tanstack/react-query"
+import { useQuery, useInfiniteQuery, keepPreviousData, useIsFetching, InfiniteData, useQueryClient } from "@tanstack/react-query"
 import { useInView } from "react-intersection-observer"
 import { ArrowUpRight, Loader2, RefreshCcw, Zap } from "lucide-react"
 
-import { cn, handleAction } from "@/lib/utils"
+import { cn, handleAction, unwrap } from "@/lib/utils"
 import { useDebounce } from "@/hooks/use-debounce"
 
 // Components
@@ -17,8 +17,8 @@ import { OrderCardSkeleton } from "../shared/order-card-skeleton"
 import { FeedContext } from "../../page"
 import { getOrders, GetOrdersResponse } from "@/actions/order/get-feed"
 
-import { useFeedStatsStore } from "@/store/use-feed-stats"
-import { useActiveFeed } from "../layout/FeedController"
+
+import { useActiveFeed, useOrdersStream } from "../layout/FeedController"
 
 /**
  * ИЗОЛИРОВАННЫЙ ТРИГГЕР СКРОЛЛА
@@ -27,28 +27,23 @@ import { useActiveFeed } from "../layout/FeedController"
  * он сработает повторно без необходимости двигать скролл.
  */
 const ScrollObserver = React.memo(({
-    context,
     hasNextPage,
     fetchNextPage,
+    isFetchingNextPage, // Передаем извне
     isError
 }: {
-    context: FeedContext | null,
     hasNextPage: boolean | undefined,
     fetchNextPage: () => void,
+    isFetchingNextPage: boolean,
     isError: boolean
 }) => {
-    // 1. Следим за сетевым статусом именно этого запроса
-    const isFetchingCount = useIsFetching({
-        queryKey: ["orders", "list", context]
-    });
-    const isFetchingNextPage = isFetchingCount > 0;
+
 
     const { ref, inView } = useInView({
         threshold: 0,
-        rootMargin: '400px'
+        rootMargin: '600px' // Чуть увеличим для плавности
     });
 
-    // 2. Авто-загрузка при скролле (только если нет ошибки)
     React.useEffect(() => {
         if (inView && hasNextPage && !isFetchingNextPage && !isError) {
             fetchNextPage();
@@ -129,21 +124,57 @@ const ScrollObserver = React.memo(({
 
 
 
-export const OrdersFeed = React.memo(function OrdersFeed() {
-    const renderCount = React.useRef(0);
-    const context = useActiveFeed();
+// Выносим счетчик в глобал, чтобы он не обнулялся никогда
+let globalOrdersFeedRenderCount = 0;
 
-   
+export const OrdersFeed = React.memo(function OrdersFeed() {
+    globalOrdersFeedRenderCount++;
+    const context = useActiveFeed();
+    const queryClient = useQueryClient();
+
+    const ordersStream = useOrdersStream();
+    const serverDataRaw = React.use(ordersStream);
+
+    // ЗАТВОР ДЛЯ СМЕНЫ ФИЛЬТРОВ: Запоминаем самый первый контекст, с которым страница родилась на сервере
+    const initialContextRef = React.useRef(context);
+
+    // Если текущий контекст (радиус, slug, категория) перестал быть равен начальному — значит, юзер крутит фильтры!
+    const isFiltersChanged = initialContextRef.current !== context;
+
+    const queryKey = ['orders', 'list', context];
+
     const query = useInfiniteQuery<GetOrdersResponse<'list'>>({
-        queryKey: ['orders', 'list', context],
+        queryKey,
         queryFn: ({ pageParam }) => handleAction(getOrders({ ...context, cursor: pageParam as string, mode: 'list' })),
         initialPageParam: undefined,
         getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
         enabled: !!context,
         placeholderData: keepPreviousData,
-        notifyOnChangeProps: ['data', 'hasNextPage', 'isError'], // Добавили isFetching для индикатора
-        structuralSharing: true,
+
+        // Указываем тип возвращаемого значения с возможностью вернуть undefined для смены фильтров
+        initialData: (): InfiniteData<GetOrdersResponse<'list'>> | undefined => {
+            // 1. Если данные по этому ключу уже есть в кэше (вернулись на старый фильтр) — берем их
+            const cached = queryClient.getQueryData<InfiniteData<GetOrdersResponse<'list'>>>(queryKey);
+            if (cached) return cached;
+
+            // 2. ДИФФ-ЗАВОР: Если юзер изменил радиус или категорию, мы ГАРАНТИРОВАННО 
+            // возвращаем undefined. Это заставит Танстек пойти в сеть (queryFn) за новыми данными!
+            if (isFiltersChanged) return undefined;
+
+            // 3. Если это самый первый «холодный» запуск страницы — берем серверный стрим
+            const unwrapped = unwrap(serverDataRaw, { orders: [], nextCursor: null, total: 0 });
+            const initialOrders = unwrapped as GetOrdersResponse<'list'>;
+
+            return {
+                pages: [initialOrders],
+                pageParams: [undefined]
+            };
+        },
+
+        // Чтобы при смене фильтров Танстек сразу давал сигнал хедерам и скелетонам через isFetching
+        notifyOnChangeProps: ['data', 'hasNextPage', 'isFetching'],
         staleTime: 1000 * 60,
+        structuralSharing: true
     });
 
     const { allOrders, total } = React.useMemo(() => {
@@ -154,34 +185,37 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
         };
     }, [query.data]);
 
-   
-
     const ordersCount = allOrders.length;
-    renderCount.current++;
 
-    console.log(`📦 [RENDER #${renderCount.current}] OrdersFeed | Total: ${total} | Loaded: ${ordersCount}`);
+    console.log(`📦 [RENDER #${globalOrdersFeedRenderCount}] OrdersFeed | Total: ${total} | Loaded: ${ordersCount}, isFetching: ${query.isFetching}`);
 
-    if (ordersCount === 0 && !query.isFetching) return <EmptyState />;
+    if (ordersCount === 0) return <EmptyState />;
+
 
     return (
         <div className="relative min-h-[600px]">
-            {/* Список карточек */}
-            <div className="grid gap-10 transition-all duration-500">
+            {/* ГРУППИРОВКА СПИСКА ДЛЯ ИЗОЛИРОВАННОГО БЛЮРА */}
+            <div className={cn(
+                "grid gap-10 transition-all duration-700 ease-in-out", // Чуть медленнее для "дорогого" эффекта
+
+                "opacity-100 blur-0 grayscale-0 scale-100"
+            )}>
                 {allOrders.map((order) => (
                     <OrderCard key={order.id} order={order} isMatch={order.isMatch} />
                 ))}
             </div>
 
-            {/* Бесконечный скролл */}
+            {/* Бесконечный скролл (ВНЕ зоны блюра) */}
+
             <ScrollObserver
                 key={`trigger-${ordersCount}`}
-                context={context}
                 hasNextPage={query.hasNextPage}
                 fetchNextPage={query.fetchNextPage}
+                isFetchingNextPage={query.isFetchingNextPage} // Нативный флаг TanStack
                 isError={query.isError}
             />
 
-            {/* Финальный блок (The End) */}
+            {/* Финальный блок (The End) — тоже не должен блюриться */}
             {!query.hasNextPage && ordersCount > 0 && (
                 <div className="flex flex-col items-center gap-8 py-24 animate-in fade-in slide-in-from-bottom-10 duration-1000">
                     <div className="flex items-center gap-4">
@@ -214,6 +248,8 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
                     </button>
                 </div>
             )}
+
+
         </div>
     );
 });

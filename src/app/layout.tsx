@@ -54,17 +54,19 @@ export default function RootLayout({
       <body className={`${geistSans.className} antialiased h-screen flex flex-col overflow-hidden bg-white`}>
 
         <TanstackProvider>
-          <Heartbeat />
+
           {/* HEADER: Занимает ровно столько, сколько нужно контенту */}
-          <header className="flex-none z-50">
+          {/*  <header className="flex-none z-50">
             <Suspense fallback={<NavbarSkeleton />}>
               <Navbar />
             </Suspense>
 
             <Suspense fallback={<LivePulseSkeleton />}>
               <LivePulseMarquee />
+              
             </Suspense>
-          </header>
+             <Heartbeat />
+          </header>*/}
 
           {/* 
             MAIN: flex-1 забирает всё пространство от Header до низа экрана.

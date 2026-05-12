@@ -95,12 +95,14 @@ export default async function OrdersPage({ params }: Props) {
   );
 
   return (
-     <FeedProvider initialData={storeInitialData}>
-      <FeedController serverContext={feedContext} currentCategory={currentCategory}>
+    <FeedProvider initialData={storeInitialData}>
+      <FeedController
+        ordersPromise={ordersPromise} // <-- Прямо в контроллер его!
+        session={session}
+        initialProfile={initialProfile}
+        serverContext={feedContext} currentCategory={currentCategory}>
         <OrdersPageUI
-          session={session}
-          initialProfile={initialProfile}
-          ordersPromise={ordersPromise}
+
           popularCategoriesPromise={popularCategoriesPromise}
         />
       </FeedController>
