@@ -111,12 +111,9 @@ export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
                   style={{ width: `${(profile.exp / 1000) * 100}%` }}
                 />
               </div>
-              <Link
-                href="/pro/profile"
-                className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase italic text-slate-500 hover:text-white transition-all pt-1"
-              >
-                Настройки профиля <ArrowUpRight size={12} strokeWidth={3} />
-              </Link>
+
+              Настройки профиля <ArrowUpRight size={12} strokeWidth={3} />
+
             </div>
           </div>
         </div>

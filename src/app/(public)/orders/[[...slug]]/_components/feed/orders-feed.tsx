@@ -165,8 +165,7 @@ interface OrdersFeedCoreProps {
 
 /**
  * 2. ЯДРО ФИДА (Слой рендеринга и работы с кэшем)
- */
-const OrdersFeedCore = React.memo(function OrdersFeedCore({
+ */const OrdersFeedCore = React.memo(function OrdersFeedCore({
     queryKey,
     context,
     isFiltersChanged,
@@ -175,10 +174,24 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
     coreRenderCount++;
     const queryClient = useQueryClient();
 
+    // 🧱 1. УПРЕЖДАЮЩАЯ СИНХРОННАЯ ЗАПРАВКА RAM (Eager Seeding Затвор)
+    // В Production-билде этот код выполняется наносекундно ДО старта хука useInfiniteQuery.
+    // Если кэша под этот город/радиус еще нет, мы насильно и принудительно создаем его в памяти прямо сейчас.
+    const hasCached = queryClient.getQueryData(queryKey);
+
+    if (!hasCached && !isFiltersChanged) {
+        const unwrapped = unwrap(serverDataRaw, { orders: [], nextCursor: null, total: 0 });
+        queryClient.setQueryData(queryKey, {
+            pages: [unwrapped],
+            pageParams: [undefined]
+        });
+    }
+
+    // 2. Инициализируем хук. Теперь он ГАРАНТИРОВАННО сразу находит готовый кэш в RAM!
     const query = useInfiniteQuery<GetOrdersResponse<'list'>, Error, InfiniteData<GetOrdersResponse<'list'>>, typeof queryKey>({
         queryKey,
         queryFn: async ({ pageParam }) => {
-            console.log('handleAction getOrders({ ...context, cursor: pageParam as string, mode: list })')
+            console.log('📍handleAction📍 getOrders 📍')
             return handleAction(
                 getOrders({ ...context, cursor: pageParam as string, mode: 'list' })
             );
@@ -188,12 +201,13 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
         enabled: !!context,
         placeholderData: keepPreviousData,
 
-        // 🟢 Возвращаем undefined, если фильтры изменились. Это штатный сигнал для Танстека: "Иди в сеть!"
+        // initialData больше не создает инлайновые объекты-пустышки на каждом круге.
+        // Он выступает чистым пассивным фолбеком, так как память заправлена на Шаге 1.
         initialData: (): InfiniteData<GetOrdersResponse<'list'>> | undefined => {
             const cached = queryClient.getQueryData<InfiniteData<GetOrdersResponse<'list'>>>(queryKey);
             if (cached) return cached;
 
-            if (isFiltersChanged) return undefined; // Мягкий и безопасный пропуск
+            if (isFiltersChanged) return undefined;
 
             const unwrapped = unwrap(serverDataRaw, { orders: [], nextCursor: null, total: 0 });
             return {
@@ -208,20 +222,18 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
     });
 
     // 🟢 Безопасная деструктуризация страниц прямо на входе. 
-    // Если Танстек вернул undefined (пока сеть думает), мы за секунду подставляем пустой массив.
     const pages = query.data?.pages || [{ orders: [], nextCursor: null, total: 0 }];
 
     // Абсолютно чистый useMemo без внутренних if-проверок и без риска упасть в рантайме
     const { allOrders, total } = React.useMemo(() => {
         return {
             allOrders: pages.flatMap((page) => page.orders),
-            total: pages[0].total
+            total: pages[0]?.total ?? 0
         };
     }, [pages]);
 
     const ordersCount = allOrders.length;
 
-    // В логировании мы больше не дергаем query.isFetching, чтобы не провоцировать чтение свойства
     console.log(`📦 [RENDER #${coreRenderCount}] OrdersFeedCore | Total: ${total} | Loaded: ${ordersCount}`);
 
     if (ordersCount === 0) return <EmptyState />;

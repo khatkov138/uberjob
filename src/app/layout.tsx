@@ -55,7 +55,7 @@ export default function RootLayout({
 
         <TanstackProvider>
 
-          {/* HEADER: Занимает ровно столько, сколько нужно контенту */}
+          {/* HEADER: Занимает ровно столько, сколько нужно контенту 
           <header className="flex-none z-50">
             <Suspense fallback={<NavbarSkeleton />}>
               <Navbar />
@@ -66,7 +66,7 @@ export default function RootLayout({
 
             </Suspense>
             <Heartbeat />
-          </header>
+          </header>*/}
 
           {/* 
             MAIN: flex-1 забирает всё пространство от Header до низа экрана.

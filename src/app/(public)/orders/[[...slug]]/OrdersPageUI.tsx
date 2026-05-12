@@ -99,11 +99,7 @@ function ViewRendererWrapper() {
   const context = useActiveFeed();
 
   return (
-    <>
-      {/* Переносим StatsWatcher сюда, чтобы он работал внутри прогретого Suspense-контекста */}
-
-      <ViewRenderer viewMode={context.viewMode} />
-    </>
+    <ViewRenderer viewMode={context.viewMode} />
   );
 }
 

@@ -37,32 +37,28 @@ export function LocationModal() {
     } finally { setIsLoading(false) }
   }
 
-  const handleSelect = async (item: any) => {
-    if (isLoading) return; // Педантичный блок повторных нажатий
+ const handleSelect = async (item: any) => {
+  if (isLoading) return; // Педантичный блок повторных нажатий
 
-    setIsLoading(true);
-    setSelectedUri(item.uri);
+  setIsLoading(true);
+  setSelectedUri(item.uri);
 
-    try {
-      const location = await handleAction(getOrCreateLocation(item.uri));
-      setGlobalLocation(location.id)
-      // Просто пушим. Модалка размонтируется вместе со страницей.
-      // Если переход в Next.js будет быстрым, юзер даже не заметит,
-      // как модалка исчезла "сама".
-      //closeModal()
-      queryClient.removeQueries({ queryKey: ['orders'] });
+  try {
+    const location = await handleAction(getOrCreateLocation(item.uri));
+    setGlobalLocation(location.id);
 
-      // Сбрасываем статы
-      //useFeedStatsStore.getState().reset();
-      router.push(`/orders/${location.slug}`);
+    // 🔥 ВЫЖЖЕНО: queryClient.removeQueries({ queryKey: ['orders'] });
+    // Больше никакого преждевременного уничтожения данных под ногами у живого Хедера!
 
-    } catch (error) {
-      console.error("Shift error:", error);
-      setSelectedUri(null);
-      setIsLoading(false);
-    }
-  };
+    // Мягко переводим роутер на новый город
+    router.push(`/orders/${location.slug}`);
 
+  } catch (error) {
+    console.error("Shift error:", error);
+    setSelectedUri(null);
+    setIsLoading(false);
+  }
+};
 
 
   return (
