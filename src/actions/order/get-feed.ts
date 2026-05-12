@@ -56,8 +56,11 @@ export async function getOrders<T extends 'list' | 'map'>(params: FeedContext & 
 }): Promise<ActionResponse<GetOrdersResponse<T>>> {
 
     return createAction<GetOrdersResponse<T>>(async () => {
-    //await delay(3000)
-        const { lat, lng, radius, categoryId, skillIds = [], cursor, limit = 3, mode } = params;
+        //await delay(3000)
+        // 🔥 ПРИНИМАЕМ СТРОКУ И ПРЕВРАЩАЕМ В МАССИВ ДЛЯ ПРИЗМЫ
+        const { lat, lng, radius, categoryId, skillIds: rawSkillIds, cursor, limit = 3, mode } = params;
+        const skillIds = rawSkillIds ? rawSkillIds.split(',') : [];
+
         const isList = mode === 'list';
 
         // 1. SQL СТРОИТЕЛЬ

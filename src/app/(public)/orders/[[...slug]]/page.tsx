@@ -25,7 +25,7 @@ export interface FeedContext {
   name: string;
   slug: string;
   categoryId: string | null;
-  skillIds: string[];
+  skillIds: string; // 🔥 МЕНЯЕМ НА СТРОКУ
   viewMode: 'list' | 'map';
 }
 
@@ -82,7 +82,7 @@ export default async function OrdersPage({ params }: Props) {
     lng: dbLocation.lng,
     radius: feedState.radius,
     categoryId: currentCategory?.id || null,
-    skillIds,
+    skillIds: skillIds.sort().join(','), // 🔥 Сразу склеиваем в стабильную строку на сервере!
     viewMode: feedState.viewMode
   };
 
