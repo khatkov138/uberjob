@@ -17,6 +17,7 @@ type OrdersStreamPromise = Promise<ActionResponse<GetOrdersResponse<'list'> | Ge
 
 const StaticContext = createContext<Pick<FeedContext, 'locationId' | 'name' | 'slug' | 'lat' | 'lng'> | null>(null);
 const ActiveContext = createContext<FeedContext | null>(null);
+const ServerContextHashContext = createContext<string | null>(null);
 const OrdersStreamContext = createContext<OrdersStreamPromise | null>(null);
 
 export const useStaticFeed = () => {
@@ -28,6 +29,12 @@ export const useStaticFeed = () => {
 export const useActiveFeed = () => {
     const ctx = useContext(ActiveContext);
     if (!ctx) throw new Error('useActiveFeed missing');
+    return ctx;
+};
+
+export const useServerContextHash = () => {
+    const ctx = useContext(ServerContextHashContext);
+    if (!ctx) throw new Error('useServerContextHash missing');
     return ctx;
 };
 
@@ -105,12 +112,19 @@ export const FeedController = ({
         currentCategory?.id
     ]);
 
+    // 🔒 ИЗОМОРФНЫЙ СЛУЖЕБНЫЙ ЗАТВОР
+    // Замораживает строковый слепок activeContext в момент первого прохода функции (на SSR/F5)
+    // useRef гарантирует, что эта строка останется бессмертной при любых изменениях радиуса/фильтров на клиенте
+    const serverContextHashRef = useRef(JSON.stringify(activeContext));
+    console.log(serverContextHashRef)
     return (
         <StaticContext.Provider value={staticPart}>
             <ActiveContext.Provider value={activeContext}>
-                <OrdersStreamContext.Provider value={ordersPromise}>
-                    {children}
-                </OrdersStreamContext.Provider>
+                <ServerContextHashContext.Provider value={serverContextHashRef.current}>
+                    <OrdersStreamContext.Provider value={ordersPromise}>
+                        {children}
+                    </OrdersStreamContext.Provider>
+                </ServerContextHashContext.Provider>
             </ActiveContext.Provider>
         </StaticContext.Provider>
     );

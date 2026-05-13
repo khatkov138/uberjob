@@ -56,7 +56,7 @@ export async function getOrders<T extends 'list' | 'map'>(params: FeedContext & 
 }): Promise<ActionResponse<GetOrdersResponse<T>>> {
 
     return createAction<GetOrdersResponse<T>>(async () => {
-        //await delay(3000)
+        // await delay(3000)
         // 🔥 ПРИНИМАЕМ СТРОКУ И ПРЕВРАЩАЕМ В МАССИВ ДЛЯ ПРИЗМЫ
         const { lat, lng, radius, categoryId, skillIds: rawSkillIds, cursor, limit = 3, mode } = params;
         const skillIds = rawSkillIds ? rawSkillIds.split(',') : [];

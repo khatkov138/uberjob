@@ -3,9 +3,9 @@
 import React, { useMemo, useRef, Suspense, use } from 'react';
 import { useQueryClient, useIsFetching, InfiniteData, useQuery } from '@tanstack/react-query';
 
-import { cn } from '@/lib/utils';
+import { cn, unwrap } from '@/lib/utils';
 import { GetOrdersResponse } from '@/actions/order/get-feed';
-import { useActiveFeed, useStaticFeed } from './FeedController';
+import { useActiveFeed, useStaticFeed, useServerContextHash, useOrdersStream } from './FeedController';
 
 // --- СТРОГИЕ КОНТРАКТЫ ДАННЫХ И ТИПИЗАЦИЯ ---
 type GetOrdersResponseList = GetOrdersResponse<'list'>;
@@ -44,6 +44,7 @@ const StatsSkeleton = () => {
 const BadgeSkeleton = () => {
   console.log('🦴 [RENDER] BadgeSkeleton');
   return (
+    // Анатомическая обертка удержана внутри скелетона для фиксации геометрии под заголовком
     <div className="w-full flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase italic h-[22px] mt-4">
       <div className="w-24 h-[22px] bg-slate-100 border border-slate-200 rounded-lg animate-pulse" />
     </div>
@@ -89,6 +90,7 @@ export const HeaderStats = React.memo(({ totalCount, loadedCount, isReady, isFet
     </div>
   );
 });
+HeaderStats.displayName = 'HeaderStats';
 
 /**
  * 📡 2. ИНДИКАТОР АКТУАЛЬНОСТИ (БАДЖ)
@@ -96,72 +98,127 @@ export const HeaderStats = React.memo(({ totalCount, loadedCount, isReady, isFet
 export const HeaderStatusBadge = React.memo(({ isFetching, isReady }: HeaderStatusBadgeProps) => {
   console.log(`📡 [RENDER] HeaderStatusBadge | Fetching: ${isFetching} | Ready: ${isReady}`);
 
-  const UI_isFetching = isFetching || !isReady;
+  // Если данные не готовы (холодный старт без кэша), нативно подставляем скелетон в ту же позицию
+  if (!isReady) {
+    return <BadgeSkeleton />;
+  }
+
+  const UI_isFetching = isFetching;
 
   return (
-    <div className={cn(
-      "flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all duration-500 h-[22px] w-24 justify-center",
-      UI_isFetching ? "bg-blue-50 border-blue-100 text-blue-600" : "bg-emerald-50 border-emerald-100 text-emerald-600 shadow-sm"
-    )}>
+    // Живая верстка сохраняет ту же структуру флекс-контейнера и отступы, что и скелетон
+    <div className="w-full flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase italic h-[22px] mt-4">
       <div className={cn(
-        "w-1.5 h-1.5 rounded-full shrink-0",
-        UI_isFetching ? "bg-blue-500 animate-pulse" : "bg-emerald-500"
-      )} />
-      <span className="tracking-[0.1em] text-[9px] uppercase font-bold whitespace-nowrap">
-        {UI_isFetching ? "Обновление" : "Актуально"}
-      </span>
+        "flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all duration-500 h-[22px] w-24 justify-center",
+        UI_isFetching ? "bg-blue-50 border-blue-100 text-blue-600" : "bg-emerald-50 border-emerald-100 text-emerald-600 shadow-sm"
+      )}>
+        <div className={cn(
+          "w-1.5 h-1.5 rounded-full shrink-0",
+          UI_isFetching ? "bg-blue-500 animate-pulse" : "bg-emerald-500"
+        )} />
+        <span className="tracking-[0.1em] text-[9px] uppercase font-bold whitespace-nowrap">
+          {UI_isFetching ? "Обновление" : "Актуально"}
+        </span>
+      </div>
     </div>
   );
 });
+HeaderStatusBadge.displayName = 'HeaderStatusBadge';
 
 // Глобальный счетчик рендеров Хедера для отладки рантайма
 let headerDataReaderRenderCount = 0;
 
+/**
+ * 🧱 3. ДЕКЛАРАТИВНЫЙ ИЗОМОРФНЫЙ РИДЕР КЭША И СТРИМА
+ */
 export const HeaderDataReader = React.memo(() => {
   headerDataReaderRenderCount++;
 
   const context = useActiveFeed();
+  const queryClient = useQueryClient();
+
+  // Извлекаем намертво зафиксированный серверный хэш контекста холодного старта (F5)
+  const serverHash = useServerContextHash();
+
   const queryKey = useMemo(() => ['orders', 'list', context] as const, [context]);
 
-  // Проверяем глобальный статус фетчинга для этого ключа
+  // Проверяем глобальный статус фетчинга для этого ключа под индикацию баджа
   const globalIsFetching = useIsFetching({ queryKey }) > 0;
 
+  // Изоморфно опрашиваем RAM-кэш Танстека под активный ключ
+  const hasCachedData = !!queryClient.getQueryData(queryKey);
 
-  // ПАССИВНЫЙ ДЕКЛАРАТИВНЫЙ РИДЕР КЭША
-  // enabled: false гарантирует, что Хедер НИКОГДА сам не пойдет в сеть и не вызовет queryFn [1]
+  // Получаем ссылку на изоморфный стрим
+  const ordersStream = useOrdersStream<'list'>();
+
+  // ЗЕРКАЛЬНЫЙ АТОМАРНЫЙ ЗАТВОР СТРИМА НА ОСНОВЕ СФЕРИЧЕСКОГО ХЭША КОНТЕКСТА
+  const currentHash = JSON.stringify(context);
+  const isServerKeyMatch = currentHash === serverHash;
+
+  // Разворачиваем стрим СУБД строго на холодном старте (когда кэша нет и контекст совпал)
+  const serverDataRaw = (!hasCachedData && isServerKeyMatch) ? use(ordersStream) : null;
+
+  // ПАССИВНЫЙ ДЕКЛАРАТИВНЫЙ РИДЕР RAM-КЭША ТАНСТЕКА
   const { data, status } = useQuery<InfiniteOrdersData>({
     queryFn: () => { throw new Error("Observer only") },
     queryKey,
-    enabled: false, // Жесткий затвор от холостых сетевых запросов [1]
+    enabled: false,
   });
 
-  console.log(`🧱 [RENDER #${headerDataReaderRenderCount}] HeaderDataReader | Fetching: ${globalIsFetching} |status:${status}|  LocationId: ${context.locationId} | Radius: ${context.radius}}`);
+  console.log(
+    `🧱 [RENDER #${headerDataReaderRenderCount}] HeaderDataReader | ` +
+    `Match: ${isServerKeyMatch} | ` +
+    `status: ${status} | ` +
+    `hasCachedData: ${hasCachedData} | ` +
+    `LocationId: ${context.locationId} | ` +
+    `Radius: ${context.radius} | globalfetch:${globalIsFetching} `
+  );
 
   const lastStatsSnapshotRef = useRef<{ totalCount: number; loadedCount: number; isReady: boolean } | null>(null);
 
-  // Синхронный сбор метрик из RAM-слепка Танстека
+  // СИНХРОННЫЙ ПРОЦЕССОР СБОРА МЕТРИК ИЗ ЕДИНОГО ИСТОЧНИКА ПРАВДЫ
   const currentStats = useMemo(() => {
-    // Если Танстек еще пуст под этот ключ (смена фильтра/города)
-    if (status === 'pending' || !data || !data.pages || data.pages.length === 0) {
-      console.log(`⏳ [STATUS PENDING] Данных в RAM нет. Нативно включаю Скелетоны.`);
+    // Сценарий А: Читаем из живого RAM-кэша Танстека (текущий контекст)
+    if (hasCachedData && data && data.pages && data.pages.length > 0) {
+      const pages = data.pages;
+      const firstPageTotal = pages[0]?.total ?? 0;
+      const loadedCount = pages.reduce((acc, page) => acc + (page?.orders?.length || 0), 0);
+
+      return {
+        totalCount: firstPageTotal,
+        loadedCount,
+        isReady: true
+      };
+    }
+
+    // Сценарий Б: Холодный старт (F5). Кэша нет, но ключи совпали — читаем мгновенный ответ из стрима СУБД
+    if (serverDataRaw) {
+      console.log(`🌱 [HEADER DB FETCH] Кэша нет. Ключи совпали. Читаем мгновенный ответ из стрима.`);
+      const unwrapped = unwrap(serverDataRaw, { orders: [], nextCursor: null, total: 0 });
+      return {
+        totalCount: unwrapped?.total ?? 0,
+        loadedCount: unwrapped?.orders?.length || 0,
+        isReady: true
+      };
+    }
+
+    // Сценарий В: Смена радиуса/фильтров на клиенте. Кэша нет, серверный стрим заблокирован затвором.
+    return null;
+  }, [hasCachedData, data, serverDataRaw]);
+
+  // НАШ ВЫСОКОПРОИЗВОДИТЕЛЬНЫЙ СТАБИЛИЗАТОР ССЫЛОК И УДЕРЖАТЕЛЬ СТЕЙТА (UX-ОПТИМИЗАТОР)
+  const stats = useMemo(() => {
+    const previous = lastStatsSnapshotRef.current;
+    console.log(`lastStatsSnapshotRef: `, previous);
+
+    if (currentStats === null) {
+      if (previous) {
+        console.log('⏳ [UX KEEP ALIVE] Контекст изменился (радиус/город). Удерживаю старые метрики.');
+        return previous;
+      }
       return { totalCount: 0, loadedCount: 0, isReady: false };
     }
 
-    const pages = data.pages;
-    const firstPageTotal = pages[0]?.total ?? 0;
-    const loadedCount = pages.reduce((acc, page) => acc + (page?.orders?.length || 0), 0);
-
-    return {
-      totalCount: firstPageTotal,
-      loadedCount,
-      isReady: true
-    };
-  }, [data, status]);
-
-  // Наш высокопроизводительный стабилизатор ссылок (UX-оптимизатор)
-  const stats = useMemo(() => {
-    const previous = lastStatsSnapshotRef.current;
-    console.log(`lastStatsSnapshotRef: ` + previous)
     if (
       previous &&
       previous.totalCount === currentStats.totalCount &&
@@ -171,7 +228,7 @@ export const HeaderDataReader = React.memo(() => {
       return previous;
     }
 
-    console.log('🔄 [SNAPSHOT MUTATION] Метрики изменились, фиксирую стейт хедера.');
+    console.log('🔄 [SNAPSHOT MUTATION] Метрики изменились, фиксирую новый стейт хедера.');
     lastStatsSnapshotRef.current = currentStats;
     return currentStats;
   }, [currentStats]);
@@ -185,18 +242,14 @@ export const HeaderDataReader = React.memo(() => {
         isFetching={globalIsFetching}
       />
 
-      <div className="w-full flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase italic h-[22px] mt-4">
-        <HeaderStatusBadge
-          isFetching={globalIsFetching}
-          isReady={stats.isReady}
-        />
-      </div>
+      <HeaderStatusBadge
+        isFetching={globalIsFetching}
+        isReady={stats.isReady}
+      />
     </>
   );
 });
 HeaderDataReader.displayName = 'HeaderDataReader';
-
-
 
 /**
  * 🧱 4. ШЛЮЗ ДАННЫХ ХЕДЕРА
@@ -235,3 +288,4 @@ export const OrdersPageHeader = React.memo(function OrdersPageHeader() {
     </div>
   );
 });
+OrdersPageHeader.displayName = 'OrdersPageHeader';
