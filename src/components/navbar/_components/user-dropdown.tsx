@@ -7,12 +7,13 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"
-import { useRoleModeStore } from "@/store/use-role-store"
+
 import { authClient } from "@/lib/auth-client"
 import { Settings, LogOut, Shield, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { User } from "@/lib/auth"
+import { useNavbarStore } from "../navbar-provider"
 
 
 interface UserDropdownProps {
@@ -21,7 +22,7 @@ interface UserDropdownProps {
 
 
 export function UserDropdown({ user }: UserDropdownProps) {
-  const { mode } = useRoleModeStore()
+  const mode = useNavbarStore((state) => state.mode)
   const router = useRouter()
 
   return (

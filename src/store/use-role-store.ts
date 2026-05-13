@@ -1,25 +1,23 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import { setCookie } from 'cookies-next' // Импортируем из cookies-next
+// store/use-role-store.ts
+import { createStore } from 'zustand'
+import { setCookie } from 'cookies-next'
 
-type RoleMode = 'CLIENT' | 'PRO'
+export type RoleMode = 'CLIENT' | 'PRO'
 
-interface RoleState {
+export interface RoleProps {
   mode: RoleMode
+}
+
+export interface RoleState extends RoleProps {
   setMode: (mode: RoleMode) => void
 }
 
-export const useRoleModeStore = create<RoleState>()(
-  persist(
-    (set) => ({
-      mode: 'CLIENT',
-      setMode: (mode) => {
-        set({ mode })
-        // Используем setCookie. Параметр maxAge задается в секундах.
-        // 365 дней * 24 часа * 60 мин * 60 сек = 31536000
-        setCookie('zwork-mode', mode, { maxAge: 31536000 })
-      },
-    }),
-    { name: 'zwork-ui-mode' }
-  )
-)
+export const createRoleStore = (initProps: RoleProps) => {
+  return createStore<RoleState>((set) => ({
+    ...initProps,
+    setMode: (mode) => {
+      set({ mode })
+      setCookie('zwork-mode', mode, { maxAge: 31536000, path: '/' })
+    },
+  }))
+}

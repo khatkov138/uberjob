@@ -6,6 +6,8 @@ import { headers } from "next/headers";
 import { auth } from "./auth";
 import { cookies } from "next/headers"
 
+import { type RoleMode } from '@/store/use-role-store'
+
 import { cache } from "react";
 import prisma from "./prisma";
 import { LOCATION_CONFIG } from "./location-config";
@@ -161,3 +163,7 @@ export const getServerFeedState = cache(async () => {
 
     return { radius, viewMode };
 });
+
+
+
+

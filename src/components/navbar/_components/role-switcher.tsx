@@ -1,14 +1,19 @@
 // components/navbar/role-switcher.tsx
 "use client"
 
-import { useRoleModeStore } from "@/store/use-role-store"
 import { cn } from "@/lib/utils"
 import { User, BriefcaseBusiness } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
+import { useNavbarStore } from "../navbar-provider"
+// Импортируем наш новый хук-селектор вместо старого синглтона
+
 
 export function RoleSwitcher() {
-  const { mode, setMode } = useRoleModeStore()
+  // Атомарно подписываемся на динамический стейт режима из контекста Навбара
+  const mode = useNavbarStore((state) => state.mode)
+  const setMode = useNavbarStore((state) => state.setMode)
+
   const router = useRouter()
 
   const handleSwitch = (newMode: 'CLIENT' | 'PRO') => {
@@ -22,13 +27,13 @@ export function RoleSwitcher() {
       <button
         onClick={() => handleSwitch('CLIENT')}
         className={cn(
-          "relative z-10 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer",
+          "relative z-10 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer select-none",
           mode === 'CLIENT' ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
         )}
       >
-        <User className="w-4 h-4" /> 
+        <User className="w-4 h-4" />
         <span>КЛИЕНТ</span>
-        
+
         {mode === 'CLIENT' && (
           <motion.div
             layoutId="active-pill"
@@ -41,12 +46,12 @@ export function RoleSwitcher() {
       <button
         onClick={() => handleSwitch('PRO')}
         className={cn(
-          "relative z-10 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer",
+          "relative z-10 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer select-none",
           mode === 'PRO' ? "text-white" : "text-slate-400 hover:text-slate-600"
         )}
       >
-        <BriefcaseBusiness className="w-4 h-4" /> 
-        <span>МАСТЕР</span>
+        <BriefcaseBusiness className="w-4 h-4" />
+        <span>Исполнитель</span>
 
         {mode === 'PRO' && (
           <motion.div
