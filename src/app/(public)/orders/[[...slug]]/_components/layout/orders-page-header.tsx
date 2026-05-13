@@ -1,14 +1,31 @@
-// src/features/orders/ui/orders-page-header.tsx
 'use client';
 
-import React, { useMemo, use, useRef, Suspense } from "react";
-import { useQuery, type InfiniteData } from "@tanstack/react-query";
-import { cn, unwrap } from "@/lib/utils";
-import { useStaticFeed, useActiveFeed, useOrdersStream } from "./FeedController";
-import { useFeedStore } from "./FeedProvider";
-import { type GetOrdersResponse } from "@/actions/order/get-feed";
-import { type ActionResponse } from "@/lib/server-utils";
+import React, { useMemo, useRef, useDeferredValue, Suspense } from 'react';
+import { useSuspenseInfiniteQuery, InfiniteData } from '@tanstack/react-query';
 
+import { cn, unwrap } from '@/lib/utils'; // Ваш стандартный хелпер классов
+import { GetOrdersResponse } from '@/actions/order/get-feed';
+import { useActiveFeed, useOrdersStream, useStaticFeed } from './FeedController';
+
+// --- ТИПЫ И КОНТРАКТЫ ДАННЫХ ---
+type GetOrdersResponseList = GetOrdersResponse<'list'>;
+type InfiniteOrdersData = InfiniteData<GetOrdersResponseList>;
+
+interface HeaderStatsProps {
+  totalCount: number;
+  loadedCount: number;
+  isReady: boolean;
+  isFetching: boolean;
+}
+
+interface HeaderStatusBadgeProps {
+  isFetching: boolean;
+  isReady: boolean;
+}
+
+// --- АТОМАРНЫЕ ИЗОЛИРОВАННЫЕ СКЕЛЕТОНЫ ---
+
+// Скелетон счетчика: рендерится в строку флекса, БЕЗ w-full
 const StatsSkeleton = () => (
   <div className="flex items-center gap-3 animate-pulse">
     <span className="text-5xl font-black italic text-slate-50">/</span>
@@ -22,62 +39,61 @@ const StatsSkeleton = () => (
   </div>
 );
 
-interface HeaderStatsProps {
-  totalCount: number;
-  loadedCount: number;
-  isReady: boolean;
-  isFetching: boolean;
-}
+// Скелетон баджа: имеет w-full mt-4, чтобы изначально падать на нижнюю строчку
+const BadgeSkeleton = () => (
+  <div className="w-full flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase italic h-[22px] mt-4">
+    <div className="w-24 h-[22px] bg-slate-100 border border-slate-200 rounded-lg animate-pulse" />
+  </div>
+);
+
 
 /**
- * 📊 1. АТОМАРНЫЙ СЧЕТЧИК
- * Защищен через React.memo. Изменение родительских узлов не заставит React 
- * перерисовывать реальные DOM-ноды с текстом, если цифры примитивов совпали.
+ * 📊 1. АТОМАРНЫЙ ВИЗУАЛЬНЫЙ СЧЕТЧИК
  */
-const HeaderStats = React.memo(({ totalCount, loadedCount, isReady, isFetching }: HeaderStatsProps) => {
-  const viewMode = useFeedStore((s) => s.viewMode);
+export const HeaderStats = React.memo(({ totalCount, loadedCount, isReady, isFetching }: HeaderStatsProps) => {
+  const viewMode = 'list'; // Замените на ваш реальный селектор из стора
 
   console.log(`📊 [RENDER] HeaderStats | Total: ${totalCount} | Loaded: ${loadedCount} | Ready: ${isReady} | Fetching: ${isFetching}`);
 
-  if (!isReady) return <StatsSkeleton />;
-
   return (
     <div className="flex items-center h-[60px] min-w-[140px]">
-      <div className={cn(
-        "flex items-center gap-3 animate-in fade-in zoom-in-95 duration-500 transition-opacity",
-        isFetching ? "opacity-40" : "opacity-100"
-      )}>
-        <span className="text-5xl font-black italic text-slate-100">/</span>
-        <div className="flex items-baseline">
-          <span className="text-6xl font-black italic text-slate-900 tracking-tighter tabular-nums leading-none">
-            {totalCount}
-          </span>
+      {!isReady ? (
+        <StatsSkeleton />
+      ) : (
+        <div className={cn(
+          "flex items-center gap-3 animate-in fade-in zoom-in-95 duration-500 transition-opacity",
+          isFetching ? "opacity-40" : "opacity-100"
+        )}>
+          <span className="text-5xl font-black italic text-slate-100">/</span>
+          <div className="flex items-baseline">
+            <span className="text-6xl font-black italic text-slate-900 tracking-tighter tabular-nums leading-none">
+              {totalCount}
+            </span>
 
-          {totalCount > 0 && viewMode === 'list' && (
-            <div className="flex flex-col ml-2 translate-y-[-4px]">
-              <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-0.5 whitespace-nowrap">
-                Найдено
-              </span>
-              <span className="text-2xl font-black italic text-slate-300 leading-none tracking-tighter tabular-nums">
-                / {loadedCount}
-              </span>
-            </div>
-          )}
+            {totalCount > 0 && viewMode === 'list' && (
+              <div className="flex flex-col ml-2 translate-y-[-4px]">
+                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-0.5 whitespace-nowrap">
+                  Найдено
+                </span>
+                <span className="text-2xl font-black italic text-slate-300 leading-none tracking-tighter tabular-nums">
+                  / {loadedCount}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 });
 
-interface HeaderStatusBadgeProps {
-  isFetching: boolean;
-  isReady: boolean;
-}
+HeaderStats.displayName = 'HeaderStats';
+
 
 /**
- * 📡 2. ИНДИКАТОР СТАТУСА (БАДЖ)
+ * 📡 2. ИНДИКАТОР АКТУАЛЬНОСТИ (БАДЖ)
  */
-const HeaderStatusBadge = React.memo(({ isFetching, isReady }: HeaderStatusBadgeProps) => {
+export const HeaderStatusBadge = React.memo(({ isFetching, isReady }: HeaderStatusBadgeProps) => {
   console.log(`📡 [RENDER] HeaderStatusBadge | Fetching: ${isFetching} | Ready: ${isReady}`);
 
   const UI_isFetching = isFetching || !isReady;
@@ -98,135 +114,146 @@ const HeaderStatusBadge = React.memo(({ isFetching, isReady }: HeaderStatusBadge
   );
 });
 
+HeaderStatusBadge.displayName = 'HeaderStatusBadge';
+
+
 /**
  * 🧱 3. ЕДИНЫЙ ПАССИВНЫЙ ДАТА-БРИДЖ ПОД СУСПЕНСОМ
- * Реализует паттерн Progressive Cache Takeover.
- * Бесшовно объединяет асинхронныйuse(ordersStream) и RAM-кэш Танстека v5.
- */function HeaderDataBridge() {
+ */
+export const HeaderDataReader = React.memo(() => {
   const context = useActiveFeed();
-  const { name: cityName } = useStaticFeed();
-
   const ordersStream = useOrdersStream<'list'>();
-  const serverDataRaw = use(ordersStream);
+
+  // Изоморфное разворачивание серверного промиса из контекста страницы
+  const serverPayload = React.use(ordersStream);
 
   const queryKey = useMemo(() => ['orders', 'list', context] as const, [context]);
   const lastRenderedContextRef = useRef(context);
-
-  // Ссылочный затвор для сохранения идентичности объекта статов между микротасками
   const lastStatsSnapshotRef = useRef<{ totalCount: number; loadedCount: number; isReady: boolean } | null>(null);
 
-  const { data } = useQuery<
-    GetOrdersResponse<'list'>,
-    Error,
-    InfiniteData<GetOrdersResponse<'list'>>,
-    typeof queryKey
-  >({
+  const currentContextHash = useMemo(() => JSON.stringify(context), [context]);
+  const prevContextHashRef = useRef(currentContextHash);
+
+  const isFiltersChanged = prevContextHashRef.current !== currentContextHash;
+
+  const { data } = useSuspenseInfiniteQuery<GetOrdersResponseList, Error, InfiniteOrdersData, typeof queryKey>({
     queryKey,
-    enabled: false,
-    queryFn: () => new Promise(() => { }),
-    notifyOnChangeProps: ['data']
+    queryFn: () => { throw new Error("") },
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    staleTime: 1000 * 60,
+
+    initialData: (): InfiniteOrdersData | undefined => {
+      if (isFiltersChanged || !serverPayload) return undefined;
+      const unwrapped = unwrap(serverPayload, { orders: [], nextCursor: null, total: 0 });
+      return {
+        pages: [unwrapped],
+        pageParams: [undefined]
+      };
+    }
   });
 
-  const cachedPages = data?.pages;
-  const hasFreshData = cachedPages && cachedPages.length > 0;
+  const pages = data.pages;
+  const firstPageTotal = pages[0]?.total;
 
-  if (hasFreshData && lastRenderedContextRef.current !== context) {
-    lastRenderedContextRef.current = context;
+  const deferredContext = useDeferredValue(context);
+  const UI_isFetching = lastRenderedContextRef.current !== deferredContext;
+
+  if (!UI_isFetching && lastRenderedContextRef.current !== deferredContext) {
+    lastRenderedContextRef.current = deferredContext;
   }
 
-  const isFiltersChanged = !hasFreshData && lastRenderedContextRef.current !== context;
-  const UI_isFetching = isFiltersChanged;
+  if (pages.length > 0 && prevContextHashRef.current !== currentContextHash) {
+    prevContextHashRef.current = currentContextHash;
+  }
 
-  console.log(`🧱 [RENDER] HeaderDataBridge (Single Observer) | City: ${cityName} | HasData: ${hasFreshData} | UIFetching: ${UI_isFetching}`);
+  const currentStats = useMemo(() => ({
+    totalCount: firstPageTotal ?? 0,
+    loadedCount: pages.reduce((acc, page) => acc + (page.orders?.length || 0), 0),
+    isReady: true
+  }), [pages.length, firstPageTotal, UI_isFetching]);
 
-  const pagesLength = cachedPages?.length ?? 0;
-
-  // Изоморфный расчет статов с сохранением ссылочной целостности объекта
   const stats = useMemo(() => {
-    let current: { totalCount: number; loadedCount: number; isReady: boolean };
-
-    if (hasFreshData && cachedPages) {
-      // 1. Приоритет №1: Кэш Танстека в оперативной памяти
-      current = {
-        totalCount: cachedPages[0]?.total ?? 0,
-        loadedCount: cachedPages.reduce((acc, page) => acc + (page.orders?.length || 0), 0),
-        isReady: true
-      };
-    } else if (isFiltersChanged) {
-      // 2. Приоритет №2: Транзакция навигации / смены фильтров
-      current = { totalCount: 0, loadedCount: 0, isReady: false };
-    } else {
-      // 3. Приоритет №3: Холодный старт (F5) и первый кадр — распаковка SSR промиса Next.js 15
-      const unwrapped = unwrap(serverDataRaw, { orders: [], nextCursor: null, total: 0 });
-      current = {
-        totalCount: unwrapped.total,
-        loadedCount: unwrapped.orders?.length || 0,
-        isReady: true
-      };
-    }
-
-    // ⚡️ ССЫЛОЧНЫЙ ЗАЩЕЛКИВАЮЩИЙ ЗАТВОР:
-    // Если примитивы структуры в точности совпадают с прошлым кадром — отдаем СТАРУЮ ссылку на объект из кучи!
+    const previous = lastStatsSnapshotRef.current;
     if (
-      lastStatsSnapshotRef.current &&
-      lastStatsSnapshotRef.current.totalCount === current.totalCount &&
-      lastStatsSnapshotRef.current.loadedCount === current.loadedCount &&
-      lastStatsSnapshotRef.current.isReady === current.isReady
+      previous &&
+      previous.totalCount === currentStats.totalCount &&
+      previous.loadedCount === currentStats.loadedCount &&
+      previous.isReady === currentStats.isReady
     ) {
-      return lastStatsSnapshotRef.current;
+      return previous;
     }
-
-    // Если данные реально изменились (прилетела новая пагинация или сокет) — обновляем ссылку
-    lastStatsSnapshotRef.current = current;
-    return current;
-  }, [pagesLength, hasFreshData, isFiltersChanged, serverDataRaw]);
+    lastStatsSnapshotRef.current = currentStats;
+    return currentStats;
+  }, [currentStats]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-baseline gap-4 flex-wrap min-h-[60px]">
-        <h1 className="text-5xl font-black uppercase italic tracking-tighter text-slate-900 leading-none py-1">
-          Заказы <span className="text-blue-600 ml-2 whitespace-nowrap text-4xl font-black">в {cityName}</span>
-        </h1>
+    <>
+      {/* ЯРУС 1: Отрендерится четко в строку флекса рядом с h1 города */}
+      <HeaderStats
+        totalCount={stats.totalCount}
+        loadedCount={stats.loadedCount}
+        isReady={stats.isReady}
+        isFetching={UI_isFetching}
+      />
 
-        <HeaderStats
-          totalCount={stats.totalCount}
-          loadedCount={stats.loadedCount}
-          isReady={stats.isReady}
-          isFetching={UI_isFetching}
-        />
-      </div>
-
-      <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase italic h-[22px]">
+      {/* ЯРУС 2: Отрендерится строго внизу под текстом "Заказы" благодаря w-full и mt-4 */}
+      <div className="w-full flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase italic h-[22px] mt-4">
         <HeaderStatusBadge
           isFetching={UI_isFetching}
           isReady={stats.isReady}
         />
       </div>
+    </>
+  );
+});
+
+HeaderDataReader.displayName = 'HeaderDataReader';
+
+
+/**
+ * 🧱 4. ШЛЮЗ ДАННЫХ ХЕДЕРА
+ */
+export function HeaderDataBridge() {
+  const { name: cityName } = useStaticFeed();
+
+  return (
+    <div className="flex items-baseline gap-4 flex-wrap min-h-[60px] w-full">
+      {/* Название города — влетает в браузер за 0 мс в первом HTTP-чанке */}
+      <h1 className="text-5xl font-black uppercase italic tracking-tighter text-slate-900 leading-none py-1">
+        Заказы <span className="text-blue-600 ml-2 whitespace-nowrap text-4xl font-black">в {cityName}</span>
+      </h1>
+
+      {/* 
+        ⚡️ ПЛОСКИЙ ИЗОМОРФНЫЙ СУСПЕНС:
+        Мы убрали промежуточный div-контейнер из fallback!
+        Теперь во время загрузки React-фрагмент выплевывает скелетоны ровно в те же 
+        флекс-позиции, которые потом займут живые компоненты. 0 Layout Shifts!
+      */}
+      <Suspense fallback={
+        <>
+          <StatsSkeleton /> {/* Встанет четко в строку флекса справа от города */}
+          <BadgeSkeleton /> {/* Упадет на строчку вниз под заголовок */}
+        </>
+      }>
+        <HeaderDataReader />
+      </Suspense>
     </div>
   );
 }
 
+
 /**
- * 🏛 4. ГЛАВНЫЙ СТАТИЧЕСКИЙ КАРКАС ХЕДЕРА
+ * 🏛 5. ГЛАВНЫЙ СТАТИЧЕСКИЙ КАРКАС ХЕДЕРА
  */
 export const OrdersPageHeader = React.memo(function OrdersPageHeader() {
   console.log(`⚛️ [RENDER] OrdersPageHeader (Static Frame)`);
 
   return (
-    <div className="px-2 pt-4 pb-8">
-      <Suspense fallback={
-        <div className="space-y-4 animate-pulse">
-          <div className="flex items-baseline gap-4 flex-wrap min-h-[60px]">
-            <h1 className="text-5xl font-black uppercase italic tracking-tighter text-slate-200 leading-none py-1">
-              Заказы...
-            </h1>
-            <StatsSkeleton />
-          </div>
-          <div className="h-[22px] w-24 bg-slate-100 rounded-lg" />
-        </div>
-      }>
-        <HeaderDataBridge />
-      </Suspense>
+    <div className="px-2 pt-4 pb-8 w-full">
+      <HeaderDataBridge />
     </div>
   );
 });
+
+OrdersPageHeader.displayName = 'OrdersPageHeader';

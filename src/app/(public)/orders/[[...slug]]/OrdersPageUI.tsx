@@ -49,7 +49,9 @@ export default function OrdersPageUI({
         {/* ПРАВАЯ КОЛОНКА (Основной контентный блок) */}
         <section className="lg:col-span-9 space-y-8">
           {/* Хедер (Уже полностью независим, город виден мгновенно) */}
+
           <OrdersPageHeader />
+
 
           {/* 
     ОБЩАЯ СТИЛЬНАЯ ОБЕРТКА ФИДА И ТУЛБАРА.

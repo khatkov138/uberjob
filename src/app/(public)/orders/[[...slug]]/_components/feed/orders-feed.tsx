@@ -136,15 +136,27 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
 
     const context = useActiveFeed();
     const ordersStream = useOrdersStream<'list'>();
-    const serverDataRaw = React.use(ordersStream);
 
-    const initialKeyRef = React.useRef(JSON.stringify(context));
-    const currentKeyStr = JSON.stringify(context);
-    const isFiltersChanged = initialKeyRef.current !== currentKeyStr;
-
+    const queryClient = useQueryClient();
     const queryKey = React.useMemo(() => ['orders', 'list', context] as const, [context]);
 
-    console.log(`🔌 [RENDER #${connectorRenderCount}] OrdersFeedConnector | FiltersChanged: ${isFiltersChanged}`);
+    const hasCachedData = !!queryClient.getQueryData(queryKey);
+    const serverDataRaw = hasCachedData ? null : React.use(ordersStream);
+
+    // ⚡️ СКОЛЬЗЯЩИЙ ЗАТВОР ПО ЗНАЧЕНИЮ (Сериализуем контекст в плоский хэш)
+    const currentContextHash = React.useMemo(() => JSON.stringify(context), [context]);
+    const prevContextHashRef = React.useRef(currentContextHash);
+
+    // Фильтры реально изменились, если хэш текущих параметров не совпадает с прошлым сохраненным
+    // И в оперативной памяти Танстека под этот ключ еще абсолютно пусто
+    const isFiltersChanged = !hasCachedData && prevContextHashRef.current !== currentContextHash;
+
+    // Синхронизируем скользящий затвор строго в тот момент, когда данные успешно прогрузились в RAM
+    if (hasCachedData && prevContextHashRef.current !== currentContextHash) {
+        prevContextHashRef.current = currentContextHash;
+    }
+
+    console.log(`🔌 [RENDER #${connectorRenderCount}] OrdersFeedConnector | FiltersChanged: ${isFiltersChanged} | StreamBypassed: ${hasCachedData} | Radius/Filter: ${currentContextHash}`);
 
     return (
         <OrdersFeedCore
@@ -160,38 +172,25 @@ interface OrdersFeedCoreProps {
     queryKey: readonly ['orders', 'list', ReturnType<typeof useActiveFeed>];
     context: ReturnType<typeof useActiveFeed>;
     isFiltersChanged: boolean;
-    serverDataRaw: ActionResponse<GetOrdersResponse<"list">>;
+    // ⚡️ Добавляем null в объединение типов (Union Type)
+    serverDataRaw: ActionResponse<GetOrdersResponse<"list">> | null;
 }
-
 /**
  * 2. ЯДРО ФИДА (Слой рендеринга и работы с кэшем)
- */const OrdersFeedCore = React.memo(function OrdersFeedCore({
+ */
+const OrdersFeedCore = React.memo(function OrdersFeedCore({
     queryKey,
     context,
     isFiltersChanged,
     serverDataRaw
 }: OrdersFeedCoreProps) {
     coreRenderCount++;
-    const queryClient = useQueryClient();
 
-    // 🧱 1. УПРЕЖДАЮЩАЯ СИНХРОННАЯ ЗАПРАВКА RAM (Eager Seeding Затвор)
-    // В Production-билде этот код выполняется наносекундно ДО старта хука useInfiniteQuery.
-    // Если кэша под этот город/радиус еще нет, мы насильно и принудительно создаем его в памяти прямо сейчас.
-    const hasCached = queryClient.getQueryData(queryKey);
-
-    if (!hasCached && !isFiltersChanged) {
-        const unwrapped = unwrap(serverDataRaw, { orders: [], nextCursor: null, total: 0 });
-        queryClient.setQueryData(queryKey, {
-            pages: [unwrapped],
-            pageParams: [undefined]
-        });
-    }
-
-    // 2. Инициализируем хук. Теперь он ГАРАНТИРОВАННО сразу находит готовый кэш в RAM!
+    // Инициализируем хук. Заправка происходит легально и атомарно на фазе инициализации.
     const query = useInfiniteQuery<GetOrdersResponse<'list'>, Error, InfiniteData<GetOrdersResponse<'list'>>, typeof queryKey>({
         queryKey,
         queryFn: async ({ pageParam }) => {
-            console.log('📍handleAction📍 getOrders 📍')
+            console.log('📍handleAction📍 getOrders 📍');
             return handleAction(
                 getOrders({ ...context, cursor: pageParam as string, mode: 'list' })
             );
@@ -201,14 +200,11 @@ interface OrdersFeedCoreProps {
         enabled: !!context,
         placeholderData: keepPreviousData,
 
-        // initialData больше не создает инлайновые объекты-пустышки на каждом круге.
-        // Он выступает чистым пассивным фолбеком, так как память заправлена на Шаге 1.
+        // 🧱 ДЕКЛАРАТИВНЫЙ ЗАТВОР (Заменяет Шаг 1 и старый initialData)
         initialData: (): InfiniteData<GetOrdersResponse<'list'>> | undefined => {
-            const cached = queryClient.getQueryData<InfiniteData<GetOrdersResponse<'list'>>>(queryKey);
-            if (cached) return cached;
+            if (isFiltersChanged || !serverDataRaw) return undefined;
 
-            if (isFiltersChanged) return undefined;
-
+            // Вызывается только на холодном старте, когда serverDataRaw гарантированно существует
             const unwrapped = unwrap(serverDataRaw, { orders: [], nextCursor: null, total: 0 });
             return {
                 pages: [unwrapped],
@@ -221,20 +217,21 @@ interface OrdersFeedCoreProps {
         structuralSharing: true
     });
 
-    // 🟢 Безопасная деструктуризация страниц прямо на входе. 
+    // Безопасная деструктуризация страниц. 
     const pages = query.data?.pages || [{ orders: [], nextCursor: null, total: 0 }];
 
-    // Абсолютно чистый useMemo без внутренних if-проверок и без риска упасть в рантайме
+    // Абсолютно чистый useMemo завязанный на примитив длины массива страниц и тотал
     const { allOrders, total } = React.useMemo(() => {
+
         return {
             allOrders: pages.flatMap((page) => page.orders),
             total: pages[0]?.total ?? 0
         };
-    }, [pages]);
+    }, [pages.length, pages[0]?.total]); // Точечные примитивы исключают CPU-Throttling
 
     const ordersCount = allOrders.length;
 
-    console.log(`📦 [RENDER #${coreRenderCount}] OrdersFeedCore | Total: ${total} | Loaded: ${ordersCount}`);
+    console.log(`📦 [RENDER #${coreRenderCount}] OrdersFeedCore | Total: ${total} | Loaded: ${ordersCount} | cursor: ${query.data?.pages[0].nextCursor} `);
 
     if (ordersCount === 0) return <EmptyState />;
 
