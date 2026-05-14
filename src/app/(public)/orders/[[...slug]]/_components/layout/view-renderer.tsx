@@ -1,13 +1,14 @@
+// src/features/orders/ui/_components/layout/view-renderer.tsx
 'use client';
 
-import { memo } from 'react';
-import { useIsFetching } from '@tanstack/react-query';
+import React, { memo, Suspense } from 'react';
 import { cn } from '@/lib/utils';
+import { useIsFetching } from '@tanstack/react-query';
 import { FetchingRadar } from '../shared/fetching-radar';
 import { OrdersFeed } from '../feed/orders-feed';
 import { MapViewport } from '../map/map-viewport';
+import { OrderCardSkeleton } from '../shared/order-card-skeleton';
 
-// Оставляем радар изолированным, это было правильное решение
 const GlobalRadar = memo(() => {
     const isFetchingCount = useIsFetching({ queryKey: ["orders"] });
     return <FetchingRadar isVisible={isFetchingCount > 0} />;
@@ -17,8 +18,8 @@ interface ViewRendererProps {
     viewMode: 'list' | 'map';
 }
 
-// Оборачиваем в memo: теперь он рендерится ТОЛЬКО если изменился viewMode
 export const ViewRenderer = memo(function ViewRenderer({ viewMode }: ViewRendererProps) {
+    console.log(`🎛️ [RENDER] ViewRenderer | Выбор шлюза Саспенса для режима: ${viewMode.toUpperCase()}`);
 
     return (
         <div className={cn(
@@ -29,11 +30,31 @@ export const ViewRenderer = memo(function ViewRenderer({ viewMode }: ViewRendere
 
             {viewMode === "list" ? (
                 <div className="p-4 md:p-8 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                    <OrdersFeed />
+                    {/* 
+                      ИЗОЛИРОВАННЫЙ СУСПЕНС СПИСКА:
+                      Ловит саспенд-эффект use(ordersStream) строго внутри этой ветки дерева.
+                      Пока идет гидратация F5, крутятся текстовые скелетоны карточек!
+                    */}
+                    <Suspense fallback={
+                        <div className="space-y-8">
+                            <OrderCardSkeleton />
+                            <OrderCardSkeleton />
+                        </div>
+                    }>
+                        <OrdersFeed />
+                    </Suspense>
                 </div>
             ) : (
                 <div className="h-[750px] w-full relative animate-in fade-in zoom-in-95 duration-500">
-                    <MapViewport />
+                    {/* 
+                      ИЗОЛИРОВАННЫЙ СУСПЕНС КАРТЫ:
+                      Если при первом открытии карты идет фоновый запрос или подгрузка ресурсов,
+                      мы больше не показываем текстовые карточки! Включается нативный MapViewport,
+                      внутри которого сработает ваш MapPlaceholder (Initializing Engine...).
+                    */}
+                    <Suspense fallback={null}>
+                        <MapViewport />
+                    </Suspense>
                 </div>
             )}
         </div>

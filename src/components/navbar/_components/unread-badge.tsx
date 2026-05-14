@@ -1,27 +1,32 @@
 "use client"
 
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
+import { useNavbarUser } from "../navbar-provider" // Наш чистый Слой Гранит
 
-import { authClient } from "@/lib/auth-client"
+interface UnreadCountResponse {
+  count: number;
+}
 
 export function UnreadBadge() {
+  // 1. Достаем зацементированного пользователя из контекста (0ms, без дублирования API запросов)
+  const user = useNavbarUser()
 
-
-
-  const { data: session } = authClient.useSession()
-
-  const { data: countData } = useQuery({
+  // 2. Декларативный запрос счетчика непрочитанных сообщений в TanStack Query v5
+  const { data: countData } = useQuery<UnreadCountResponse>({
     queryKey: ["unread-count"],
     queryFn: async () => {
       const res = await fetch("/api/messages/unread-count")
+      if (!res.ok) throw new Error("Failed to fetch unread count")
       return res.json()
     },
-    enabled: !!session?.user?.id,
-   
+    // Запрос активируется строго тогда, когда на сервере подтверждено наличие ID пользователя
+    enabled: !!user?.id,
+    staleTime: 1000 * 30, // Данные валидны 30 секунд (защита от DDOS бэкенда)
   })
 
   const count = countData?.count || 0
 
+  // Если непрочитанных сообщений нет — 0мс влияния на DOM-дерево
   if (count === 0) return null
 
   return (

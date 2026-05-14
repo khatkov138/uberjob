@@ -1,3 +1,4 @@
+// src/features/orders/ui/_components/layout/orders-toolbar.tsx
 "use client"
 
 import * as React from "react"
@@ -6,27 +7,20 @@ import { cn } from "@/lib/utils"
 
 import { useLocationStore } from "@/store/use-location-store"
 import { LOCATION_CONFIG } from "@/lib/location-config"
-import { useFeedStore } from "./FeedProvider"
-import { useActiveFeed } from "./FeedController"
-// ИМПОРТ ИЗ НАШЕЙ НОВОЙ ШИНЫ
-
+import { useFeedStore } from "../providers/FeedProvider"
+import { useActiveFeed, useStaticFeed } from "../providers/FeedController"
 
 const RADIUS_OPTIONS = LOCATION_CONFIG.SETTINGS.radiusOptions;
 
 export function OrdersToolbar() {
-  const renderCount = React.useRef(0);
-  renderCount.current++;
-
-  // 1. ДЕЙСТВИЯ (Берем из стора через наш новый хук-провайдер)
+  // 1. ДЕЙСТВИЯ (Извлекаем мутаторы стейта напрямую из Zustand-сторов)
   const setViewMode = useFeedStore(s => s.setViewMode)
   const setRadius = useFeedStore(s => s.setRadius)
   const openModal = useLocationStore(s => s.openModal)
 
-  // 2. ДАННЫЕ (Читаем из стабильной шины)
-  // Благодаря инъекции, здесь НИКОГДА не будет undefined
-  const { viewMode, name, radius } = useActiveFeed();
-
-  console.log(`🛠️ [RENDER #${renderCount.current}] OrdersToolbar | Mode: ${viewMode} | City: ${name} | Radius: ${radius}km`);
+  // 2. ДАННЫЕ (Раздельное чтение без дублирования строк и лишней памяти)
+  const { viewMode, radius } = useActiveFeed(); // Ртуть: динамические фильтры
+  const { name } = useStaticFeed();             // Гранит: константное имя города из URL/SSR
 
   return (
     <div className="bg-white px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-100 sticky top-0 z-30">

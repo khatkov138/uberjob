@@ -13,18 +13,21 @@ import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
 
-import { authClient } from "@/lib/auth-client"
+import { useNavbarUser } from "../navbar-provider" // Чистый зацементированный контекст пользователя
 import { Notification } from "@prisma/client"
 import { markAllAsRead, markAsRead } from "@/actions/notification/manage"
 
 export function NotificationsBell() {
   const queryClient = useQueryClient()
-  const { data: session } = authClient.useSession()
   
-  const userId = session?.user?.id
-  // Создаем стабильный ключ
+  // 1. Достаем пользователя из контекста (0ms, без холостых GET-запросов к API Better Auth)
+  const user = useNavbarUser()
+  const userId = user?.id
+
+  // 2. Стабилизируем ключ кэша строго на базе примитива ID
   const queryKey = React.useMemo(() => ["notifications", userId], [userId])
 
+  // 3. Декларативная подписка на уведомления в TanStack Query v5
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
     queryKey,
     queryFn: async () => {
@@ -32,13 +35,13 @@ export function NotificationsBell() {
       if (!res.ok) throw new Error("Failed to fetch")
       return res.json()
     },
-    enabled: !!userId,
+    enabled: !!userId, // Затвор сработает только для авторизованных сессий
     staleTime: 1000 * 60 * 5, // 5 минут считаем данные свежими
   })
 
   const unreadCount = notifications.filter((n) => !n.isRead).length
 
-  // Мутация: Прочитать всё
+  // 4. Оптимистичная мутация: Прочитать всё
   const markAllMutation = useMutation({
     mutationFn: () => handleAction(markAllAsRead()),
     onMutate: async () => {
@@ -57,7 +60,7 @@ export function NotificationsBell() {
     onSettled: () => queryClient.invalidateQueries({ queryKey })
   })
 
-  // Мутация: Прочитать одно
+  // 5. Оптимистичная мутация: Прочитать одно
   const markOneMutation = useMutation({
     mutationFn: (id: string) => handleAction(markAsRead(id)),
     onMutate: async (id) => {

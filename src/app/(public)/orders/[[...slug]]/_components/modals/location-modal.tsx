@@ -11,15 +11,15 @@ import { handleAction, handleApi, cn } from "@/lib/utils"
 import { getOrCreateLocation } from "@/actions/location/manage"
 
 import { useQueryClient } from "@tanstack/react-query"
+import { useActiveFeed, useStaticFeed } from "../providers/FeedController"
 
-import { useActiveFeed } from "../layout/FeedController"
 
 export function LocationModal() {
 
-  const queryClient = useQueryClient();
+
   const router = useRouter()
   const { isModalOpen, closeModal } = useLocationStore() // Убрали лишний setGlobalLocation здесь
-  const currentContext = useActiveFeed()
+  const currentContext = useStaticFeed()
   const setGlobalLocation = useLocationStore(s => s.setGlobalLocation);
   const [query, setQuery] = React.useState("")
   const [suggestions, setSuggestions] = React.useState<any[]>([])
@@ -37,28 +37,28 @@ export function LocationModal() {
     } finally { setIsLoading(false) }
   }
 
- const handleSelect = async (item: any) => {
-  if (isLoading) return; // Педантичный блок повторных нажатий
+  const handleSelect = async (item: any) => {
+    if (isLoading) return; // Педантичный блок повторных нажатий
 
-  setIsLoading(true);
-  setSelectedUri(item.uri);
+    setIsLoading(true);
+    setSelectedUri(item.uri);
 
-  try {
-    const location = await handleAction(getOrCreateLocation(item.uri));
-    setGlobalLocation(location.id);
+    try {
+      const location = await handleAction(getOrCreateLocation(item.uri));
+      setGlobalLocation(location.id);
 
-    // 🔥 ВЫЖЖЕНО: queryClient.removeQueries({ queryKey: ['orders'] });
-    // Больше никакого преждевременного уничтожения данных под ногами у живого Хедера!
+      // 🔥 ВЫЖЖЕНО: queryClient.removeQueries({ queryKey: ['orders'] });
+      // Больше никакого преждевременного уничтожения данных под ногами у живого Хедера!
 
-    // Мягко переводим роутер на новый город
-    router.push(`/orders/${location.slug}`);
+      // Мягко переводим роутер на новый город
+      router.push(`/orders/${location.slug}`);
 
-  } catch (error) {
-    console.error("Shift error:", error);
-    setSelectedUri(null);
-    setIsLoading(false);
-  }
-};
+    } catch (error) {
+      console.error("Shift error:", error);
+      setSelectedUri(null);
+      setIsLoading(false);
+    }
+  };
 
 
   return (

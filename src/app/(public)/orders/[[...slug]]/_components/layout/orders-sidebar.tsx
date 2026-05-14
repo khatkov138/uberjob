@@ -24,7 +24,7 @@ import { cn, handleAction } from "@/lib/utils"
 import { PopularCategoryResult } from "@/actions/category/get"
 import { FullProfile } from "@/actions/profile/get"
 import { removeSkill } from "@/actions/profile/manage"
-import { useActiveFeed, useStaticFeed } from "./FeedController"
+import { useStaticFeed } from "../providers/FeedController"
 
 interface OrdersSidebarProps {
   popularCategories: PopularCategoryResult[]

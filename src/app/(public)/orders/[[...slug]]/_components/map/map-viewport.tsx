@@ -1,4 +1,5 @@
-"use client"
+// src/features/orders/ui/_components/map/map-viewport.tsx
+'use client';
 
 import * as React from "react"
 import dynamic from "next/dynamic"
@@ -6,11 +7,9 @@ import { Map as MapIcon, Loader2 } from "lucide-react"
 import { cn, handleAction } from "@/lib/utils"
 import { useQuery, keepPreviousData } from "@tanstack/react-query"
 
-// Хуки и экшены
-
-import { getOrders } from "@/actions/order/get-feed"
-import { GetOrdersResponse } from "@/actions/order/get-feed"
-import { useActiveFeed } from "../layout/FeedController"
+// Хуки, типы и экшены
+import { getOrders, type GetOrdersResponse } from "@/actions/order/get-feed"
+import { useActiveFeed, useQueryFeedContext } from "../providers/FeedController" // Наша монолитная шина
 
 // Динамический импорт движка (Leaflet/Google/Yandex)
 const OrdersMap = dynamic(
@@ -22,22 +21,24 @@ const OrdersMap = dynamic(
 )
 
 export function MapViewport() {
-    // 1. Читаем наш "Гениальный" стабильный контекст
-    const context = useActiveFeed();
+    // 🪄 Извлекаем ПОЛНЫЙ монолитный контекст (содержит координаты lat, lng, locationId)
+    const queryContext = useQueryFeedContext();
 
-    // 2. Основной запрос за маркерами
+    // 💧 Извлекаем легкий динамический контекст для проверки вкладок
+    const { viewMode, radius } = useActiveFeed();
+
+    // 2. Основной запрос за маркерами карты (0 ошибок TypeScript!)
     const { data, isFetching } = useQuery<GetOrdersResponse<'map'>>({
-        // Тот же ключ, что и в гидраторе — это залог успеха
-        queryKey: ["orders", "map", context],
-        queryFn: () => handleAction(getOrders({ ...context, mode: 'map' })),
-        enabled: !!context && context.viewMode === 'map',
-        placeholderData: keepPreviousData, // Чтобы карта не пропадала при смене радиуса
-        staleTime: 1000 * 60 * 5,
+        // Детерминированный ключ кэша на основе полного контекста запроса
+        queryKey: ["orders", "map", queryContext],
+        queryFn: () => handleAction(getOrders({ ...queryContext, mode: 'map' })),
+        // Запрос активируется строго тогда, когда юзер физически переключился на вкладку карты
+        enabled: !!queryContext && viewMode === 'map',
+        placeholderData: keepPreviousData, // Защита от мигания: удерживает маркеры при смене радиуса
+        staleTime: 1000 * 60 * 5, // Маркеры на карте валидны 5 минут
     });
 
     const orders = data?.orders ?? [];
-
-    // Определяем, нужно ли показывать "затуп" (первая загрузка или смена фильтров)
     const isRefreshing = isFetching && orders.length > 0;
 
     return (
@@ -47,16 +48,16 @@ export function MapViewport() {
                 "w-full h-full rounded-[3.5rem] border-2 border-slate-100 bg-slate-50 overflow-hidden relative z-10 transition-all duration-700",
                 isRefreshing ? "grayscale-[0.5] opacity-80 shadow-inner" : "shadow-2xl shadow-slate-200/50"
             )}>
-                {context && (
+                {queryContext && (
                     <OrdersMap
                         orders={orders}
-                        center={[context.lat, context.lng]}
-                        radius={context.radius}
+                        center={[queryContext.lat, queryContext.lng]} // 🔥 Передаем строго валидные координаты центра города!
+                        radius={radius} // Передаем реактивный радиус из Zustand
                         isFetching={isFetching}
                     />
                 )}
 
-                {/* ГРАДИЕНТНАЯ МАСКА (Чтобы карта вписывалась в дизайн) */}
+                {/* ГРАДИЕНТНАЯ МАСКА */}
                 <div className="absolute inset-0 pointer-events-none ring-[24px] ring-white/10 rounded-[3.5rem] z-20" />
             </div>
 
@@ -66,13 +67,13 @@ export function MapViewport() {
                     <div className="bg-slate-950 text-white px-6 py-3 rounded-2xl flex items-center gap-3 shadow-2xl border border-white/10">
                         <Loader2 className="w-4 h-4 animate-spin text-blue-500" strokeWidth={3} />
                         <span className="text-[10px] font-black uppercase italic tracking-[0.2em] whitespace-nowrap">
-                            Scanning Area / {context.radius}km
+                            Scanning Area / {radius}km
                         </span>
                     </div>
                 </div>
             )}
 
-            {/* ПЛАШКА С КОЛИЧЕСТВОМ (Для техно-шика) */}
+            {/* ПЛАШКА С КОЛИЧЕСТВОМ */}
             {!isFetching && orders.length > 0 && (
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 animate-in slide-in-from-bottom-4 duration-500">
                     <div className="bg-white px-5 py-2 rounded-xl border border-slate-100 shadow-xl flex items-center gap-2">

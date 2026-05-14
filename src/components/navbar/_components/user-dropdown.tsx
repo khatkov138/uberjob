@@ -12,18 +12,15 @@ import { authClient } from "@/lib/auth-client"
 import { Settings, LogOut, Shield, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { User } from "@/lib/auth"
-import { useNavbarStore } from "../navbar-provider"
+import { useNavbarStore, useNavbarUser } from "../navbar-provider"
 
-
-interface UserDropdownProps {
-  user: User
-}
-
-
-export function UserDropdown({ user }: UserDropdownProps) {
+export function UserDropdown() {
   const mode = useNavbarStore((state) => state.mode)
+  const user = useNavbarUser() // 🧱 Достаем зацементированный Слой Гранит
   const router = useRouter()
+
+  // Предохранитель на случай, если компонент отрендерился для неавторизованного гостя
+  if (!user) return null
 
   return (
     <DropdownMenu>

@@ -8,11 +8,12 @@ import TanstackProvider from "@/providers/TanstackProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { Footer } from "@/components/footer";
 import { LivePulseMarquee, LivePulseSkeleton } from "@/components/shared/live-pulse-marquee";
-import { RoleAutoswitcher } from "@/components/navbar/_components/role-autoswitcher";
-import { Heartbeat } from "@/components/shared/heartbeat";
+
+
 import Navbar from "@/components/navbar/navbar";
 import { Suspense } from "react";
 import { NavbarSkeleton } from "@/components/navbar/_components/navbar-skeleton";
+import Heartbeat from "@/components/shared/heartbeat";
 
 
 const geistSans = Geist({
@@ -58,15 +59,15 @@ export default function RootLayout({
 
 
           <header className="flex-none z-50">
-            <Suspense fallback={<NavbarSkeleton />}>
-              <Navbar />
-            </Suspense>
+
+            <Navbar />
+            <Heartbeat />
 
             <Suspense fallback={<LivePulseSkeleton />}>
               <LivePulseMarquee />
 
             </Suspense>
-            <Heartbeat />
+
           </header>
 
           {/* 

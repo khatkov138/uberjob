@@ -1,10 +1,11 @@
+// src/app/orders/[[...slug]]/page.tsx
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 
 // Libs & Actions
 import { getServerSession } from "@/lib/get-session";
-import { unwrap } from "@/lib/utils";
+import { delay, unwrap } from "@/lib/utils";
 
 import { getMyProfile } from "@/actions/profile/get";
 import { getPopularCategories } from "@/actions/category/get";
@@ -14,8 +15,8 @@ import { getServerFeedState, getServerLocation } from "@/lib/server-utils";
 import OrdersPageUI from "./OrdersPageUI";
 import { getOrders } from "@/actions/order/get-feed";
 
-import { FeedProvider } from "./_components/layout/FeedProvider";
-import { FeedController } from "./_components/layout/FeedController";
+import { FeedProvider } from "./_components/providers/FeedProvider";
+import { FeedController } from "./_components/providers/FeedController";
 
 export interface FeedContext {
   locationId: string;
@@ -32,7 +33,6 @@ export interface FeedContext {
 interface Props {
   params: Promise<{ slug?: string[] }>;
 }
-
 
 export default async function OrdersPage({ params }: Props) {
   const { slug = [] } = await params;
@@ -86,8 +86,17 @@ export default async function OrdersPage({ params }: Props) {
     viewMode: feedState.viewMode
   };
 
+  // 🔒 СЕРВЕРНЫЙ ЗАТВОР: Генерируем бессмертный хэш состояния SSR прямо здесь!
+  // Клиент примет готовую константную строку, избавив CPU от runtime JSON.stringify.
+  const initialServerHash = JSON.stringify(feedContext);
+
   // 4. ТЯЖЕЛЫЕ ПРОМИСЫ (Стриминг)
-  const ordersPromise = getOrders({ ...feedContext, mode: feedState.viewMode });
+  const ordersPromise = (async () => {
+    // Искусственно притормаживаем поток на сервере.
+    // Это гарантирует, что клиентский React 19 начнет гидратацию ДО того, как промис зарезолвится в браузере!
+    
+    return getOrders({ ...feedContext, mode: feedState.viewMode });
+  })();
   const popularCategoriesPromise = getPopularCategories(
     feedContext.lat,
     feedContext.lng,
@@ -97,12 +106,14 @@ export default async function OrdersPage({ params }: Props) {
   return (
     <FeedProvider initialData={storeInitialData}>
       <FeedController
-        ordersPromise={ordersPromise} // <-- Прямо в контроллер его!
+        ordersPromise={ordersPromise}
         session={session}
         initialProfile={initialProfile}
-        serverContext={feedContext} currentCategory={currentCategory}>
+        serverContext={feedContext}
+        currentCategory={currentCategory}
+        initialServerHash={initialServerHash} // 🔥 Пробрасываем готовый хэш в контроллер
+      >
         <OrdersPageUI
-
           popularCategoriesPromise={popularCategoriesPromise}
         />
       </FeedController>

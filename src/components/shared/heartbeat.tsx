@@ -1,28 +1,14 @@
-"use client"
+import { getServerSession } from "@/lib/get-session"
+import { HeartbeatClient } from "./heartbeat-client"
 
-import { useEffect } from "react"
-import { authClient } from "@/lib/auth-client"
-import { handleApi } from "@/lib/utils"
 
-export function Heartbeat() {
-    const { data: session } = authClient.useSession()
+export default async function Heartbeat() {
+    // Используем тот же системный кэш сессии, что и Navbar
+    const session = await getServerSession()
+    const isAuthenticated = !!session?.user
 
-    useEffect(() => {
-        if (!session?.user) return
+    console.log(`🧬 [SERVER HEARTBEAT] Статус авторизации определен: ${isAuthenticated}`)
 
-        const pulse = () => {
-            // handleApi сам проверит res.ok и json.success
-            handleApi(fetch("/api/user/heartbeat", { 
-                method: "POST",
-                keepalive: true 
-            })).catch(err => console.error("Heartbeat error:", err))
-        }
-
-        pulse()
-        const interval = setInterval(pulse, 120000)
-
-        return () => clearInterval(interval)
-    }, [session])
-
-    return null
+    // Рендерим клиентскую часть, передавая только стабильный булевый примитив
+    return <HeartbeatClient isAuthenticated={isAuthenticated} />
 }
