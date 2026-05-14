@@ -1,64 +1,59 @@
-// app/api/location/validate/route.ts
-import { NextResponse } from "next/server"
-import prisma from "@/lib/prisma"
+// src/app/api/location/validate/route.ts
+import { type NextRequest } from "next/server";
+import { createApiResponse } from "@/lib/server-utils";
+import prisma from "@/lib/prisma";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const slug = searchParams.get("slug")?.toLowerCase().trim()
-
-  // Защита от пустых или слишком коротких запросов
+// Изолируем логику, чтобы TypeScript автоматически вывел тип возвращаемого значения
+async function validateLocation(slug: string | null) {
   if (!slug || slug.length < 3) {
-    return NextResponse.json({ valid: false }, { status: 400 })
+    return { valid: false as const }; // Используем as const для точного вывода литералов
   }
 
-  // 1. ШАГ №1: Ищем строгое точное совпадение (irkutsk -> irkutsk)
+  // ШАГ №1: Ищем точное совпадение
   let dbLocation = await prisma.location.findUnique({
     where: { slug },
     select: { id: true }
-  })
+  });
 
-  // 2. ШАГ №2: Если точного нет, ищем города, начинающиеся на эту строку (angars -> angarsk)
+  // ШАГ №2: Ищем по началу строки
   if (!dbLocation) {
-    const suggestions = await prisma.location.findMany({
-      where: {
-        slug: {
-          startsWith: slug,
-        }
-      },
+    dbLocation = await prisma.location.findFirst({
+      where: { slug: { startsWith: slug } },
       select: { id: true },
-      take: 1 // Нам нужен только один самый первый релевантный ID
-    })
-    
-    if (suggestions.length > 0) {
-      dbLocation = suggestions[0]
-    }
+      orderBy: { slug: 'asc' }
+    });
   }
 
-  // 3. ШАГ №3: Если все еще пусто, ищем частичное вхождение подстроки (ngarsk -> angarsk)
+  // ШАГ №3: Ищем по частичному вхождению
   if (!dbLocation) {
-    const suggestions = await prisma.location.findMany({
-      where: {
-        slug: {
-          contains: slug,
-        }
-      },
+    dbLocation = await prisma.location.findFirst({
+      where: { slug: { contains: slug } },
       select: { id: true },
-      take: 1
-    })
-
-    if (suggestions.length > 0) {
-      dbLocation = suggestions[0]
-    }
+      orderBy: { slug: 'asc' }
+    });
   }
 
-  // Если город или похожий аналог вообще не найдены в базе данных
   if (!dbLocation) {
-    return NextResponse.json({ valid: false })
+    return { valid: false as const };
   }
 
-  // Возвращаем валидный статус и ID найденного города для инжекции в куку
-  return NextResponse.json({ 
-    valid: true, 
-    id: dbLocation.id 
-  })
+  return {
+    valid: true as const,
+    id: dbLocation.id
+  };
+}
+
+export type LocationValidationResult = Awaited<ReturnType<typeof validateLocation>>;
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = request.nextUrl;
+
+  // Добавляем || null в конец, чтобы гарантировать тип string | null
+  const slug = searchParams.get("slug")?.toLowerCase().trim() || null;
+
+  return createApiResponse<LocationValidationResult>(async () => {
+    // Теперь типы идеально сходятся: slug имеет тип string | null
+   
+    return validateLocation(slug);
+  });
 }

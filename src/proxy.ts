@@ -1,6 +1,17 @@
 // proxy.ts
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { handleApi } from './lib/utils'
+import { LocationValidationResult } from './app/api/location/validate/route'
+
+interface ZustandLocationCookie {
+  state?: {
+    globalLocationId?: string | null
+    lastOrderLocationId?: string | null
+    [key: string]: unknown
+  }
+  version?: number
+}
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
@@ -23,19 +34,17 @@ export async function proxy(request: NextRequest) {
   let shouldUpdateLocationCookie = false
   let newCookieValue = ''
 
-  // Город находится на второй позиции (pathParts[1]), если он передан в URL
   if (isOrdersPage && pathParts[1]) {
-    const urlCitySlug = pathParts[1] // Например, 'irkutsk'
+    const urlCitySlug = pathParts[1]
     const rawLocCookie = request.cookies.get('zwork-core-loc')?.value
 
     let currentGlobalLocationId: string | null = null
-    let parsedCookieState: any = { state: { globalLocationId: null, lastOrderLocationId: null }, version: 0 }
+    let parsedCookieState: ZustandLocationCookie = { state: { globalLocationId: null, lastOrderLocationId: null }, version: 0 }
 
-    // Декодируем и парсим старую куку Zustand, если она существует
     if (rawLocCookie) {
       try {
         const decoded = decodeURIComponent(rawLocCookie)
-        parsedCookieState = JSON.parse(decoded)
+        parsedCookieState = JSON.parse(decoded) as ZustandLocationCookie
         currentGlobalLocationId = parsedCookieState?.state?.globalLocationId || null
       } catch (e) {
         console.error("❌ [PROXY] Cookie parse error:", e)
@@ -44,31 +53,34 @@ export async function proxy(request: NextRequest) {
 
     try {
       const origin = request.nextUrl.origin
-      // Делаем сверхбыстрый запрос к нашему внутреннему Node.js API-эндпоинту
-      const res = await fetch(`${origin}/api/location/validate?slug=${urlCitySlug}`)
-      const data = await res.json()
 
-      // Если город валиден и его ID отличается от текущего в куке — пересобираем стейт стора
-      if (data.valid && data.id !== currentGlobalLocationId) {
-        shouldUpdateLocationCookie = true
+      // Используем handleApi для извлечения строго типизированных данных LocationValidationResult
+      const validationData = await handleApi<LocationValidationResult>(
+        fetch(`${origin}/api/location/validate?slug=${urlCitySlug}`)
+      )
 
-        if (!parsedCookieState.state) {
-          parsedCookieState.state = {}
+      // handleApi гарантирует, что сюда дойдут только успешные данные (json.success === true)
+      if (validationData.valid && validationData.id) {
+        const fetchedCityId = validationData.id
+
+        if (fetchedCityId !== currentGlobalLocationId) {
+          shouldUpdateLocationCookie = true
+
+          if (!parsedCookieState.state) {
+            parsedCookieState.state = {}
+          }
+          parsedCookieState.state.globalLocationId = fetchedCityId
+          newCookieValue = encodeURIComponent(JSON.stringify(parsedCookieState))
         }
-        parsedCookieState.state.globalLocationId = data.id
-
-        // Собираем JSON обратно и кодируем для cookie-стандарта Next.js
-        newCookieValue = encodeURIComponent(JSON.stringify(parsedCookieState))
       }
     } catch (e) {
-      console.error("❌ [PROXY FETCH ERROR]:", e)
+      // Сюда попадут как сетевые ошибки fetch, так и ошибки валидации/бэкенда, выброшенные из handleApi
+      console.error("❌ [PROXY FETCH / VALIDATION ERROR]:", e instanceof Error ? e.message : e)
     }
   }
 
-  // 3. ОДНОВРЕМЕННАЯ МОДИФИКАЦИЯ ЗАПРОСА И ОТВЕТА (Если есть изменения кук)
+  // 3. ОДНОВРЕМЕННАЯ МОДИФИКАЦИЯ ЗАПРОСА И ОТВЕТА
   if (targetMode !== currentMode || shouldUpdateLocationCookie) {
-
-    // Перезаписываем куки внутри летящего ЗАПРОСА к серверным компонентам
     if (targetMode !== currentMode) {
       request.cookies.set('zwork-mode', targetMode)
     }
@@ -76,7 +88,6 @@ export async function proxy(request: NextRequest) {
       request.cookies.set('zwork-core-loc', newCookieValue)
     }
 
-    // Синхронизируем строку заголовка 'cookie' летящего запроса
     const allCookies = request.cookies.getAll()
     const cookieString = allCookies.map(c => `${c.name}=${c.value}`).join('; ')
     requestHeaders.set('cookie', cookieString)
@@ -87,7 +98,6 @@ export async function proxy(request: NextRequest) {
       },
     })
 
-    // Записываем куки в ОТВЕТ браузера для физического сохранения на клиенте (maxAge: 365 дней)
     if (targetMode !== currentMode) {
       response.cookies.set('zwork-mode', targetMode, { maxAge: 31536000, path: '/' })
     }
@@ -98,7 +108,6 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  // Если изменений кук не требуется, просто летим дальше со стандартным ответом
   return NextResponse.next()
 }
 

@@ -24,7 +24,7 @@ import { cn, handleAction } from "@/lib/utils"
 import { PopularCategoryResult } from "@/actions/category/get"
 import { FullProfile } from "@/actions/profile/get"
 import { removeSkill } from "@/actions/profile/manage"
-import { useActiveFeed } from "./FeedController"
+import { useActiveFeed, useStaticFeed } from "./FeedController"
 
 interface OrdersSidebarProps {
   popularCategories: PopularCategoryResult[]
@@ -33,9 +33,8 @@ interface OrdersSidebarProps {
 export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
   const queryClient = useQueryClient()
   const { open: openCatModal } = useCategoryModalStore()
-
   // 1. КОНТЕКСТ ЧЕРЕЗ КАСТОМНЫЙ ХУК
-  const context = useActiveFeed()
+  const context = useStaticFeed()
 
   // 2. ПРОФИЛЬ И СКИЛЛЫ
   const { profile, hasSkills } = useUserSkills()
