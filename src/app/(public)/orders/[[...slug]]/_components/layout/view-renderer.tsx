@@ -36,10 +36,7 @@ export const ViewRenderer = memo(function ViewRenderer({ viewMode }: ViewRendere
                       Пока идет гидратация F5, крутятся текстовые скелетоны карточек!
                     */}
                     <Suspense fallback={
-                        <div className="space-y-8">
-                            <OrderCardSkeleton />
-                            <OrderCardSkeleton />
-                        </div>
+                        <OrderCardSkeleton />
                     }>
                         <OrdersFeed />
                     </Suspense>

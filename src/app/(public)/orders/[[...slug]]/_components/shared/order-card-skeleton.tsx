@@ -1,6 +1,9 @@
 "use client"
 
+import { useEffect } from "react"
+
 export function OrderCardSkeleton() {
+
   return (
     <div className="w-full bg-white border border-slate-100 rounded-[2.5rem] p-8 space-y-6 animate-pulse">
       {/* Шапка: Заголовок и Цена */}

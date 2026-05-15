@@ -14,6 +14,7 @@ import Navbar from "@/components/navbar/navbar";
 import { Suspense } from "react";
 import { NavbarSkeleton } from "@/components/navbar/_components/navbar-skeleton";
 import Heartbeat from "@/components/shared/heartbeat";
+import { OrderCardSkeleton } from "./(public)/orders/[[...slug]]/_components/shared/order-card-skeleton";
 
 
 const geistSans = Geist({
@@ -59,8 +60,12 @@ export default function RootLayout({
 
 
           <header className="flex-none z-50">
+            <Suspense fallback={
+              <OrderCardSkeleton />
+            }>
+              <Navbar />
+            </Suspense>
 
-            <Navbar />
             <Heartbeat />
 
             <Suspense fallback={<LivePulseSkeleton />}>
