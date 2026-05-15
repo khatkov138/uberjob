@@ -9,41 +9,37 @@ import { motion, useAnimationControls } from "framer-motion"
 import Link from "next/link"
 
 import { handleAction, unwrap } from "@/lib/utils"
-import { getLatestPublicOrders } from "@/actions/order/get"
+import { getLatestPublicOrders, LatesPublicOrders } from "@/actions/order/get"
+import { ActionResponse } from "@/lib/server-utils"
 
-interface LivePulseMarqueeProps {
-  ordersPromise: Promise<any>
-}
 
 interface LivePulseMarqueeCoreProps {
-  serverDataRaw: any
+  // Сырые данные, переданные из use(ordersPromise) на клиенте
+  serverDataRaw: ActionResponse<LatesPublicOrders> | null
   isAdminPage: boolean
 }
 
-let connectorRenderCount = 0;
-let coreRenderCount = 0;
-let trackRenderCount = 0;
 
 /**
  * 🧬 CONNECTOR COMPONENT
  */
-export function LivePulseMarquee({ ordersPromise }: LivePulseMarqueeProps) {
-  connectorRenderCount++
+export function LivePulseMarquee({ ordersPromise }: {
+  // Промис от сервера, который несет в себе полный ответ экшена
+  ordersPromise: Promise<ActionResponse<LatesPublicOrders>>
+}) {
+
   const pathname = usePathname()
   const isAdminPage = pathname?.startsWith('/admin')
 
-  const isServer = typeof window === 'undefined'
-  const envMarker = isServer ? '🧬 [SERVER-SSR]' : '💻 [CLIENT-HYDRATE]'
 
-  //console.log(`${envMarker} 🔔 [CONNECTOR RENDER #${connectorRenderCount}] LivePulseMarquee | Admin: ${isAdminPage}`)
 
   // Извлекаем поток данных сервера
   const serverDataRaw = !isAdminPage ? use(ordersPromise) : null
 
   return (
-    <LivePulseMarqueeCore 
-      serverDataRaw={serverDataRaw} 
-      isAdminPage={isAdminPage} 
+    <LivePulseMarqueeCore
+      serverDataRaw={serverDataRaw}
+      isAdminPage={isAdminPage}
     />
   )
 }
@@ -51,46 +47,44 @@ export function LivePulseMarquee({ ordersPromise }: LivePulseMarqueeProps) {
 /**
  * 🎛️ CORE COMPONENT
  */
+
+
 const LivePulseMarqueeCore = React.memo(function LivePulseMarqueeCore({
   serverDataRaw,
   isAdminPage
 }: LivePulseMarqueeCoreProps) {
-  coreRenderCount++
- // console.log(`🎬 [CORE ENTRY #${coreRenderCount}] LivePulseMarqueeCore начал выполнение тела функции.`)
+
 
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const query = useQuery({
+  // Передаем типы в Танстек: <Что возвращает queryFn, ТипОшибки, Что лежит в query.data>
+  // Так как handleAction уже возвращает чистый массив, оба параметра — это LatesPublicOrders
+  const query = useQuery<LatesPublicOrders>({
     queryKey: ["public-latest-orders"],
-    // 🛡️ Чистый handleAction для сохранения кэша при сбоях сети
-    queryFn: async () => {
-    //  console.log(`🚀 [NETWORK FETCH] Танстек ТЯНЕТ свежие заказы для бегущей строки через queryFn!`)
+
+    // 🛡️ Чистая функция: handleAction сама развернет экшен и вернет чистый массив объектов
+    queryFn: () => {
       return handleAction(getLatestPublicOrders())
     },
     refetchInterval: 60000,
     enabled: !isAdminPage,
-    
+
     // 🌱 Сидинг данных в кэш TanStack
-    initialData: (): any => {
-    //  console.log(`🌱 [INITIAL DATA SEEDER] Опрос затвора бегущей строки для сидинга.`)
+    initialData: () => {
       if (!serverDataRaw) return undefined
-      return serverDataRaw 
+      // Если сервер прислал сырой экшен, распаковываем его один раз при сидинге
+      return unwrap(serverDataRaw, [])
     },
 
-    // ⚡️ Безопасный процессор данных на уровне ядра
-    select: (data: any) => {
-     // console.log('⚡️ [SELECT PROCESSOR] Безопасная распаковка данных бегущей строки через unwrap')
-      return unwrap(data, [])
-    },
+    // ⚡️ Больше никакой секции select! Данные в кэше уже лежат в виде чистого массива.
     staleTime: 1000 * 30,
   })
 
-  //console.log(`🏁 [CORE COMMIT #${coreRenderCount}] useQuery пройден, JSX уходит на рендеринг.`)
-
+  // Танстек теперь на 100% уверен, что orders — это массив LatesPublicOrders
   const orders = query.data ?? []
 
   // Бесконечный повтор ленты для плавного скролла без дыр
-  const displayOrders = useMemo(() => {
+  const displayOrders = useMemo<LatesPublicOrders>(() => {
     if (!orders || orders.length === 0) return []
     return [...orders, ...orders, ...orders, ...orders, ...orders]
   }, [orders])
@@ -121,33 +115,33 @@ const LivePulseMarqueeCore = React.memo(function LivePulseMarqueeCore({
     </div>
   )
 })
-
 /**
  * 🎛️ ИЗОЛИРОВАННЫЙ ТРЕК АНИМАЦИИ (0 ререндеров, плавное продолжение движения)
  */
-const MarqueeTrack = React.memo(function MarqueeTrack({ displayOrders }: { displayOrders: any[] }) {
-  trackRenderCount++
- // console.log(`🏃‍♂️ [TRACK RENDER #${trackRenderCount}] Отрисовка изолированного трека анимации.`)
-  
+export const MarqueeTrack = React.memo(function MarqueeTrack({ displayOrders }: {
+  displayOrders: LatesPublicOrders
+}) {
+  // Нам не нужен счетчик рендеров в продакшене, но если нужен — выносим глобально за компонент
   const controls = useAnimationControls()
   const trackRef = useRef<HTMLDivElement>(null)
 
   // Базовое время полного цикла движения в секундах
-  const BASE_DURATION = 25 
+  const BASE_DURATION = 25
 
   // Функция запуска анимации с текущей позиции до победного конца (-50%)
   const startAnimation = useCallback((customDuration?: number) => {
     let duration = customDuration ?? BASE_DURATION
-    
+
     // Рассчитываем оставшееся время пропорционально расстоянию
     if (trackRef.current && !customDuration) {
       const transform = window.getComputedStyle(trackRef.current).transform
       if (transform && transform !== 'none') {
-        const matrix = new WebKitCSSMatrix(transform)
+        // Кроссбраузерный DOMMatrix вместо устаревшего WebKitCSSMatrix
+        const matrix = new DOMMatrix(transform)
         const currentX = matrix.m41 // Смещение по X в пикселях
         const trackWidth = trackRef.current.offsetWidth
         const endX = -(trackWidth / 2) // Конечная координата трека (-50%)
-        
+
         if (currentX < 0 && endX < 0) {
           const remainingPercent = (currentX - endX) / Math.abs(endX)
           if (remainingPercent > 0 && remainingPercent <= 1) {
@@ -197,36 +191,41 @@ const MarqueeTrack = React.memo(function MarqueeTrack({ displayOrders }: { displ
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {displayOrders.map((order: any, idx: number) => (
-        <Link
-          key={`${order.id}-${idx}`}
-          href={`/orders/${order.id}`}
-          className="flex items-center gap-6 px-8 shrink-0 hover:opacity-70 transition-opacity cursor-pointer group"
-        >
-          {/* ГОРОД */}
-          <div className="flex items-center gap-1.5 bg-slate-900 text-white px-2 py-0.5 rounded-md transition-colors group-hover:bg-blue-600">
-            <MapPin className="w-2.5 h-2.5 text-blue-400 group-hover:text-white" />
-            <span className="text-[9px] font-black uppercase italic leading-none">
-              {order.location?.name || "РФ"}
+      {displayOrders.map((order, idx) => {
+        // Извлекаем первую категорию, если она существует
+        const firstCategoryName = order.categories?.[0]?.category?.name
+
+        return (
+          <Link
+            key={`${order.id}-${idx}`}
+            href={`/order/${order.slug}`} // Исправлен разрыв синтаксиса order.
+            className="flex items-center gap-6 px-8 shrink-0 hover:opacity-70 transition-opacity cursor-pointer group"
+          >
+            {/* ГОРОД */}
+            <div className="flex items-center gap-1.5 bg-slate-900 text-white px-2 py-0.5 rounded-md transition-colors group-hover:bg-blue-600">
+              <MapPin className="w-2.5 h-2.5 text-blue-400 group-hover:text-white" />
+              <span className="text-[9px] font-black uppercase italic leading-none">
+                {order.location?.name || "РФ"}
+              </span>
+            </div>
+
+            {/* НАЗВАНИЕ ЗАКАЗА */}
+            <span className="text-[11px] font-black text-slate-800 uppercase italic tracking-tight">
+              {order.title}
             </span>
-          </div>
 
-          {/* НАЗВАНИЕ ЗАКАЗА */}
-          <span className="text-[11px] font-black text-slate-800 uppercase italic tracking-tight">
-            {order.title}
-          </span>
+            {/* КАТЕГОРИЯ */}
+            {firstCategoryName && (
+              <span className="text-[10px] font-black uppercase text-blue-600/50 italic group-hover:text-blue-600 transition-colors">
+                #{firstCategoryName.replace(/\s+/g, '')}
+              </span>
+            )}
 
-          {/* КАТЕГОРИЯ */}
-          {order.categories?.[0]?.category?.name && (
-            <span className="text-[10px] font-black uppercase text-blue-600/50 italic group-hover:text-blue-600 transition-colors">
-              #{order.categories[0].category.name.replace(/\s+/g, '')}
-            </span>
-          )}
-
-          {/* РАЗДЕЛИТЕЛЬ */}
-          <div className="w-1 h-1 rounded-full bg-slate-200" />
-        </Link>
-      ))}
+            {/* РАЗДЕЛИТЕЛЬ */}
+            <div className="w-1 h-1 rounded-full bg-slate-200" />
+          </Link>
+        )
+      })}
     </motion.div>
   )
 })

@@ -126,7 +126,7 @@ HeaderStatusBadge.displayName = 'HeaderStatusBadge';
  */
 export const HeaderDataReader = React.memo(function HeaderDataReader() {
   // 1. Подключаемся к шине данных через контексты платформы ZWORK
-  const context = useQueryFeedContext();
+ 
   const ordersStream = useOrdersStream<'list'>();
 
   // 2. Внедряем единый изоморфный затвор из кастомного хука

@@ -123,7 +123,7 @@ export async function getOrderByIdOrSlug(identifier: string) {
 
 
 export async function getLatestPublicOrders() {
-  
+
   return createAction(async () => {
     const orders = await prisma.order.findMany({
       take: 10,
@@ -131,7 +131,7 @@ export async function getLatestPublicOrders() {
       select: {
         id: true,
         title: true,
-
+        slug: true,
         location: {
           select: {
             name: true,
@@ -162,5 +162,5 @@ export async function getLatestPublicOrders() {
 
 export type ClientOrder = InferActionResult<typeof getClientOrders>
 export type OrderByIdOrSlugResponse = InferActionResult<typeof getOrderByIdOrSlug>
-
+export type LatesPublicOrders = InferActionResult<typeof getLatestPublicOrders>[]
 
