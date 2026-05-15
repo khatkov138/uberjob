@@ -1,30 +1,19 @@
-
-import { getServerSession } from "@/lib/get-session"
-import prisma from "@/lib/prisma"
-import { NextResponse } from "next/server"
+import prisma from "@/lib/prisma";
+import { withApiAuth } from "@/lib/server-utils";
 
 export async function GET() {
-  try {
-    const session = await getServerSession("API")
-    
-    if (!session?.user) {
-      return new NextResponse("Unauthorized", { status: 401 })
-    }
-
-    // Получаем последние 20 уведомлений пользователя
-    const notifications = await prisma.notification.findMany({
-      where: {
-        userId: session.user.id
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: 20
-    })
-
-    return NextResponse.json(notifications)
-  } catch (error) {
-    console.error("[NOTIFICATIONS_GET]", error)
-    return new NextResponse("Internal Error", { status: 500 })
-  }
+    // strict contract: withApiAuth сам обработает 401, 500 и логирование ошибок
+    return withApiAuth(async (userId) => {
+        return await prisma.notification.findMany({
+            where: {
+                userId // withApiAuth гарантирует, что userId чистый и принадлежит текущей сессии
+            },
+            orderBy: {
+                createdAt: 'desc'
+            },
+            take: 20,
+            // Сюда можно добавить select, если не нужен весь объект уведомления целиком, 
+            // для максимальной разгрузки трафика сети
+        });
+    });
 }

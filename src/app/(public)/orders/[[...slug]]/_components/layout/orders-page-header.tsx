@@ -147,7 +147,6 @@ export const HeaderStatusBadge = React.memo(({ isFetching, isReady }: HeaderStat
   const shouldUnwrapStream = !hasCachedData && isServerKeyMatch;
   const serverDataRaw = shouldUnwrapStream ? use(ordersStream) : null;
 
-  console.log('orderspageheader', isServerKeyMatch, hasCachedData);
 
 
   // 5. Пассивный декларативный наблюдатель за RAM-кэшем Танстека с удержанием старого кэша

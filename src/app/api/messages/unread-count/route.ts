@@ -1,18 +1,17 @@
-import { NextResponse } from "next/server"
-import { getServerSession } from "@/lib/get-session"
-import prisma from "@/lib/prisma"
+import prisma from "@/lib/prisma";
+import { withApiAuth } from "@/lib/server-utils";
 
 export async function GET() {
-  // Вызываем с меткой API — в консоли будет порядок
-  const session = await getServerSession("API")
-  if (!session?.user?.id) return NextResponse.json({ count: 0 })
+    // strict contract: withApiAuth сам завалидирует сессию, поймает ошибки и запишет логи
+    return withApiAuth(async (userId) => {
+        const count = await prisma.message.count({
+            where: {
+                recipientId: userId, // Гарантированный ID из токена сессии
+                isRead: false
+            }
+        });
 
-  const count = await prisma.message.count({
-    where: {
-      recipientId: session.user.id,
-      isRead: false
-    }
-  })
-
-  return NextResponse.json({ count })
+        // Возвращаем чистый объект — withApiAuth сам упакует его в NextResponse.json
+        return { count };
+    });
 }

@@ -1,27 +1,28 @@
 "use client"
 
+import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
-import { useNavbarUser } from "../navbar-provider" // Наш чистый Слой Гранит
+import { handleApi } from "@/lib/utils" // 🚀 Импортируем твой хелпер-перехватчик
+import { useNavbarUser } from "../navbar-provider"
 
 interface UnreadCountResponse {
   count: number;
 }
 
 export function UnreadBadge() {
-  // 1. Достаем зацементированного пользователя из контекста (0ms, без дублирования API запросов)
+  // 1. Достаем зацементированного пользователя из контекста (Слой Гранит, 0ms ререндеров)
   const user = useNavbarUser()
 
   // 2. Декларативный запрос счетчика непрочитанных сообщений в TanStack Query v5
   const { data: countData } = useQuery<UnreadCountResponse>({
     queryKey: ["unread-count"],
+    // 🛡️ Чистый, безопасный сетевой контракт через handleApi без бойлерплейта
     queryFn: async () => {
-      const res = await fetch("/api/messages/unread-count")
-      if (!res.ok) throw new Error("Failed to fetch unread count")
-      return res.json()
+      return handleApi(fetch("/api/messages/unread-count", { method: "GET" }))
     },
     // Запрос активируется строго тогда, когда на сервере подтверждено наличие ID пользователя
     enabled: !!user?.id,
-    staleTime: 1000 * 30, // Данные валидны 30 секунд (защита от DDOS бэкенда)
+    staleTime: 1000 * 30, // Защита бэкенда от DDOS
   })
 
   const count = countData?.count || 0

@@ -8,7 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { cn, handleAction } from "@/lib/utils"
+import { cn, handleAction, handleApi } from "@/lib/utils" // 🚀 Импортируем твой handleApi
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { ru } from "date-fns/locale"
@@ -20,20 +20,19 @@ import { markAllAsRead, markAsRead } from "@/actions/notification/manage"
 export function NotificationsBell() {
   const queryClient = useQueryClient()
   
-  // 1. Достаем пользователя из контекста (0ms, без холостых GET-запросов к API Better Auth)
+  // 1. Достаем пользователя из контекста (0ms, без холостых GET-запросов)
   const user = useNavbarUser()
   const userId = user?.id
 
-  // 2. Стабилизируем ключ кэша строго на базе примитива ID
-  const queryKey = React.useMemo(() => ["notifications", userId], [userId])
+  // 2. Стабилизируем ключ кэша строго на базе примитива ID и связываем с глобальной шиной
+  const queryKey = React.useMemo(() => ["user-notifications", userId], [userId])
 
-  // 3. Декларативная подписка на уведомления в TanStack Query v5
+  // 3. Декларативная подписка на уведомления в TanStack Query v5 через handleApi
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
     queryKey,
+    // 🛡️ Безопасный сетевой контракт, считывающий с бэкенда withApiAuth чистый массив
     queryFn: async () => {
-      const res = await fetch("/api/notifications")
-      if (!res.ok) throw new Error("Failed to fetch")
-      return res.json()
+      return handleApi(fetch("/api/notifications", { method: "GET" }))
     },
     enabled: !!userId, // Затвор сработает только для авторизованных сессий
     staleTime: 1000 * 60 * 5, // 5 минут считаем данные свежими
@@ -41,7 +40,7 @@ export function NotificationsBell() {
 
   const unreadCount = notifications.filter((n) => !n.isRead).length
 
-  // 4. Оптимистичная мутация: Прочитать всё
+  // 4. Оптимистичная mutация: Прочитать всё
   const markAllMutation = useMutation({
     mutationFn: () => handleAction(markAllAsRead()),
     onMutate: async () => {
