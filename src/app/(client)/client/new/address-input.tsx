@@ -23,11 +23,20 @@ export function AddressInput({ defaultValue, onSelect, placeholder }: AddressInp
     const [suggestions, setSuggestions] = React.useState<YandexSuggestItem[]>([])
     const [isLoading, setIsLoading] = React.useState(false)
 
+    // 🔒 ФИКСИРУЕМ СТАРТОВОЕ СОСТОЯНИЕ ДЛЯ БЛОКИРОВКИ ПЕРВОГО ХОЛОСТОГО ЗАПРОСА
+    const isFirstRenderWithDefault = React.useRef(!!defaultValue)
+
     // Используем дебаунс (300мс), чтобы не вешать API
     const debouncedQuery = useDebounce(query, 300)
 
     // Эффект на поиск
     React.useEffect(() => {
+        // 🛡️ ЗАТВОР: если это первый проход гидратации/монтирования и текст совпадает с дефолтом — гасим запрос
+        if (isFirstRenderWithDefault.current && debouncedQuery === defaultValue) {
+            isFirstRenderWithDefault.current = false // Сбрасываем затвор, следующие изменения пойдут в сеть
+            return
+        }
+
         const fetchSuggestions = async () => {
             if (debouncedQuery.length < 3) {
                 setSuggestions([])
@@ -48,9 +57,10 @@ export function AddressInput({ defaultValue, onSelect, placeholder }: AddressInp
         }
 
         fetchSuggestions()
-    }, [debouncedQuery])
+    }, [debouncedQuery, defaultValue]) // Добавили defaultValue в зависимости для честной работы контракта React
 
     const handleItemClick = (item: YandexSuggestItem) => {
+        isFirstRenderWithDefault.current = false // Любой клик окончательно деактивирует затвор
         setQuery(item.title.text)
         setSuggestions([])
         onSelect(item)
@@ -66,7 +76,10 @@ export function AddressInput({ defaultValue, onSelect, placeholder }: AddressInp
 
                 <Input
                     value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    onChange={(e) => {
+                        isFirstRenderWithDefault.current = false // Пользователь начал стирать/писать — затвор снимается
+                        setQuery(e.target.value)
+                    }}
                     placeholder={placeholder || "Введите город или адрес..."}
                     className="h-16 pl-14 pr-12 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-blue-600 font-black italic text-lg uppercase tracking-tighter transition-all outline-none shadow-inner"
                 />
@@ -74,7 +87,11 @@ export function AddressInput({ defaultValue, onSelect, placeholder }: AddressInp
                 {query && (
                     <button
                         type="button"
-                        onClick={() => { setQuery(""); setSuggestions([]); }}
+                        onClick={() => { 
+                            isFirstRenderWithDefault.current = false; 
+                            setQuery(""); 
+                            setSuggestions([]); 
+                        }}
                         className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-slate-100 rounded-full transition-colors z-10"
                     >
                         {isLoading ? (

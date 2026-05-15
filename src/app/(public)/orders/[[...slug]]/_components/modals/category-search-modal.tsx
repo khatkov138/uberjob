@@ -3,12 +3,13 @@
 import * as React from "react"
 import { X, Search, Plus, Check, Loader2, SearchX } from "lucide-react"
 import { cn, handleAction } from "@/lib/utils"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient, useMutationState } from "@tanstack/react-query"
 import { DBCategory, getAllCategories } from "@/actions/category/get"
 import { useCategoryModalStore } from "@/store/use-category-modal-store"
 import { toast } from "sonner"
 import { addSkill, removeSkill } from "@/actions/profile/manage"
-import { useUserSkills } from "@/hooks/use-user-skills" // 🚀 Импортируем твой хук
+import { useUserSkills } from "@/hooks/use-user-skills"
+import { FullProfile } from "@/actions/profile/get"
 
 const CategoryItemSkeleton = () => (
   <div className="w-full flex items-center justify-between p-5 rounded-[1.5rem] border-2 border-slate-50 bg-white/50 relative overflow-hidden">
@@ -23,10 +24,10 @@ export function CategorySearchModal() {
   const [query, setQuery] = React.useState("")
   const queryClient = useQueryClient()
 
-  // 1. ПОДКЛЮЧАЕМ ТВОЙ ХУК: Заменяет useQuery, заглушки, обработку ошибок и генерацию Set
+  // Подключаем кастомный хук профиля пользователя
   const { skillIds } = useUserSkills()
 
-  // 2. ЗАГРУЗКА КАТЕГОРИЙ (Кэш на 1 час)
+  // ЗАГРУЗКА КАТЕГОРИЙ (Кэш на 1 час)
   const { data: dbCategories = [], isLoading } = useQuery<DBCategory[]>({
     queryKey: ["all-categories"],
     queryFn: async () => await handleAction(getAllCategories()),
@@ -34,23 +35,40 @@ export function CategorySearchModal() {
     staleTime: 1000 * 60 * 60,
   })
 
-  // Индексация категорий для быстрого O(1) поиска в мутациях
+  // Индексация категорий для быстрого O(1) поиска в onSuccess коммите
   const categoriesMap = React.useMemo(() => new Map(dbCategories.map(c => [c.id, c])), [dbCategories])
 
-  // 3. МУТАЦИЯ: Оптимистичный UI
-  const { mutate: toggleSkill, variables, status } = useMutation({
+  // 📡 ГЛОБАЛЬНЫЙ СКАНЕР МУТАЦИЙ ТАНСТЕКА СТРОГО ДЛЯ МОДАЛКИ:
+  // Извлекает из шины данных ID всех категорий, которые прямо сейчас добавляются/удаляются
+  const itemsBeingProcessed = useMutationState({
+    filters: { mutationKey: ["toggle-skill-niche"], status: "pending" },
+    select: (mutation) => (mutation.state.variables as any)?.id as string,
+  })
+
+  // МУТАЦИЯ: Лоадер на экране ➡️ Обновление DOM-состояния по факту успеха
+  const { mutate: toggleSkill } = useMutation({
+    mutationKey: ["toggle-skill-niche"], // Жесткий ключ привязки к сканеру
     mutationFn: async ({ id, isSelected }: { id: string; isSelected: boolean }) => {
       return isSelected ? await handleAction(removeSkill(id)) : await handleAction(addSkill(id))
     },
-    onMutate: async ({ id, isSelected }) => {
+    
+    // БОЛЬШЕ НЕ ДЕЛАЕМ деструктивных правок в onMutate. Кэш стабилен, пока идет сеть
+    onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["user-profile"] })
-      const previousProfile = queryClient.getQueryData(["user-profile"])
-
-      queryClient.setQueryData(["user-profile"], (old: any) => {
+    },
+    
+    // 🔥 ЧЕСТНЫЙ ПОСТ-КОММИТ КЭША: Цвет плашки и стейт меняются за 0мс строго после ответа сервера
+    // Ни одного повторного сетевого fetch-запроса на чтение профиля к базе данных!
+    onSuccess: (_, { id, isSelected }) => {
+      const catName = categoriesMap.get(id)?.name || "Ниша"
+      
+      queryClient.setQueryData<FullProfile>(["user-profile"], (old: any) => {
         if (!old) return old
         if (isSelected) {
+          // Если был выбран — чисто вырезаем локально
           return { ...old, skills: old.skills.filter((s: any) => s.categoryId !== id) }
         } else {
+          // Если не был выбран — подмешиваем эталонный объект
           const cat = categoriesMap.get(id)
           if (!cat) return old
           return {
@@ -59,16 +77,12 @@ export function CategorySearchModal() {
           }
         }
       })
-      return { previousProfile }
-    },
-    onError: (err, _, context) => {
-      if (context?.previousProfile) queryClient.setQueryData(["user-profile"], context.previousProfile)
-      toast.error("Ошибка синхронизации")
-    },
-    onSuccess: (_, { id, isSelected }) => {
-      const catName = categoriesMap.get(id)?.name || "Ниша"
+
       toast.success(isSelected ? `Удалено: ${catName}` : `Добавлено: ${catName}`)
     },
+    onError: () => {
+      toast.error("Ошибка синхронизации радара ниш")
+    }
   })
 
   const filtered = React.useMemo(() => {
@@ -79,7 +93,7 @@ export function CategorySearchModal() {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 select-none">
       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300" onClick={close} />
 
       <div className="relative w-full max-w-lg bg-white rounded-[3rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.25)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-8 duration-300">
@@ -114,9 +128,11 @@ export function CategorySearchModal() {
                 </div>
               ) : filtered.length > 0 ? (
                 filtered.map((cat) => {
-                  // Используем skillIds напрямую из твоего хука!
                   const isSelected = skillIds.has(cat.id)
-                  const isPending = status === "pending" && variables?.id === cat.id
+                  
+                  // 💡 ИСТИННЫЙ PENDING ИЗ ЯДРА ТАНСТЕКА:
+                  // Сканер проверяет, обрабатывается ли данный конкретный ID прямо сейчас сетью
+                  const isPending = itemsBeingProcessed.includes(cat.id)
 
                   return (
                     <button
@@ -127,7 +143,8 @@ export function CategorySearchModal() {
                         "w-full flex items-center justify-between p-5 rounded-[1.5rem] border-2 transition-all active:scale-[0.98] group",
                         isSelected
                           ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200"
-                          : "bg-white border-slate-100 hover:border-blue-200 text-slate-950"
+                          : "bg-white border-slate-100 hover:border-blue-200 text-slate-950",
+                        isPending && "opacity-70 pointer-events-none"
                       )}
                     >
                       <span className="font-black uppercase italic text-sm tracking-tight">{cat.name}</span>

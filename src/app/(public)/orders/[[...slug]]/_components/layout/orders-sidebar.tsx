@@ -8,16 +8,15 @@ import {
   Settings2,
   Plus,
   X,
-  Zap,
   Loader2,
-  ArrowUpRight
+  ArrowUpRight,
+  Zap
 } from "lucide-react"
 
 // Hooks & Stores
 import { useUserSkills } from "@/hooks/use-user-skills"
 import { useCategoryModalStore } from "@/store/use-category-modal-store"
-
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useMutationState, useQueryClient } from "@tanstack/react-query"
 
 // Utils & Actions
 import { cn, handleAction } from "@/lib/utils"
@@ -33,39 +32,45 @@ interface OrdersSidebarProps {
 export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
   const queryClient = useQueryClient()
   const { open: openCatModal } = useCategoryModalStore()
-  // 1. КОНТЕКСТ ЧЕРЕЗ КАСТОМНЫЙ ХУК
   const context = useStaticFeed()
 
-  // 2. ПРОФИЛЬ И СКИЛЛЫ
   const { profile, hasSkills } = useUserSkills()
 
-  // 3. МУТАЦИЯ УДАЛЕНИЯ (Оптимистичный апдейт)
-  const { mutate: handleRemoveSkill, variables: deletingId } = useMutation({
-    mutationFn: (categoryId: string) => handleAction(removeSkill(categoryId)),
-    onMutate: async (categoryId) => {
-      await queryClient.cancelQueries({ queryKey: ["user-profile"] })
-      const previousProfile = queryClient.getQueryData<FullProfile>(["user-profile"])
-
-      if (previousProfile) {
-        queryClient.setQueryData<FullProfile>(["user-profile"], {
-          ...previousProfile,
-          skills: previousProfile.skills.filter(s => s.categoryId !== categoryId)
-        })
-      }
-      return { previousProfile }
-    },
-    onError: (_err, _id, ctx) => {
-      if (ctx?.previousProfile) {
-        queryClient.setQueryData(["user-profile"], ctx.previousProfile)
-      }
-    },
-
+  // 📡 РЕАКТИВНЫЙ СКАНЕР МУТАЦИЙ ТАНСТЕКА
+  // Вытаскивает ID всех категорий, которые прямо сейчас удаляются на сервере.
+  // Лоадер завязан напрямую на этот массив, исключая залипания стейта React.
+  const skillsBeingDeleted = useMutationState({
+    filters: { mutationKey: ["remove-skill"], status: "pending" },
+    select: (mutation) => mutation.state.variables as string,
   })
 
-
+  // МУТАЦИЯ УДАЛЕНИЯ (Смена фазы: Лоадер ➡️ Удаление из DOM)
+  const { mutate: handleRemoveSkill } = useMutation({
+    mutationKey: ["remove-skill"],
+    mutationFn: (categoryId: string) => handleAction(removeSkill(categoryId)),
+    
+    // В onMutate мы БОЛЬШЕ НЕ ВЫРЕЗАЕМ карточку из кэша.
+    // Мы просто отменяем текущие запросы чтения, позволяя лоадеру крутиться на экране.
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["user-profile"] })
+    },
+    
+    // 🔥 УМНЫЙ КЛИЕНТСКИЙ КОММИТ: Удаление из DOM происходит СТРОГО после успешного ответа сервера.
+    // 0 повторных сетевых рефетчей к базе — кэш модифицируется локально в памяти.
+    onSuccess: (_, categoryId) => {
+      queryClient.setQueryData<FullProfile>(["user-profile"], (oldProfile) => {
+        if (!oldProfile) return oldProfile;
+        return {
+          ...oldProfile,
+          skills: oldProfile.skills.filter(s => s.categoryId !== categoryId)
+        }
+      })
+      console.log(`❌ Скилл ${categoryId} успешно удален. DOM синхронизирован за 0ms.`)
+    }
+  })
 
   return (
-    <div className="flex flex-col gap-6 sticky top-6">
+    <div className="flex flex-col gap-6 sticky top-6 select-none">
 
       {/* SECTION 1: PROFILE / AUTH CARD */}
       {profile ? (
@@ -111,8 +116,12 @@ export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
                 />
               </div>
 
-              Настройки профиля <ArrowUpRight size={12} strokeWidth={3} />
-
+              <Link 
+                href="/profile/settings"
+                className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors mt-2"
+              >
+                Настройки профиля <ArrowUpRight size={12} strokeWidth={3} />
+              </Link>
             </div>
           </div>
         </div>
@@ -148,18 +157,26 @@ export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
         <div className="flex flex-wrap gap-2">
           {profile && hasSkills ? (
             profile.skills.map((skill) => {
-              const isDeleting = deletingId === skill.categoryId;
+              // Проверяем, идет ли прямо сейчас запрос удаления этой категории на сервере
+              const isDeleting = skillsBeingDeleted.includes(skill.categoryId);
+
               return (
                 <div key={skill.categoryId} className={cn(
-                  "group flex items-center gap-3 bg-white border border-slate-200 pl-4 pr-2 py-2.5 rounded-2xl text-[10px] font-black text-slate-900 uppercase italic hover:border-blue-300 transition-all shadow-sm",
-                  isDeleting && "opacity-40 pointer-events-none"
+                  "group flex items-center gap-3 bg-white border border-slate-200 pl-4 pr-2 py-2.5 rounded-2xl text-[10px] font-black text-slate-900 uppercase italic transition-all shadow-sm",
+                  isDeleting && "opacity-60 bg-slate-50/80 border-slate-200"
                 )}>
                   {skill.category.name}
                   <button
+                    type="button"
+                    disabled={isDeleting} // Блокируем от повторных кликов во время сети
                     onClick={() => handleRemoveSkill(skill.categoryId)}
-                    className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-50 text-slate-300 group-hover:text-red-500 group-hover:bg-red-50 transition-all"
+                    className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-50 text-slate-300 group-hover:text-red-500 group-hover:bg-red-50 transition-all focus:outline-none disabled:cursor-not-allowed"
                   >
-                    {isDeleting ? <Loader2 size={10} className="animate-spin" /> : <X size={12} strokeWidth={3} />}
+                    {isDeleting ? (
+                      <Loader2 size={10} className="animate-spin text-red-500" />
+                    ) : (
+                      <X size={12} strokeWidth={3} />
+                    )}
                   </button>
                 </div>
               )
@@ -193,7 +210,6 @@ export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
               className="flex items-center justify-between group"
             >
               <div className="flex items-center gap-4">
-                {/* Техно-бадж счетчика */}
                 <div className="w-10 h-7 bg-slate-100 group-hover:bg-slate-950 transition-colors flex items-center justify-center rounded-lg border border-slate-200 group-hover:border-slate-950">
                   <span className="text-[10px] font-black italic text-slate-400 group-hover:text-white transition-colors">
                     {cat._count?.orders || 0}

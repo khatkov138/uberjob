@@ -91,21 +91,32 @@ export const FeedController = React.memo(function FeedController({
 
     // 🎯 СКИЛЛЫ: Изоморфная стабилизация без ссылочного дребезга массивов и объектов.
     // Сравниваем зависимости строго по примитивным строкам идентификаторов.
+    // 🎯 ИЗОМОРФНАЯ СТАБИЛИЗАЦИЯ СКИЛЛОВ (БЕЗ ПАДЕНИЯ В СЕРВЕРНЫЙ ДЕФОЛТ ПРИ ОЧИСТКЕ)
     const currentSkillIdsStr = useMemo(() => {
-        const targetSkills = profile?.skills ?? initialProfile?.skills;
-
-        if (targetSkills && targetSkills.length > 0) {
+        // 1. Если профиль с клиента уже загрузился (Танстек выдал данные)
+        if (profile) {
+            const targetSkills = profile.skills ?? [];
             return targetSkills.map(s => s.categoryId).sort().join(',');
         }
 
-        return serverContext.skillIds || '';
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // 2. Если профиля с клиента еще нет, но есть дефолтный профиль SSR гидратации
+        if (initialProfile) {
+            const targetSkills = initialProfile.skills ?? [];
+            return targetSkills.map(s => s.categoryId).sort().join(',');
+        }
+
+        // 3. Фолбэк на контекст страницы (работает ТОЛЬКО для неавторизованных / гостей)
+        if (Array.isArray(serverContext.skillIds)) {
+            return serverContext.skillIds.sort().join(',');
+        }
+        return (serverContext.skillIds as string) || '';
+
+        // Завязываем зависимости строго на реактивные примитивы Танстека и гидратации
     }, [
         profile?.skills?.map(s => s.categoryId).sort().join(','),
         initialProfile?.skills?.map(s => s.categoryId).sort().join(','),
         serverContext.skillIds
     ]);
-
     // 💧 СЛОЙ РТУТЬ (Динамика фильтров) — ссылка стабильна, пока не изменятся примитивы фильтров
     const activeContext = useMemo((): ActiveFeedContextType => {
         return {

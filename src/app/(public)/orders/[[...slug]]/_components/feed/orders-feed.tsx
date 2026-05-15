@@ -76,7 +76,7 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
 
     // ⚡️ Стабильный flatMap-процессор списка
     const selectProcessor = useCallback((data: InfiniteOrdersData): SelectOutput => {
-        console.log('⚡️ [SELECT MEMO PROCESSOR] Запуск flatMap-процессора на уровне ядра TanStack. cursor:' + data.pages[0].nextCursor);
+        console.log('⚡️ [SELECT MEMO PROCESSOR] Запуск flatMap-процессора на уровне ядра TanStack. total pages:' + data.pages[0].total, `cursor` + data.pages[0].nextCursor);
         return {
             allOrders: data.pages.flatMap((page) => page?.orders ?? []),
             total: data.pages[0]?.total ?? 0
