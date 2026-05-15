@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useShallow } from 'zustand/react/shallow';
 
 import { type FeedContext } from '../../page';
 import { getMyProfile, type FullProfile } from '@/actions/profile/get';
@@ -62,7 +61,8 @@ interface FeedControllerProps {
 
 let controllerRenderCount = 0;
 
-export const FeedController = ({
+// 🧱 Обертываем в React.memo, защищая контекст от случайных ререндеров макета сверху
+export const FeedController = React.memo(function FeedController({
     serverContext,
     currentCategory,
     session,
@@ -70,9 +70,8 @@ export const FeedController = ({
     ordersPromise,
     initialServerHash,
     children
-}: FeedControllerProps) => {
+}: FeedControllerProps) {
     controllerRenderCount++;
-
 
     console.log(`🎛️  [CONTROLLER ENTRY #${controllerRenderCount}] Инициализация жизненного цикла FeedController.`);
 
@@ -85,22 +84,29 @@ export const FeedController = ({
         notifyOnChangeProps: ['data'],
     });
 
-    // 🛡️ Атомарный селектор Zustand с защитой от лишних ререндеров
-    const { radius, viewMode } = useFeedStore(
-        useShallow(s => ({ radius: s.radius, viewMode: s.viewMode }))
-    );
+    // ⚡️ АТОМАРНЫЙ ВЫБОР СТЭЙТА: Извлекаем примитивы напрямую.
+    // Больше никаких useShallow и деструктуризаций объектов! Ререндер только при изменении цифр/строк.
+    const radius = useFeedStore(s => s.radius);
+    const viewMode = useFeedStore(s => s.viewMode);
 
-    // 🎯 СКИЛЛЫ: Изоморфная стабилизация + атомарный лог через оператор "запятая"
+    // 🎯 СКИЛЛЫ: Изоморфная стабилизация без ссылочного дребезга массивов и объектов.
+    // Сравниваем зависимости строго по примитивным строкам идентификаторов.
     const currentSkillIdsStr = useMemo(() => {
         const targetSkills = profile?.skills ?? initialProfile?.skills;
-        const result = targetSkills
-            ? targetSkills.map(s => s.categoryId).sort().join(',')
-            : (serverContext.skillIds || '');
 
-        return result;
-    }, [profile?.skills, initialProfile?.skills, serverContext.skillIds]);
+        if (targetSkills && targetSkills.length > 0) {
+            return targetSkills.map(s => s.categoryId).sort().join(',');
+        }
 
-    // 💧 СЛОЙ РТУТЬ (Динамика фильтров)
+        return serverContext.skillIds || '';
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        profile?.skills?.map(s => s.categoryId).sort().join(','),
+        initialProfile?.skills?.map(s => s.categoryId).sort().join(','),
+        serverContext.skillIds
+    ]);
+
+    // 💧 СЛОЙ РТУТЬ (Динамика фильтров) — ссылка стабильна, пока не изменятся примитивы фильтров
     const activeContext = useMemo((): ActiveFeedContextType => {
         return {
             radius,
@@ -129,7 +135,7 @@ export const FeedController = ({
         initialServerHash
     ]);
 
-    // 🪄 МОНОЛИТНЫЙ ОБЪЕКТ ЗАПРОСА
+    // 🪄 МОНОЛИТНЫЙ ОБЪЕКТ ЗАПРОСА — собирает слои без побочных эффектов
     const fullQueryContext = useMemo((): FeedContext => {
         return {
             locationId: staticPart.locationId,
@@ -157,4 +163,4 @@ export const FeedController = ({
             </ActiveContext.Provider>
         </StaticContext.Provider>
     );
-};
+});

@@ -35,7 +35,7 @@ export function LivePulseMarquee({ ordersPromise }: LivePulseMarqueeProps) {
   const isServer = typeof window === 'undefined'
   const envMarker = isServer ? '🧬 [SERVER-SSR]' : '💻 [CLIENT-HYDRATE]'
 
-  console.log(`${envMarker} 🔔 [CONNECTOR RENDER #${connectorRenderCount}] LivePulseMarquee | Admin: ${isAdminPage}`)
+  //console.log(`${envMarker} 🔔 [CONNECTOR RENDER #${connectorRenderCount}] LivePulseMarquee | Admin: ${isAdminPage}`)
 
   // Извлекаем поток данных сервера
   const serverDataRaw = !isAdminPage ? use(ordersPromise) : null
@@ -56,7 +56,7 @@ const LivePulseMarqueeCore = React.memo(function LivePulseMarqueeCore({
   isAdminPage
 }: LivePulseMarqueeCoreProps) {
   coreRenderCount++
-  console.log(`🎬 [CORE ENTRY #${coreRenderCount}] LivePulseMarqueeCore начал выполнение тела функции.`)
+ // console.log(`🎬 [CORE ENTRY #${coreRenderCount}] LivePulseMarqueeCore начал выполнение тела функции.`)
 
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -64,7 +64,7 @@ const LivePulseMarqueeCore = React.memo(function LivePulseMarqueeCore({
     queryKey: ["public-latest-orders"],
     // 🛡️ Чистый handleAction для сохранения кэша при сбоях сети
     queryFn: async () => {
-      console.log(`🚀 [NETWORK FETCH] Танстек ТЯНЕТ свежие заказы для бегущей строки через queryFn!`)
+    //  console.log(`🚀 [NETWORK FETCH] Танстек ТЯНЕТ свежие заказы для бегущей строки через queryFn!`)
       return handleAction(getLatestPublicOrders())
     },
     refetchInterval: 60000,
@@ -72,20 +72,20 @@ const LivePulseMarqueeCore = React.memo(function LivePulseMarqueeCore({
     
     // 🌱 Сидинг данных в кэш TanStack
     initialData: (): any => {
-      console.log(`🌱 [INITIAL DATA SEEDER] Опрос затвора бегущей строки для сидинга.`)
+    //  console.log(`🌱 [INITIAL DATA SEEDER] Опрос затвора бегущей строки для сидинга.`)
       if (!serverDataRaw) return undefined
       return serverDataRaw 
     },
 
     // ⚡️ Безопасный процессор данных на уровне ядра
     select: (data: any) => {
-      console.log('⚡️ [SELECT PROCESSOR] Безопасная распаковка данных бегущей строки через unwrap')
+     // console.log('⚡️ [SELECT PROCESSOR] Безопасная распаковка данных бегущей строки через unwrap')
       return unwrap(data, [])
     },
     staleTime: 1000 * 30,
   })
 
-  console.log(`🏁 [CORE COMMIT #${coreRenderCount}] useQuery пройден, JSX уходит на рендеринг.`)
+  //console.log(`🏁 [CORE COMMIT #${coreRenderCount}] useQuery пройден, JSX уходит на рендеринг.`)
 
   const orders = query.data ?? []
 
@@ -127,7 +127,7 @@ const LivePulseMarqueeCore = React.memo(function LivePulseMarqueeCore({
  */
 const MarqueeTrack = React.memo(function MarqueeTrack({ displayOrders }: { displayOrders: any[] }) {
   trackRenderCount++
-  console.log(`🏃‍♂️ [TRACK RENDER #${trackRenderCount}] Отрисовка изолированного трека анимации.`)
+ // console.log(`🏃‍♂️ [TRACK RENDER #${trackRenderCount}] Отрисовка изолированного трека анимации.`)
   
   const controls = useAnimationControls()
   const trackRef = useRef<HTMLDivElement>(null)

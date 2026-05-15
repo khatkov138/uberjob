@@ -1,14 +1,12 @@
 'use client';
 
-import React, { useMemo, useRef, Suspense, use } from 'react';
-import { useQueryClient, useIsFetching, InfiniteData, useQuery } from '@tanstack/react-query';
+import React, { useMemo, useRef, Suspense, use, useCallback } from 'react';
+import { useQueryClient, useIsFetching, InfiniteData, useQuery, keepPreviousData } from '@tanstack/react-query';
 
 import { cn, unwrap } from '@/lib/utils';
 import { GetOrdersResponse } from '@/actions/order/get-feed';
 import { useActiveFeed, useOrdersStream, useQueryFeedContext, useStaticFeed } from '../providers/FeedController';
 import { useIsomorphicGate } from '../hooks/useIsomorphicGate';
-
-
 
 // --- СТРОГИЕ КОНТРАКТЫ ДАННЫХ И ТИПИЗАЦИЯ ---
 type GetOrdersResponseList = GetOrdersResponse<'list'>;
@@ -34,7 +32,6 @@ const StatsSkeleton = () => {
     <div className="flex items-center gap-3 animate-pulse h-[60px]">
       <span className="text-5xl font-black italic text-slate-50">/</span>
       <div className="flex items-baseline gap-2">
-        {/* Фиксируем ширину под 2-3 значные цифры (w-16) и высоту под text-6xl (h-12) */}
         <div className="w-16 h-12 bg-slate-100 rounded-2xl" />
         <div className="flex flex-col gap-1 translate-y-[-4px]">
           <div className="w-12 h-2 bg-slate-100 rounded" />
@@ -45,10 +42,6 @@ const StatsSkeleton = () => {
   );
 };
 
-/**
- * 🦴 ГЕОМЕТРИЧЕСКИЙ БЛИЗНЕЦ БАДЖА (0px LAYOUT SHIFT)
- * Реплицирует h-[22px], mt-4, w-24 и внутренние скругления rounded-lg.
- */
 const BadgeSkeleton = () => {
   console.log('Bone [RENDER] BadgeSkeleton');
   return (
@@ -67,7 +60,6 @@ export const HeaderStats = React.memo(({ totalCount, loadedCount, isReady, isFet
   const viewMode = 'list';
 
   return (
-    // Жесткий ограничивающий контейнер h-[60px] гарантирует иммунитет к вертикальным сдвигам
     <div className="flex items-center h-[60px] min-w-[140px]">
       {!isReady ? (
         <StatsSkeleton />
@@ -98,6 +90,7 @@ export const HeaderStats = React.memo(({ totalCount, loadedCount, isReady, isFet
     </div>
   );
 });
+HeaderStats.displayName = 'HeaderStats';
 
 /**
  * 📡 2. ИНДИКАТОР АКТУАЛЬНОСТИ (БАДЖ)
@@ -126,52 +119,49 @@ export const HeaderStatusBadge = React.memo(({ isFetching, isReady }: HeaderStat
     </div>
   );
 });
+HeaderStatusBadge.displayName = 'HeaderStatusBadge';
 
 /**
  * 🧱 3. ДЕКЛАРАТИВНЫЙ ИЗОМОРФНЫЙ РИДЕР КЭША И СТРИМА
- */export const HeaderDataReader = React.memo(function HeaderDataReader() {
+ */
+export const HeaderDataReader = React.memo(function HeaderDataReader() {
   // 1. Подключаемся к шине данных через контексты платформы ZWORK
   const context = useQueryFeedContext();
   const ordersStream = useOrdersStream<'list'>();
 
-  // 2. Формируем детерминированный queryKey, строго совпадающий с OrdersFeed
-
-  // Статусы фетчинга из RAM-кэша TanStack Query v5
-
-  // 3. Внедряем единый изоморфный затвор из кастомного хука
-  const { isServerKeyMatch, hasCachedData, queryKey } = useIsomorphicGate();
+  // 2. Внедряем единый изоморфный затвор из кастомного хука
+  const { isServerKeyMatch, queryKey } = useIsomorphicGate();
   const globalIsFetching = useIsFetching({ queryKey }) > 0;
 
-  // 4. 🔒 БЕЗОПАСНЫЙ ЗАТВОР RECOGNITION (React 19 Rules):
-  // Разворачиваем стрим строго на холодном старте (F5) на верхнем уровне компонента
-  const shouldUnwrapStream = !hasCachedData && isServerKeyMatch;
-  const serverDataRaw = shouldUnwrapStream ? use(ordersStream) : null;
+  // 🔥 ФИКС 1: Вытягиваем поток ВСЕГДА на холодном старте (F5) при совпадении ключей.
+  // Локальный кэш-слот клиента больше не заблокирует SSR-распаковку стрима.
+  const serverDataRaw = isServerKeyMatch ? use(ordersStream) : null;
 
-
-
-  // 5. Пассивный декларативный наблюдатель за RAM-кэшем Танстека с удержанием старого кэша
+  // 3. Пассивный декларативный наблюдатель за RAM-кэшем Танстека с удержанием старого кэша
   const { data } = useQuery<InfiniteOrdersData>({
     queryKey,
     queryFn: () => { throw new Error("Observer only") },
     enabled: false,
-    // placeholderData: keepPreviousData, // 🔥 ГАРАНТИЯ ОТ СКЕЛЕТОНОВ: удерживает data при смене queryKey!
+    // 🔥 ФИКС 2: Возвращаем канонический удержатель кадра v5.
+    // Гарантирует, что во время смены радиуса/скилов `data` НЕ превратится в undefined,
+    // а сохранит старый слепок, предотвращая падение в скелетоны.
+    placeholderData: keepPreviousData, 
   });
 
   // Хранилище слепка для UX Keep-Alive
   const lastStatsSnapshotRef = useRef<{ totalCount: number; loadedCount: number; isReady: boolean } | null>(null);
 
-  // 6. Синхронный процессор сбора метрик (работает без вызовов hooks/unwrap внутри)
+  // 4. Синхронный процессор сбора метрик (работает без вызовов hooks/unwrap внутри)
   const currentStats = useMemo(() => {
-    // Сценарий А: Данные уже есть в RAM-кэше Танстека (или удерживаются через placeholderData)
-
+    // Сценарий А: Данные уже есть в RAM-кэше Танстека (или удерживаются через placeholderData при смене фильтров)
     if (data?.pages && data.pages.length > 0) {
-
       const { pages } = data;
       const firstPageTotal = pages[0]?.total ?? 0;
       const loadedCount = pages.reduce((acc, page) => acc + (page?.orders?.length || 0), 0);
 
-      // Шапка готова, только если в фоне не идет фетчинг новой порции данных
-      return { totalCount: firstPageTotal, loadedCount, isReady: !globalIsFetching };
+      // 🔥 ФИКС 3: Шапка готова показать старые цифры, пока идет фетчинг! 
+      // isReady: true защищает от сваливания в StatsSkeleton, давая цифрам красиво тускнеть.
+      return { totalCount: firstPageTotal, loadedCount, isReady: true };
     }
 
     // Сценарий Б: Холодный старт (F5) — данные гарантированно развернуты выше через React.use
@@ -186,11 +176,10 @@ export const HeaderStatusBadge = React.memo(({ isFetching, isReady }: HeaderStat
 
     // Сценарий В: Смена фильтров на самом старте, когда вообще нет истории
     return null;
-  }, [data, globalIsFetching, serverDataRaw]);
+  }, [data, serverDataRaw]);
 
-  // 7. Высокопроизводительный стабилизатор ссылок (Keep-Alive UX Шапки)
+  // 5. Высокопроизводительный стабилизатор ссылок (Keep-Alive UX Шапки)
   const stats = useMemo(() => {
-
     const previous = lastStatsSnapshotRef.current;
 
     if (currentStats === null) {
@@ -225,6 +214,7 @@ export const HeaderStatusBadge = React.memo(({ isFetching, isReady }: HeaderStat
     </>
   );
 });
+
 /**
  * 🧱 4. ШЛЮЗ ДАННЫХ ХЕДЕРА
  */

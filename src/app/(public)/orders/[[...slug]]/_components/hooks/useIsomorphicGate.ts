@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useActiveFeed, useStaticFeed } from '../providers/FeedController';
-import { type FeedContext } from '../../page'; // 🎯 Единственная точка импорта оригинального контекста
+import { type FeedContext } from '../../page'; 
 
 export type IsomorphicOrdersQueryKey = readonly ['orders', 'list', FeedContext];
 
@@ -35,16 +35,21 @@ export function useIsomorphicGate(): IsomorphicGateResult {
   const activeFilters = useActiveFeed() as FeedContext;
   const queryClient = useQueryClient();
 
+  // Извлекаем примитивы для стабильного массива зависимостей useMemo
+  const clientRadius = activeFilters.radius;
+  const clientViewMode = activeFilters.viewMode;
+  const clientCategory = activeFilters.categoryId ?? null;
+  const clientSkills = activeFilters.skillIds || '';
+
   return useMemo(() => {
     const serverDefaults = parseServerHash(initialServerHash);
 
-    const clientCategory = activeFilters.categoryId ?? null;
     const serverCategory = serverDefaults.categoryId ?? null;
-    const clientSkills = activeFilters.skillIds || '';
     const serverSkills = serverDefaults.skillIds || '';
 
-    const isRadiusMatch = activeFilters.radius === serverDefaults.radius;
-    const isViewModeMatch = activeFilters.viewMode === serverDefaults.viewMode;
+    // Сверяем строго по вытащенным примитивам
+    const isRadiusMatch = clientRadius === serverDefaults.radius;
+    const isViewModeMatch = clientViewMode === serverDefaults.viewMode;
     const isCategoryMatch = clientCategory === serverCategory;
     const isSkillsMatch = clientSkills === serverSkills;
 
@@ -57,8 +62,12 @@ export function useIsomorphicGate(): IsomorphicGateResult {
 
     const queryKey: IsomorphicOrdersQueryKey = ['orders', 'list', stableContext];
 
+    // Императивно проверяем кэш без подписки на ререндеринг queryClient
     const hasCachedData = !!queryClient.getQueryData(queryKey);
-    const isFiltersChanged = !hasCachedData && !isServerKeyMatch;
+
+    // 🔥 МОНУМЕНТАЛЬНЫЙ ФИКС: Флаг измененных фильтров обязан быть равен true,
+    // если текущие параметры клиента не совпадают со стартовыми параметрами SSR-сервера.
+    const isFiltersChanged = !isServerKeyMatch;
 
     return {
       queryKey,
@@ -67,5 +76,7 @@ export function useIsomorphicGate(): IsomorphicGateResult {
       hasCachedData,
       serverDefaults
     };
-  }, [initialServerHash, activeFilters, queryClient]);
+  // Завязываем кэш useMemo строго на примитивы фильтров и хэш сервера. 
+  // Объект queryClient и активный контекст больше не могут устроить ссылочный дребезг!
+  }, [initialServerHash, clientRadius, clientViewMode, clientCategory, clientSkills, queryClient]);
 }

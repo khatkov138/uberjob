@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useInfiniteQuery, keepPreviousData, type InfiniteData } from '@tanstack/react-query';
 import { useQueryFeedContext, useOrdersStream } from '../providers/FeedController';
 import { handleAction, unwrap } from '@/lib/utils';
@@ -14,9 +14,6 @@ import { IsolatedScrollObserver } from './isolated-scroll-observer';
 import { IsomorphicOrdersQueryKey, useIsomorphicGate } from '../hooks/useIsomorphicGate';
 import { FeedContext } from '../../page';
 
-// 🚀 Импортируем готовый хук и сквозные типы напрямую из первоисточника
-
-
 export type GetOrdersResponseList = GetOrdersResponse<'list'>;
 export type InfiniteOrdersData = InfiniteData<GetOrdersResponseList, string | undefined>;
 
@@ -28,7 +25,7 @@ export interface SelectOutput {
 export interface OrdersFeedCoreProps {
     queryKey: IsomorphicOrdersQueryKey;
     context: FeedContext;
-    isFiltersChanged: boolean;
+
     serverDataRaw: ActionResponse<GetOrdersResponseList> | null;
 }
 
@@ -46,20 +43,21 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
     const context = useQueryFeedContext() as FeedContext;
     const ordersStream = useOrdersStream<'list'>();
 
-    const { queryKey, isServerKeyMatch, isFiltersChanged, hasCachedData } = useIsomorphicGate();
+    const { queryKey, isServerKeyMatch, hasCachedData } = useIsomorphicGate();
 
     console.log(
         `${envMarker} 🔔 [CONNECTOR RENDER #${connectorRenderCount}] OrdersFeed | ` +
-        `Match: ${isServerKeyMatch} | Cached: ${hasCachedData} | FiltersChanged: ${isFiltersChanged}`
+        `Match: ${isServerKeyMatch} | Cached: ${hasCachedData} `
     );
 
-    const serverDataRaw = (!hasCachedData && isServerKeyMatch) ? React.use(ordersStream) : null;
+    // Стрим разворачивается СТРОГО когда фильтры идентичны серверным дефолтам (F5)
+    const serverDataRaw = isServerKeyMatch ? React.use(ordersStream) : null;
 
     return (
         <OrdersFeedCore
             queryKey={queryKey}
             context={context}
-            isFiltersChanged={isFiltersChanged}
+
             serverDataRaw={serverDataRaw}
         />
     );
@@ -71,11 +69,36 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
 const OrdersFeedCore = React.memo(function OrdersFeedCore({
     queryKey,
     context,
-    isFiltersChanged,
     serverDataRaw
 }: OrdersFeedCoreProps) {
     coreRenderCount++;
     console.log(`🎬 [CORE ENTRY #${coreRenderCount}] OrdersFeedCore начал выполнение тела функции.`);
+
+    // ⚡️ Стабильный flatMap-процессор списка
+    const selectProcessor = useCallback((data: InfiniteOrdersData): SelectOutput => {
+        console.log('⚡️ [SELECT MEMO PROCESSOR] Запуск flatMap-процессора на уровне ядра TanStack. cursor:' + data.pages[0].nextCursor);
+        return {
+            allOrders: data.pages.flatMap((page) => page?.orders ?? []),
+            total: data.pages[0]?.total ?? 0
+        };
+    }, []);
+
+    // 🔥 ДЕКЛАРАТИВНЫЙ ИЗОМОРФНЫЙ СИДЕР
+    // Вычисляется симметрично на сервере и клиенте на основе физического наличия serverDataRaw.
+    const computedInitialData = useMemo(() => {
+        // Мы логируем сам факт опроса затвора. 
+        // true — если поток есть (F5), false — если ушли в динамику на клиенте (смена радиуса)
+        console.log(`🌱 [INITIAL DATA SEEDER] Опрос затвора для сидинга. HasServerData: ${!!serverDataRaw}`);
+
+        if (!serverDataRaw) {
+            console.log(`🛡️ [INITIAL DATA] Сидинг отклонен (мы в динамических фильтрах). Отдаем undefined.`);
+            return undefined;
+        }
+
+        console.log(`📦 [INITIAL DATA] Подхватываем и разворачиваем готовый Edge-поток.`);
+        const unwrapped = unwrap(serverDataRaw, { orders: [], nextCursor: null, total: 0 });
+        return { pages: [unwrapped], pageParams: [undefined] };
+    }, [serverDataRaw]);
 
     const query = useInfiniteQuery<
         GetOrdersResponseList,
@@ -98,32 +121,18 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
         initialPageParam: undefined,
         getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
         enabled: !!context,
+
+        // ⚡️ Танстек v5 идеально подхватит плейсхолдер при смене радиуса, так как computedInitialData 
+        // станет статичным undefined (поскольку serverDataRaw превратится в null в коннекторе)
         placeholderData: keepPreviousData,
-
-        initialData: (): InfiniteOrdersData | undefined => {
-            console.log(`🌱 [INITIAL DATA SEEDER] Опрос затвора для сидинга. FiltersChanged: ${isFiltersChanged}`);
-            if (isFiltersChanged || !serverDataRaw) {
-                console.log(`🛡️ [INITIAL DATA] Сидинг отклонен. Отдаем undefined для честного fetch.`);
-                return undefined;
-            }
-            console.log(`📦 [INITIAL DATA] Подхватываем и разворачиваем готовый Edge-поток.`);
-            const unwrapped = unwrap(serverDataRaw, { orders: [], nextCursor: null, total: 0 });
-            return { pages: [unwrapped], pageParams: [undefined] };
-        },
-
-        select: (data: InfiniteOrdersData): SelectOutput => {
-            console.log('⚡️ [SELECT MEMO PROCESSOR] Запуск flatMap-процессора на уровне ядра TanStack');
-            return {
-                allOrders: data.pages.flatMap((page) => page?.orders ?? []),
-                total: data.pages[0]?.total ?? 0
-            };
-        },
+        initialData: computedInitialData,
+        select: selectProcessor,
 
         notifyOnChangeProps: ['data', 'hasNextPage'],
         staleTime: 1000 * 60,
     });
 
-    console.log(`🏁 [CORE COMMIT #${coreRenderCount}] useInfiniteQuery пройден, JSX уходит на рендеринг.`);
+    console.log(`🏁 [CORE COMMIT #${coreRenderCount}] useInfiniteQuery пройден, JSX уходит на рендеринг. isfetchnig: ${query.isFetching}`);
     const allOrders = query.data?.allOrders ?? [];
     const ordersCount = allOrders.length;
 
