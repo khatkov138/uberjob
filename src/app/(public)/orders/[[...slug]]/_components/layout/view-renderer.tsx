@@ -8,6 +8,7 @@ import { FetchingRadar } from '../shared/fetching-radar';
 import { OrdersFeed } from '../feed/orders-feed';
 import { MapViewport } from '../map/map-viewport';
 import { OrderCardSkeleton } from '../shared/order-card-skeleton';
+import { OrderPreviewSheet } from '../shared/order-preview-sheet';
 
 const GlobalRadar = memo(() => {
     const isFetchingCount = useIsFetching({ queryKey: ["orders"] });
@@ -51,6 +52,7 @@ export const ViewRenderer = memo(function ViewRenderer({ viewMode }: ViewRendere
                     */}
                     <Suspense fallback={null}>
                         <MapViewport />
+                        <OrderPreviewSheet />
                     </Suspense>
                 </div>
             )}

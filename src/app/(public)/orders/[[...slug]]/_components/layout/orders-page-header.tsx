@@ -135,13 +135,12 @@ export const HeaderStatusBadge = React.memo(({ isFetching, isReady }: HeaderStat
   const ordersStream = useOrdersStream<'list'>();
 
   // 2. Формируем детерминированный queryKey, строго совпадающий с OrdersFeed
-  const queryKey = useMemo(() => ['orders', 'list', context] as const, [context]);
 
   // Статусы фетчинга из RAM-кэша TanStack Query v5
-  const globalIsFetching = useIsFetching({ queryKey }) > 0;
 
   // 3. Внедряем единый изоморфный затвор из кастомного хука
-  const { isServerKeyMatch, hasCachedData } = useIsomorphicGate(queryKey);
+  const { isServerKeyMatch, hasCachedData, queryKey } = useIsomorphicGate();
+  const globalIsFetching = useIsFetching({ queryKey }) > 0;
 
   // 4. 🔒 БЕЗОПАСНЫЙ ЗАТВОР RECOGNITION (React 19 Rules):
   // Разворачиваем стрим строго на холодном старте (F5) на верхнем уровне компонента
@@ -165,7 +164,9 @@ export const HeaderStatusBadge = React.memo(({ isFetching, isReady }: HeaderStat
   // 6. Синхронный процессор сбора метрик (работает без вызовов hooks/unwrap внутри)
   const currentStats = useMemo(() => {
     // Сценарий А: Данные уже есть в RAM-кэше Танстека (или удерживаются через placeholderData)
+
     if (data?.pages && data.pages.length > 0) {
+
       const { pages } = data;
       const firstPageTotal = pages[0]?.total ?? 0;
       const loadedCount = pages.reduce((acc, page) => acc + (page?.orders?.length || 0), 0);
@@ -186,10 +187,11 @@ export const HeaderStatusBadge = React.memo(({ isFetching, isReady }: HeaderStat
 
     // Сценарий В: Смена фильтров на самом старте, когда вообще нет истории
     return null;
-  }, [data, serverDataRaw, globalIsFetching]);
+  }, [data, globalIsFetching, serverDataRaw]);
 
   // 7. Высокопроизводительный стабилизатор ссылок (Keep-Alive UX Шапки)
   const stats = useMemo(() => {
+
     const previous = lastStatsSnapshotRef.current;
 
     if (currentStats === null) {

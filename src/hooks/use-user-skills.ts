@@ -7,10 +7,10 @@ export function useUserSkills() {
   const { data: profile } = useQuery<FullProfile | null>({
     queryKey: ["user-profile"],
     // Указываем, что хук пассивно читает данные из кеша
-    enabled: false, 
+    enabled: false,
     // Заглушка для TS, так как данные поставляет OrdersPageClient через initialData
     queryFn: () => { throw new Error("Profile must be hydrated in OrdersPageClient") },
-    
+
   });
 
   const skillIds = useMemo(() =>

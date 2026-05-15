@@ -123,6 +123,7 @@ export async function getOrderByIdOrSlug(identifier: string) {
 
 
 export async function getLatestPublicOrders() {
+  
   return createAction(async () => {
     const orders = await prisma.order.findMany({
       take: 10,

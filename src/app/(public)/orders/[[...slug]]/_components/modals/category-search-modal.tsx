@@ -7,10 +7,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { DBCategory, getAllCategories } from "@/actions/category/get"
 import { useCategoryModalStore } from "@/store/use-category-modal-store"
 import { toast } from "sonner"
-import { FullProfile } from "@/actions/profile/get"
 import { addSkill, removeSkill } from "@/actions/profile/manage"
+import { useUserSkills } from "@/hooks/use-user-skills" // 🚀 Импортируем твой хук
 
-// ТЕХНО-СКЕЛЕТОН: Стабильная геометрия
 const CategoryItemSkeleton = () => (
   <div className="w-full flex items-center justify-between p-5 rounded-[1.5rem] border-2 border-slate-50 bg-white/50 relative overflow-hidden">
     <div className="h-4 bg-slate-100 rounded-md w-1/3 animate-pulse" />
@@ -24,7 +23,10 @@ export function CategorySearchModal() {
   const [query, setQuery] = React.useState("")
   const queryClient = useQueryClient()
 
-  // 1. ЗАГРУЗКА КАТЕГОРИЙ (Кэш на 1 час)
+  // 1. ПОДКЛЮЧАЕМ ТВОЙ ХУК: Заменяет useQuery, заглушки, обработку ошибок и генерацию Set
+  const { skillIds } = useUserSkills()
+
+  // 2. ЗАГРУЗКА КАТЕГОРИЙ (Кэш на 1 час)
   const { data: dbCategories = [], isLoading } = useQuery<DBCategory[]>({
     queryKey: ["all-categories"],
     queryFn: async () => await handleAction(getAllCategories()),
@@ -32,42 +34,28 @@ export function CategorySearchModal() {
     staleTime: 1000 * 60 * 60,
   })
 
-  // 2. ПРОФИЛЬ (Строгий контракт: данные обязаны быть в кэше)
-  const { data: profile } = useQuery<FullProfile>({
-    queryKey: ["user-profile"],
-    queryFn: () => {
-      const cached = queryClient.getQueryData<FullProfile>(["user-profile"])
-      if (!cached) throw new Error("CRITICAL: Profile must be pre-hydrated in cache")
-      return cached
-    },
-    enabled: isOpen,
-    staleTime: Infinity,
-  })
+  // Индексация категорий для быстрого O(1) поиска в мутациях
+  const categoriesMap = React.useMemo(() => new Map(dbCategories.map(c => [c.id, c])), [dbCategories])
 
-  const userCategoryIds = React.useMemo(() =>
-    new Set(profile?.skills?.map(s => s.categoryId) || []),
-    [profile]
-  )
-
-  // 3. МУТАЦИЯ: Оптимистичный UI + Фикс залипания лоадера через status
+  // 3. МУТАЦИЯ: Оптимистичный UI
   const { mutate: toggleSkill, variables, status } = useMutation({
     mutationFn: async ({ id, isSelected }: { id: string; isSelected: boolean }) => {
       return isSelected ? await handleAction(removeSkill(id)) : await handleAction(addSkill(id))
     },
     onMutate: async ({ id, isSelected }) => {
       await queryClient.cancelQueries({ queryKey: ["user-profile"] })
-      const previousProfile = queryClient.getQueryData<FullProfile>(["user-profile"])
+      const previousProfile = queryClient.getQueryData(["user-profile"])
 
-      queryClient.setQueryData<FullProfile | null>(["user-profile"], (old) => {
+      queryClient.setQueryData(["user-profile"], (old: any) => {
         if (!old) return old
         if (isSelected) {
-          return { ...old, skills: old.skills.filter((s) => s.categoryId !== id) }
+          return { ...old, skills: old.skills.filter((s: any) => s.categoryId !== id) }
         } else {
-          const cat = dbCategories.find((c) => c.id === id)
+          const cat = categoriesMap.get(id)
           if (!cat) return old
           return {
             ...old,
-            skills: [...old.skills, { categoryId: id, category: cat, profileId: old.id } as any],
+            skills: [...old.skills, { categoryId: id, category: cat, profileId: old.id }],
           }
         }
       })
@@ -78,16 +66,14 @@ export function CategorySearchModal() {
       toast.error("Ошибка синхронизации")
     },
     onSuccess: (_, { id, isSelected }) => {
-      const catName = dbCategories.find((c) => c.id === id)?.name
+      const catName = categoriesMap.get(id)?.name || "Ниша"
       toast.success(isSelected ? `Удалено: ${catName}` : `Добавлено: ${catName}`)
     },
-  
   })
 
   const filtered = React.useMemo(() => {
-    return dbCategories.filter((cat) =>
-      cat.name.toLowerCase().includes(query.toLowerCase())
-    )
+    const lowerQuery = query.toLowerCase()
+    return dbCategories.filter((cat) => cat.name.toLowerCase().includes(lowerQuery))
   }, [dbCategories, query])
 
   if (!isOpen) return null
@@ -102,7 +88,7 @@ export function CategorySearchModal() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-950 leading-none">Ниши</h2>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mt-2 italic">Выбор специализации</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 mt-2 italic">Выбор specialization</p>
             </div>
             <button onClick={close} className="w-12 h-12 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-full transition-all active:scale-90 group">
               <X className="w-6 h-6 text-slate-950 group-hover:rotate-90 transition-transform" strokeWidth={3} />
@@ -128,8 +114,8 @@ export function CategorySearchModal() {
                 </div>
               ) : filtered.length > 0 ? (
                 filtered.map((cat) => {
-                  const isSelected = userCategoryIds.has(cat.id)
-                  // КЛЮЧЕВОЙ ФИКС: Проверяем статус мутации, чтобы лоадер исчезал мгновенно
+                  // Используем skillIds напрямую из твоего хука!
+                  const isSelected = skillIds.has(cat.id)
                   const isPending = status === "pending" && variables?.id === cat.id
 
                   return (
@@ -170,17 +156,7 @@ export function CategorySearchModal() {
                 </div>
               )}
             </div>
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none" />
           </div>
-        </div>
-
-        <div className="p-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between px-8">
-          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
-            Активно ниш: <span className="text-blue-600">{userCategoryIds.size}</span>
-          </p>
-          <button onClick={close} className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-950 hover:text-blue-600 transition-colors">
-            Закрыть
-          </button>
         </div>
       </div>
     </div>

@@ -1,40 +1,106 @@
 "use client"
 
 import * as React from "react"
+import { use } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Zap, MapPin } from "lucide-react"
 import { usePathname } from "next/navigation"
-import { motion, useAnimationFrame, useMotionValue, useTransform } from "framer-motion"
+import { motion } from "framer-motion"
 import Link from "next/link"
 
-import { handleAction } from "@/lib/utils"
+import { handleAction, unwrap } from "@/lib/utils"
 import { getLatestPublicOrders } from "@/actions/order/get"
 
-export function LivePulseMarquee() {
+interface LivePulseMarqueeProps {
+  ordersPromise: Promise<any>
+}
+
+interface LivePulseMarqueeCoreProps {
+  serverDataRaw: any
+  isAdminPage: boolean
+}
+
+let connectorRenderCount = 0;
+let coreRenderCount = 0;
+
+/**
+ * 🧬 CONNECTOR COMPONENT
+ */
+export function LivePulseMarquee({ ordersPromise }: LivePulseMarqueeProps) {
+  connectorRenderCount++
   const pathname = usePathname()
   const isAdminPage = pathname?.startsWith('/admin')
+
+  const isServer = typeof window === 'undefined'
+  const envMarker = isServer ? '🧬 [SERVER-SSR]' : '💻 [CLIENT-HYDRATE]'
+
+  console.log(`${envMarker} 🔔 [CONNECTOR RENDER #${connectorRenderCount}] LivePulseMarquee | Admin: ${isAdminPage}`)
+
+  // Извлекаем поток данных сервера
+  const serverDataRaw = !isAdminPage ? React.use(ordersPromise) : null
+
+  return (
+    <LivePulseMarqueeCore 
+      serverDataRaw={serverDataRaw} 
+      isAdminPage={isAdminPage} 
+    />
+  )
+}
+
+/**
+ * 🎛️ CORE COMPONENT
+ */
+const LivePulseMarqueeCore = React.memo(function LivePulseMarqueeCore({
+  serverDataRaw,
+  isAdminPage
+}: LivePulseMarqueeCoreProps) {
+  coreRenderCount++
+  console.log(`🎬 [CORE ENTRY #${coreRenderCount}] LivePulseMarqueeCore начал выполнение тела функции.`)
+
   const [isPaused, setIsPaused] = React.useState(false)
   const containerRef = React.useRef<HTMLDivElement>(null)
 
-  const { data: orders, isLoading } = useQuery({
+  const query = useQuery({
     queryKey: ["public-latest-orders"],
-    queryFn: async () => await handleAction(getLatestPublicOrders()),
+    // 🛡️ Возвращаем чистый handleAction. Ошибки не ломают кэш, старые данные остаются на экране!
+    queryFn: async () => {
+      console.log(`🚀 [NETWORK FETCH] Танстек ТЯНЕТ свежие заказы для бегущей строки через queryFn!`)
+      return handleAction(getLatestPublicOrders())
+    },
     refetchInterval: 60000,
     enabled: !isAdminPage,
+    
+    // 🌱 Сидинг данных в кэш TanStack
+    initialData: (): any => {
+      console.log(`🌱 [INITIAL DATA SEEDER] Опрос затвора бегущей строки для сидинга.`)
+      if (!serverDataRaw) {
+        console.log(`🛡️ [INITIAL DATA] Сидинг отклонен. Отдаем undefined для честного fetch.`)
+        return undefined
+      }
+      console.log(`📦 [INITIAL DATA] Подхватываем и разворачиваем готовый Edge-поток заказов.`)
+      return serverDataRaw // Передаем сырой ответ, select сам его распакует
+    },
+
+    // ⚡️ Безопасный процессор данных: unwrap вызывается только при чтении
+    select: (data: any) => {
+      console.log('⚡️ [SELECT PROCESSOR] Безопасная распаковка данных бегущей строки через unwrap')
+      return unwrap(data, [])
+    },
+    staleTime: 1000 * 30,
   })
 
-  // Увеличиваем количество повторов, чтобы лента была "бесконечной" без дырок
+  console.log(`🏁 [CORE COMMIT #${coreRenderCount}] useQuery пройден, JSX уходит на рендеринг.`)
+
+  // Если произойдет ошибка сети, в query.data останется старый массив из кэша
+  const orders = query.data ?? []
+
+  // Бесконечный повтор ленты для плавного скролла
   const displayOrders = React.useMemo(() => {
     if (!orders || orders.length === 0) return []
     return [...orders, ...orders, ...orders, ...orders, ...orders]
   }, [orders])
 
-  if (isAdminPage) return null
-
-  // Скелетон с той же высотой, чтобы не дергалась страница при загрузке
-  if (isLoading || !orders || orders.length === 0) {
-    return <div className="h-12 border-b border-slate-100 bg-white" />
-  }
+  if (isAdminPage || orders.length === 0) return null
 
   return (
     <div className="sticky top-[80px] z-40 w-full h-12 border-b border-slate-100 bg-white/95 backdrop-blur-md overflow-hidden flex items-center shadow-sm">
@@ -51,7 +117,6 @@ export function LivePulseMarquee() {
         <div className="flex-1 overflow-hidden relative h-full" ref={containerRef}>
           <motion.div
             className="flex items-center h-full will-change-transform py-2"
-            // Замедлили до 100 секунд для плавного скольжения
             animate={isPaused ? {} : { x: [0, "-50%"] }}
             transition={{
               x: {
@@ -64,7 +129,7 @@ export function LivePulseMarquee() {
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
           >
-            {displayOrders.map((order, idx) => (
+            {displayOrders.map((order: any, idx: number) => (
               <Link
                 key={`${order.id}-${idx}`}
                 href={`/orders/${order.id}`}
@@ -84,7 +149,7 @@ export function LivePulseMarquee() {
                 </span>
 
                 {/* КАТЕГОРИЯ */}
-                {order.categories?.[0]?.category?.name && (
+                {order.categories[0]?.category?.name && (
                   <span className="text-[10px] font-black uppercase text-blue-600/50 italic group-hover:text-blue-600 transition-colors">
                     #{order.categories[0].category.name.replace(/\s+/g, '')}
                   </span>
@@ -103,28 +168,24 @@ export function LivePulseMarquee() {
       </div>
     </div>
   )
-}
+})
 
+/**
+ * 💀 SKELETON
+ */
 export function LivePulseSkeleton() {
   return (
     <div className="w-full h-12 border-b border-slate-100 bg-white flex items-center overflow-hidden">
       <div className="max-w-5xl mx-auto w-full px-4 flex items-center h-full">
-
-        {/* Фиксированная левая часть (Лейбл) */}
         <div className="flex items-center gap-2.5 pr-6 border-r border-slate-100 shrink-0 h-full">
           <div className="w-4 h-4 rounded-full bg-slate-100 animate-pulse" />
           <div className="h-2 w-24 bg-slate-100 rounded-full animate-pulse" />
         </div>
-
-        {/* Бегущая строка (заглушки) */}
         <div className="flex-1 flex items-center gap-10 px-8 overflow-hidden">
           {[1, 2, 3].map((i) => (
             <div key={i} className="flex items-center gap-4 shrink-0">
-              {/* Кружок-локация */}
               <div className="w-16 h-5 bg-slate-50 rounded-md animate-pulse" />
-              {/* Текст заказа */}
               <div className="h-3 w-40 bg-slate-100 rounded-full animate-pulse" />
-              {/* Разделитель */}
               <div className="w-1.5 h-1.5 rounded-full bg-slate-50" />
             </div>
           ))}

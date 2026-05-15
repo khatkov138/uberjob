@@ -1,25 +1,24 @@
-// src/features/orders/ui/feed/orders-feed.tsx
 'use client';
 
-import React, { useMemo } from 'react';
-import { useQueryClient, useInfiniteQuery, keepPreviousData, InfiniteData } from '@tanstack/react-query';
-import { useQueryFeedContext, useStaticFeed, useOrdersStream, useActiveFeed } from '../providers/FeedController';
+import React from 'react';
+import { useInfiniteQuery, keepPreviousData, type InfiniteData } from '@tanstack/react-query';
+import { useQueryFeedContext, useOrdersStream } from '../providers/FeedController';
 import { handleAction, unwrap } from '@/lib/utils';
 import { getOrders, type GetOrdersResponse } from '@/actions/order/get-feed';
-import { type FeedContext } from '../../page';
 import { type ActionResponse } from '@/lib/server-utils';
 
-
-import { ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '../shared/empty-state';
 import { OrderCard } from './order-card';
 import { IsolatedScrollObserver } from './isolated-scroll-observer';
-import { useIsomorphicGate } from '../hooks/useIsomorphicGate';
+import { IsomorphicOrdersQueryKey, useIsomorphicGate } from '../hooks/useIsomorphicGate';
+import { FeedContext } from '../../page';
+
+// 🚀 Импортируем готовый хук и сквозные типы напрямую из первоисточника
+
 
 export type GetOrdersResponseList = GetOrdersResponse<'list'>;
 export type InfiniteOrdersData = InfiniteData<GetOrdersResponseList, string | undefined>;
-export type OrdersQueryKey = readonly ['orders', 'list', FeedContext];
 
 export interface SelectOutput {
     allOrders: GetOrdersResponseList['orders'];
@@ -27,7 +26,7 @@ export interface SelectOutput {
 }
 
 export interface OrdersFeedCoreProps {
-    queryKey: OrdersQueryKey;
+    queryKey: IsomorphicOrdersQueryKey;
     context: FeedContext;
     isFiltersChanged: boolean;
     serverDataRaw: ActionResponse<GetOrdersResponseList> | null;
@@ -39,30 +38,21 @@ let coreRenderCount = 0;
 /**
  * 🧬 CONNECTOR COMPONENT
  */
-
 export const OrdersFeed = React.memo(function OrdersFeed() {
     connectorRenderCount++;
     const isServer = typeof window === 'undefined';
     const envMarker = isServer ? '🧬 [SERVER-SSR]' : '💻 [CLIENT-HYDRATE]';
 
-    // 1. Извлекаем монолитный контекст и стрим Edge-потока Next.js 15
-    const context = useQueryFeedContext();
+    const context = useQueryFeedContext() as FeedContext;
     const ordersStream = useOrdersStream<'list'>();
 
-    // 2. Формируем детерминированный ключ для TanStack Query v5
-    const queryKey = useMemo(() => ['orders', 'list', context] as const, [context]);
+    const { queryKey, isServerKeyMatch, isFiltersChanged, hasCachedData } = useIsomorphicGate();
 
-    // 3. Делегируем логику затвора и ленивого парсинга изолированному кастомному хуку
-    const { isServerKeyMatch, isFiltersChanged, hasCachedData } = useIsomorphicGate(queryKey);
-
-    // 4. Высокопроизводительный логгер (работает без внесения лишних зависимостей)
     console.log(
         `${envMarker} 🔔 [CONNECTOR RENDER #${connectorRenderCount}] OrdersFeed | ` +
         `Match: ${isServerKeyMatch} | Cached: ${hasCachedData} | FiltersChanged: ${isFiltersChanged}`
     );
 
-    // 5. Изоморфный затвор Concurrent-режима на базе React 19 API (React.use)
-    // Разворачивает Edge-поток строго при совпадении ключей и отсутствии RAM-кэша Танстека
     const serverDataRaw = (!hasCachedData && isServerKeyMatch) ? React.use(ordersStream) : null;
 
     return (
@@ -91,15 +81,15 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
         GetOrdersResponseList,
         Error,
         SelectOutput,
-        OrdersQueryKey,
+        IsomorphicOrdersQueryKey,
         string | undefined
     >({
         queryKey,
-        queryFn: async ({ pageParam, queryKey: [, , feedCtx] }) => {
-            console.log(`🚀 [NETWORK FETCH] Танстек ТЯНЕТ данные через queryFn! Radius: ${feedCtx.radius}km`);
+        queryFn: async ({ pageParam }) => {
+            console.log(`🚀 [NETWORK FETCH] Танстек ТЯНЕТ данные через queryFn! Radius: ${context.radius}km`);
             return handleAction(
                 getOrders({
-                    ...feedCtx,
+                    ...context,
                     cursor: pageParam,
                     mode: 'list'
                 })
@@ -134,15 +124,6 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
     });
 
     console.log(`🏁 [CORE COMMIT #${coreRenderCount}] useInfiniteQuery пройден, JSX уходит на рендеринг.`);
-    console.log(
-        `📊 [CORE COMMIT #${coreRenderCount}] Срез состоянияuseInfiniteQuery:\n` +
-        `   • status: "${query.status}"\n` +
-        `   • fetchStatus: "${query.fetchStatus}"\n` +
-        `   • isFetching: ${query.isFetching}\n` +
-        `   • isFetchingNextPage: ${query.isFetchingNextPage}\n` +
-        `   • dataUpdatedAt: ${query.dataUpdatedAt}\n` +
-        `   • pagesCount: ${query.data?.allOrders.length ?? 0}`
-    );
     const allOrders = query.data?.allOrders ?? [];
     const ordersCount = allOrders.length;
 
@@ -192,12 +173,9 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
 
                     <button
                         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                        className="group flex items-center gap-6 px-10 py-6 bg-slate-900 text-white rounded-[2.5rem] hover:bg-blue-600 transition-all hover:scale-[1.02] active:scale-95 shadow-xl"
+                        className="group flex items-center gap-6 px-10 py-6 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95"
                     >
-                        <span className="text-xl font-black uppercase italic tracking-tighter">Наверх</span>
-                        <div className="p-2 bg-white/10 rounded-xl">
-                            <ArrowUpRight className="w-6 h-6" />
-                        </div>
+                        Вверх
                     </button>
                 </div>
             )}

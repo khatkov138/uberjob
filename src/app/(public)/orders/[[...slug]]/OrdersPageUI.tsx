@@ -70,7 +70,7 @@ export default function OrdersPageUI({
       </div>
 
       {/* Служебные слои */}
-      <OrderPreviewSheet />
+      
       <LocationModal />
       <CategorySearchModal />
     </Container>

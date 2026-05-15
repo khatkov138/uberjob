@@ -7,7 +7,6 @@ import TanstackProvider from "@/providers/TanstackProvider";
 
 import { Toaster } from "@/components/ui/sonner";
 import { Footer } from "@/components/footer";
-import { LivePulseMarquee, LivePulseSkeleton } from "@/components/shared/live-pulse-marquee";
 
 
 import Navbar from "@/components/navbar/navbar";
@@ -15,6 +14,7 @@ import { Suspense } from "react";
 import { NavbarSkeleton } from "@/components/navbar/_components/navbar-skeleton";
 import Heartbeat from "@/components/shared/heartbeat";
 import { OrderCardSkeleton } from "./(public)/orders/[[...slug]]/_components/shared/order-card-skeleton";
+import { LivePulse } from "@/components/shared/live-pulse/live-pulse-wrapper";
 
 
 const geistSans = Geist({
@@ -68,10 +68,7 @@ export default function RootLayout({
 
             <Heartbeat />
 
-            <Suspense fallback={<LivePulseSkeleton />}>
-              <LivePulseMarquee />
-
-            </Suspense>
+            <LivePulse />
 
           </header>
 
