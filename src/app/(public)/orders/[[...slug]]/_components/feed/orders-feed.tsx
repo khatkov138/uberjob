@@ -2,7 +2,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 import { useInfiniteQuery, keepPreviousData, type InfiniteData } from '@tanstack/react-query';
-import { useQueryFeedContext, useOrdersStream } from '../providers/FeedController';
+import { useQueryFeedContext, useOrdersStream, type ExtendedFeedContext } from '../providers/FeedController'; // 🎯 Импортируем ExtendedFeedContext
 import { handleAction, unwrap } from '@/lib/utils';
 import { getOrders, type GetOrdersResponse } from '@/actions/order/get-feed';
 import { type ActionResponse } from '@/lib/server-utils';
@@ -12,7 +12,6 @@ import { EmptyState } from '../shared/empty-state';
 import { OrderCard } from './order-card';
 import { IsolatedScrollObserver } from './isolated-scroll-observer';
 import { IsomorphicOrdersQueryKey, useIsomorphicGate } from '../hooks/useIsomorphicGate';
-import { FeedContext } from '../../page';
 
 export type GetOrdersResponseList = GetOrdersResponse<'list'>;
 export type InfiniteOrdersData = InfiniteData<GetOrdersResponseList, string | undefined>;
@@ -24,8 +23,7 @@ export interface SelectOutput {
 
 export interface OrdersFeedCoreProps {
     queryKey: IsomorphicOrdersQueryKey;
-    context: FeedContext;
-
+    context: ExtendedFeedContext; // 🎯 Обновили на расширенный тип
     serverDataRaw: ActionResponse<GetOrdersResponseList> | null;
 }
 
@@ -40,7 +38,7 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
     const isServer = typeof window === 'undefined';
     const envMarker = isServer ? '🧬 [SERVER-SSR]' : '💻 [CLIENT-HYDRATE]';
 
-    const context = useQueryFeedContext() as FeedContext;
+    const context = useQueryFeedContext();
     const ordersStream = useOrdersStream<'list'>();
 
     const { queryKey, isServerKeyMatch, hasCachedData } = useIsomorphicGate();
@@ -57,7 +55,6 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
         <OrdersFeedCore
             queryKey={queryKey}
             context={context}
-
             serverDataRaw={serverDataRaw}
         />
     );
@@ -76,18 +73,21 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
 
     // ⚡️ Стабильный flatMap-процессор списка
     const selectProcessor = useCallback((data: InfiniteOrdersData): SelectOutput => {
-        console.log('⚡️ [SELECT MEMO PROCESSOR] Запуск flatMap-процессора на уровне ядра TanStack. total pages:' + data.pages[0].total, `cursor` + data.pages[0].nextCursor);
+        // 👍 Безопасное чтение через опциональную цепочку на случай холостого прогрева кэша
+        const firstPage = data?.pages?.[0];
+        const total = firstPage?.total ?? 0;
+        const cursor = firstPage?.nextCursor ?? 'none';
+
+        console.log(`⚡️ [SELECT MEMO PROCESSOR] Запуск flatMap-процессора на уровне ядра TanStack. total pages: ${total}, cursor: ${cursor}`);
+
         return {
             allOrders: data.pages.flatMap((page) => page?.orders ?? []),
-            total: data.pages[0]?.total ?? 0
+            total
         };
     }, []);
 
     // 🔥 ДЕКЛАРАТИВНЫЙ ИЗОМОРФНЫЙ СИДЕР
-    // Вычисляется симметрично на сервере и клиенте на основе физического наличия serverDataRaw.
     const computedInitialData = useMemo(() => {
-        // Мы логируем сам факт опроса затвора. 
-        // true — если поток есть (F5), false — если ушли в динамику на клиенте (смена радиуса)
         console.log(`🌱 [INITIAL DATA SEEDER] Опрос затвора для сидинга. HasServerData: ${!!serverDataRaw}`);
 
         if (!serverDataRaw) {
@@ -121,13 +121,9 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
         initialPageParam: undefined,
         getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
         enabled: !!context,
-
-        // ⚡️ Танстек v5 идеально подхватит плейсхолдер при смене радиуса, так как computedInitialData 
-        // станет статичным undefined (поскольку serverDataRaw превратится в null в коннекторе)
         placeholderData: keepPreviousData,
         initialData: computedInitialData,
         select: selectProcessor,
-
         notifyOnChangeProps: ['data', 'hasNextPage'],
         staleTime: 1000 * 60,
     });

@@ -1,4 +1,3 @@
-// src/features/orders/ui/_components/layout/orders-toolbar.tsx
 "use client"
 
 import * as React from "react"
@@ -7,8 +6,9 @@ import { cn } from "@/lib/utils"
 
 import { useLocationStore } from "@/store/use-location-store"
 import { LOCATION_CONFIG } from "@/lib/location-config"
-import { useFeedStore } from "../providers/FeedProvider"
-import { useActiveFeed, useStaticFeed } from "../providers/FeedController"
+
+// 🎯 Импортируем только один монолитный хук и хук чтения Zustand стора
+import { useFeedStore, useQueryFeedContext } from "../providers/FeedController"
 
 const RADIUS_OPTIONS = LOCATION_CONFIG.SETTINGS.radiusOptions;
 
@@ -18,9 +18,8 @@ export function OrdersToolbar() {
   const setRadius = useFeedStore(s => s.setRadius)
   const openModal = useLocationStore(s => s.openModal)
 
-  // 2. ДАННЫЕ (Раздельное чтение без дублирования строк и лишней памяти)
-  const { viewMode, radius } = useActiveFeed(); // Ртуть: динамические фильтры
-  const { name } = useStaticFeed();             // Гранит: константное имя города из URL/SSR
+  // 2. ДАННЫЕ (Читаем ВСЁ из одного монолитного контекста за 1 такт рендеринга!)
+  const { viewMode, radius, name } = useQueryFeedContext(); 
 
   return (
     <div className="bg-white px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-100 sticky top-0 z-30">

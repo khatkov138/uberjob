@@ -23,7 +23,7 @@ import { cn, handleAction } from "@/lib/utils"
 import { PopularCategoryResult } from "@/actions/category/get"
 import { FullProfile } from "@/actions/profile/get"
 import { removeSkill } from "@/actions/profile/manage"
-import { useStaticFeed } from "../providers/FeedController"
+import { useQueryFeedContext } from "../providers/FeedController"
 
 interface OrdersSidebarProps {
   popularCategories: PopularCategoryResult[]
@@ -32,7 +32,8 @@ interface OrdersSidebarProps {
 export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
   const queryClient = useQueryClient()
   const { open: openCatModal } = useCategoryModalStore()
-  const context = useStaticFeed()
+  const context = useQueryFeedContext()
+
 
   const { profile, hasSkills } = useUserSkills()
 

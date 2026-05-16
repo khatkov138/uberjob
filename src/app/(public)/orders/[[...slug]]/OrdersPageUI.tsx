@@ -19,9 +19,10 @@ import { OrderCardSkeleton } from './_components/shared/order-card-skeleton';
 import { OrdersSidebarHeader } from './_components/layout/orders-sidebar-header';
 import { ViewRenderer } from './_components/layout/view-renderer';
 import { OrderPreviewSheet } from './_components/shared/order-preview-sheet';
-import { useFeedStore } from './_components/providers/FeedProvider';
+
 import { useShallow } from "zustand/shallow" // Импортируем компаратор
 import { OrdersPageHeader } from './_components/layout/orders-page-header';
+import { useFeedStore } from './_components/providers/FeedController';
 
 interface OrdersPageUIProps {
   popularCategoriesPromise: Promise<ActionResponse<PopularCategoryResult[]>>;

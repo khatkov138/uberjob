@@ -1,63 +1,57 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useQueryFeedContext, useStaticFeed } from '../providers/FeedController'; // 💡 Меняем импорт контекста на полный монолит
-import { type FeedContext } from '../../page';
+import { useQueryFeedContext, type ExtendedFeedContext } from '../providers/FeedController'; // 🎯 Читаем ExtendedFeedContext
+import { type FeedContext as BaseFeedContext } from '../../page';
 
-export type IsomorphicOrdersQueryKey = readonly ['orders', 'list', FeedContext];
+export type IsomorphicOrdersQueryKey = readonly ['orders', 'list', BaseFeedContext];
 
 export interface IsomorphicGateResult {
   queryKey: IsomorphicOrdersQueryKey;
   isServerKeyMatch: boolean;
   hasCachedData: boolean;
-  serverDefaults: any;
-}
-
-let cachedServerDefaults: any = null;
-let lastHash: string | null = null;
-
-function parseServerHash(hash: string): any {
-  if (hash === lastHash && cachedServerDefaults) {
-    return cachedServerDefaults;
-  }
-  try {
-    cachedServerDefaults = JSON.parse(hash);
-    lastHash = hash;
-    return cachedServerDefaults!;
-  } catch (error) {
-    console.error('❌ [ZWORK CRITICAL] Failed to parse initialServerHash:', error);
-    return { radius: null, viewMode: 'list', categoryId: null, skillIds: [] };
-  }
+  serverDefaults: BaseFeedContext;
 }
 
 export function useIsomorphicGate(): IsomorphicGateResult {
-  const { initialServerHash } = useStaticFeed(); // Оставляем для хэша
+  const fullContext = useQueryFeedContext(); // ⚡️ Вся вселенная фида в одной переменной
 
-  // 💡 ГЛАВНЫЙ АРХИТЕКТУРНЫЙ СДВИГ: Берем полный собранный контекст со всей гео-датой!
-  const fullContext = useQueryFeedContext();
+  // 🎯 Достаем затвор и эталон бэкенда напрямую из монолитного контекста в одну строчку
+  const { initialFeedContextHash, initialFeedContext } = fullContext;
   const queryClient = useQueryClient();
+
+  // Локальный thread-safe кэш парсинга
+  const parseCacheRef = useRef<{ hash: string | null; parsed: BaseFeedContext | null }>({
+    hash: null,
+    parsed: null,
+  });
+
+  const serverDefaults = useMemo((): BaseFeedContext => {
+    if (parseCacheRef.current.hash === initialFeedContextHash && parseCacheRef.current.parsed) {
+      return parseCacheRef.current.parsed;
+    }
+    try {
+      const parsed = JSON.parse(initialFeedContextHash) as BaseFeedContext;
+      parseCacheRef.current = { hash: initialFeedContextHash, parsed };
+      return parsed;
+    } catch (error) {
+      console.error('❌ [ZWORK CRITICAL] Failed to parse initialFeedContextHash. Fallback to initialFeedContext:', error);
+      return initialFeedContext; // Полный константный эталон
+    }
+  }, [initialFeedContextHash, initialFeedContext]);
 
   // Извлекаем примитивы для стабильного массива зависимостей useMemo
   const clientRadius = fullContext.radius;
   const clientViewMode = fullContext.viewMode;
   const clientCategory = fullContext.categoryId ?? null;
+  const clientSkillsStr = fullContext.skillIds;
 
-  const clientSkillsStr = useMemo(() => {
-    const skills = fullContext.skillIds;
-    if (!skills) return '';
-    return Array.isArray(skills) ? skills.sort().join(',') : String(skills);
-  }, [fullContext.skillIds]);
-
-  return useMemo(() => {
-    const serverDefaults = parseServerHash(initialServerHash);
+  return useMemo((): IsomorphicGateResult => {
     const serverCategory = serverDefaults.categoryId ?? null;
+    const serverSkillsStr = serverDefaults.skillIds ? String(serverDefaults.skillIds) : '';
 
-    const serverSkillsStr = serverDefaults.skillIds
-      ? (Array.isArray(serverDefaults.skillIds) ? serverDefaults.skillIds.sort().join(',') : String(serverDefaults.skillIds))
-      : '';
-
-    // Сверяем примитивы
+    // Сверяем плоские примитивы «в лоб» за наносекунды
     const isRadiusMatch = clientRadius === serverDefaults.radius;
     const isViewModeMatch = clientViewMode === serverDefaults.viewMode;
     const isCategoryMatch = clientCategory === serverCategory;
@@ -65,10 +59,10 @@ export function useIsomorphicGate(): IsomorphicGateResult {
 
     const isServerKeyMatch = isRadiusMatch && isViewModeMatch && isCategoryMatch && isSkillsMatch;
 
-    // Смешиваем серверные дефолты или отдаем полный контекст, где ГЕО-ЯДРО ТЕПЕРЬ СОХРАНЕНО ВСЕГДА!
-    const stableContext: FeedContext = isServerKeyMatch
+    // Смешиваем серверные дефолты или отдаем полный монолитный контекст
+    const stableContext: BaseFeedContext = isServerKeyMatch
       ? { ...fullContext, ...serverDefaults }
-      : fullContext; // <--- Теперь здесь гарантированно лежат lat, lng, locationId, name, slug
+      : fullContext;
 
     const queryKey: IsomorphicOrdersQueryKey = ['orders', 'list', stableContext];
     const hasCachedData = !!queryClient.getQueryData(queryKey);
@@ -79,5 +73,6 @@ export function useIsomorphicGate(): IsomorphicGateResult {
       hasCachedData,
       serverDefaults
     };
-  }, [initialServerHash, clientRadius, clientViewMode, clientCategory, clientSkillsStr, queryClient, fullContext]);
+    // 🎯 Упростили массив зависимостей: убрали initialFeedContextHash, так как следим за serverDefaults
+  }, [serverDefaults, clientRadius, clientViewMode, clientCategory, clientSkillsStr, queryClient, fullContext]);
 }

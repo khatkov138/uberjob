@@ -3,19 +3,15 @@ import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 
-// Libs & Actions
-import { getServerSession } from "@/lib/get-session";
-import { delay, unwrap } from "@/lib/utils";
+import { unwrap } from "@/lib/utils"; // 🎯 Убрали лишний импорт getServerSession
 
 import { getMyProfile } from "@/actions/profile/get";
 import { getPopularCategories } from "@/actions/category/get";
 
-// Серверная логика
 import { getServerFeedState, getServerLocation } from "@/lib/server-utils";
 import OrdersPageUI from "./OrdersPageUI";
 import { getOrders } from "@/actions/order/get-feed";
 
-import { FeedProvider } from "./_components/providers/FeedProvider";
 import { FeedController } from "./_components/providers/FeedController";
 
 export interface FeedContext {
@@ -26,7 +22,7 @@ export interface FeedContext {
   name: string;
   slug: string;
   categoryId: string | null;
-  skillIds: string; // 🔥 МЕНЯЕМ НА СТРОКУ
+  skillIds: string; 
   viewMode: 'list' | 'map';
 }
 
@@ -38,9 +34,7 @@ export default async function OrdersPage({ params }: Props) {
   const { slug = [] } = await params;
   const [citySlug, categorySlug] = slug;
 
-  const session = await getServerSession();
-
-  // 1. Быстрые данные из кук и локация
+  // 1. Быстрые данные из кук и локация (Параллельный неблокирующий сбор)
   const [currentGeo, feedState] = await Promise.all([
     getServerLocation(),
     getServerFeedState()
@@ -48,7 +42,7 @@ export default async function OrdersPage({ params }: Props) {
 
   if (!citySlug) return redirect(`/orders/${currentGeo.slug}`);
 
-  // 2. БД Данные
+  // 2. БД Данные (Параллельный неблокирующий сбор)
   const [dbLocation, currentCategory] = await Promise.all([
     prisma.location.findUnique({ where: { slug: citySlug } }),
     categorySlug
@@ -62,19 +56,13 @@ export default async function OrdersPage({ params }: Props) {
   if (!dbLocation) return redirect(`/orders/${currentGeo.slug}`);
   if (categorySlug && !currentCategory) return redirect(`/orders/${citySlug}`);
 
-  // 3. Профиль
+  // 3. Профиль пользователя (Единая точка проверки сессии и сбора скиллов)
   const profileRes = await getMyProfile();
   const initialProfile = unwrap(profileRes, null);
   const skillIds = initialProfile?.skills.map(s => s.categoryId) || [];
 
-  // ФОРМИРУЕМ ДАННЫЕ ДЛЯ ИНЪЕКЦИИ В СТОР
-  const storeInitialData = {
-    viewMode: feedState.viewMode,
-    radius: feedState.radius,
-  };
-
-  // БАЗОВЫЙ КОНТЕКСТ (Чисто серверный)
-  const feedContext: FeedContext = {
+  // Наш чистый стартовый контекст
+  const initialFeedContext: FeedContext = {
     locationId: dbLocation.id,
     name: dbLocation.name,
     slug: dbLocation.slug,
@@ -82,41 +70,29 @@ export default async function OrdersPage({ params }: Props) {
     lng: dbLocation.lng,
     radius: feedState.radius,
     categoryId: currentCategory?.id || null,
-    skillIds: skillIds.sort().join(','), // 🔥 Сразу склеиваем в стабильную строку на сервере!
+    skillIds: skillIds.sort().join(','),
     viewMode: feedState.viewMode
   };
 
-  // 🔒 СЕРВЕРНЫЙ ЗАТВОР: Генерируем бессмертный хэш состояния SSR прямо здесь!
-  // Клиент примет готовую константную строку, избавив CPU от runtime JSON.stringify.
-  const initialServerHash = JSON.stringify(feedContext);
-
-  // 4. ТЯЖЕЛЫЕ ПРОМИСЫ (Стриминг)
+  // 4. Тяжелые промисы (Стриминг)
   const ordersPromise = (async () => {
-    // Искусственно притормаживаем поток на сервере.
-    // Это гарантирует, что клиентский React 19 начнет гидратацию ДО того, как промис зарезолвится в браузере!
-    
-    return getOrders({ ...feedContext, mode: feedState.viewMode });
+    return getOrders({ ...initialFeedContext, mode: feedState.viewMode });
   })();
+
   const popularCategoriesPromise = getPopularCategories(
-    feedContext.lat,
-    feedContext.lng,
-    feedContext.radius
+    initialFeedContext.lat,
+    initialFeedContext.lng,
+    initialFeedContext.radius
   );
 
   return (
-    <FeedProvider initialData={storeInitialData}>
-      <FeedController
-        ordersPromise={ordersPromise}
-        session={session}
-        initialProfile={initialProfile}
-        serverContext={feedContext}
-        currentCategory={currentCategory}
-        initialServerHash={initialServerHash} // 🔥 Пробрасываем готовый хэш в контроллер
-      >
-        <OrdersPageUI
-          popularCategoriesPromise={popularCategoriesPromise}
-        />
-      </FeedController>
-    </FeedProvider>
+    <FeedController
+      ordersPromise={ordersPromise}
+      initialProfile={initialProfile} // 🔌 Пробрасываем только профиль, сессия стерта намертво
+      initialFeedContext={initialFeedContext}
+      currentCategory={currentCategory}
+    >
+      <OrdersPageUI popularCategoriesPromise={popularCategoriesPromise} />
+    </FeedController>
   );
 }

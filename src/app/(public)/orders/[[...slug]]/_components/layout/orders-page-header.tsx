@@ -5,8 +5,9 @@ import { useQueryClient, useIsFetching, InfiniteData, useQuery, keepPreviousData
 
 import { cn, unwrap } from '@/lib/utils';
 import { GetOrdersResponse } from '@/actions/order/get-feed';
-import { useActiveFeed, useOrdersStream, useQueryFeedContext, useStaticFeed } from '../providers/FeedController';
+
 import { useIsomorphicGate } from '../hooks/useIsomorphicGate';
+import { useOrdersStream, useQueryFeedContext } from '../providers/FeedController';
 
 // --- СТРОГИЕ КОНТРАКТЫ ДАННЫХ И ТИПИЗАЦИЯ ---
 type GetOrdersResponseList = GetOrdersResponse<'list'>;
@@ -126,7 +127,7 @@ HeaderStatusBadge.displayName = 'HeaderStatusBadge';
  */
 export const HeaderDataReader = React.memo(function HeaderDataReader() {
   // 1. Подключаемся к шине данных через контексты платформы ZWORK
- 
+
   const ordersStream = useOrdersStream<'list'>();
 
   // 2. Внедряем единый изоморфный затвор из кастомного хука
@@ -145,7 +146,7 @@ export const HeaderDataReader = React.memo(function HeaderDataReader() {
     // 🔥 ФИКС 2: Возвращаем канонический удержатель кадра v5.
     // Гарантирует, что во время смены радиуса/скилов `data` НЕ превратится в undefined,
     // а сохранит старый слепок, предотвращая падение в скелетоны.
-    placeholderData: keepPreviousData, 
+    placeholderData: keepPreviousData,
   });
 
   // Хранилище слепка для UX Keep-Alive
@@ -219,7 +220,8 @@ export const HeaderDataReader = React.memo(function HeaderDataReader() {
  * 🧱 4. ШЛЮЗ ДАННЫХ ХЕДЕРА
  */
 export function HeaderDataBridge() {
-  const { name: cityName } = useStaticFeed();
+  // 🎯 Читаем имя города напрямую из общего монолитного контекста
+  const { name: cityName } = useQueryFeedContext();
   console.log(`🔌 [RENDER] HeaderDataBridge | City: ${cityName}`);
 
   return (

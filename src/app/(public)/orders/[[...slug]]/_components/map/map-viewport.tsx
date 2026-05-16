@@ -1,4 +1,3 @@
-// src/features/orders/ui/_components/map/map-viewport.tsx
 'use client';
 
 import * as React from "react"
@@ -9,7 +8,7 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query"
 
 // Хуки, типы и экшены
 import { getOrders, type GetOrdersResponse } from "@/actions/order/get-feed"
-import { useActiveFeed, useQueryFeedContext } from "../providers/FeedController" // Наша монолитная шина
+import { useQueryFeedContext, type ExtendedFeedContext } from "../providers/FeedController" // 🎯 Оставляем строго один монолитный импорт
 
 // Динамический импорт движка (Leaflet/Google/Yandex)
 const OrdersMap = dynamic(
@@ -21,19 +20,20 @@ const OrdersMap = dynamic(
 )
 
 export function MapViewport() {
-    // 🪄 Извлекаем ПОЛНЫЙ монолитный контекст (содержит координаты lat, lng, locationId)
+    // 🪄 Извлекаем ПОЛНЫЙ монолитный контекст (содержит координаты lat, lng, radius, viewMode)
     const queryContext = useQueryFeedContext();
 
-    // 💧 Извлекаем легкий динамический контекст для проверки вкладок
-    const { viewMode, radius } = useActiveFeed();
-
-    // 2. Основной запрос за маркерами карты (0 ошибок TypeScript!)
-    const { data, isFetching } = useQuery<GetOrdersResponse<'map'>>({
+    // 2. Основной запрос за маркерами карты (0 ошибок TypeScript, 0 any!)
+    const { data, isFetching } = useQuery<
+        GetOrdersResponse<'map'> | null, 
+        Error, 
+        GetOrdersResponse<'map'> | null
+    >({
         // Детерминированный ключ кэша на основе полного контекста запроса
         queryKey: ["orders", "map", queryContext],
         queryFn: () => handleAction(getOrders({ ...queryContext, mode: 'map' })),
         // Запрос активируется строго тогда, когда юзер физически переключился на вкладку карты
-        enabled: !!queryContext && viewMode === 'map',
+        enabled: queryContext.viewMode === 'map', // 🎯 Читаем напрямую из монолита
         placeholderData: keepPreviousData, // Защита от мигания: удерживает маркеры при смене радиуса
         staleTime: 1000 * 60 * 5, // Маркеры на карте валидны 5 минут
     });
@@ -48,14 +48,12 @@ export function MapViewport() {
                 "w-full h-full rounded-[3.5rem] border-2 border-slate-100 bg-slate-50 overflow-hidden relative z-10 transition-all duration-700",
                 isRefreshing ? "grayscale-[0.5] opacity-80 shadow-inner" : "shadow-2xl shadow-slate-200/50"
             )}>
-                {queryContext && (
-                    <OrdersMap
-                        orders={orders}
-                        center={[queryContext.lat, queryContext.lng]} // 🔥 Передаем строго валидные координаты центра города!
-                        radius={radius} // Передаем реактивный радиус из Zustand
-                        isFetching={isFetching}
-                    />
-                )}
+                <OrdersMap
+                    orders={orders}
+                    center={[queryContext.lat, queryContext.lng]} // 🔥 Координаты центра города из монолита
+                    radius={queryContext.radius} // 🎯 Реактивный радиус напрямую из монолита
+                    isFetching={isFetching}
+                />
 
                 {/* ГРАДИЕНТНАЯ МАСКА */}
                 <div className="absolute inset-0 pointer-events-none ring-[24px] ring-white/10 rounded-[3.5rem] z-20" />
@@ -67,7 +65,7 @@ export function MapViewport() {
                     <div className="bg-slate-950 text-white px-6 py-3 rounded-2xl flex items-center gap-3 shadow-2xl border border-white/10">
                         <Loader2 className="w-4 h-4 animate-spin text-blue-500" strokeWidth={3} />
                         <span className="text-[10px] font-black uppercase italic tracking-[0.2em] whitespace-nowrap">
-                            Scanning Area / {radius}km
+                            Scanning Area / {queryContext.radius}km
                         </span>
                     </div>
                 </div>

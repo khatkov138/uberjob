@@ -1,3 +1,4 @@
+// src/features/orders/ui/_components/modals/location-modal.tsx
 "use client"
 
 import * as React from "react"
@@ -9,20 +10,25 @@ import { Search, MapPin, Loader2, Target, ArrowUpRight } from "lucide-react"
 import { handleAction, handleApi, cn } from "@/lib/utils"
 
 import { getOrCreateLocation } from "@/actions/location/manage"
+import { useQueryFeedContext } from "../providers/FeedController" // 🎯 Перешли на единую монолитную шину
 
-import { useQueryClient } from "@tanstack/react-query"
-import { useActiveFeed, useStaticFeed } from "../providers/FeedController"
-
+// 🎯 Строгий интерфейс для подсказок гео-саггеста вместо any
+interface GeoSuggestion {
+  uri: string;
+  title: { text: string };
+  subtitle?: { text: string };
+}
 
 export function LocationModal() {
-
-
   const router = useRouter()
-  const { isModalOpen, closeModal } = useLocationStore() // Убрали лишний setGlobalLocation здесь
-  const currentContext = useStaticFeed()
-  const setGlobalLocation = useLocationStore(s => s.setGlobalLocation);
+  const { isModalOpen, closeModal } = useLocationStore()
+  const setGlobalLocation = useLocationStore(s => s.setGlobalLocation)
+
+  // 🎯 ЧИТАЕМ МОНОЛИТ: Больше никаких useStaticFeed, имя города берем отсюда за 0ms
+  const currentContext = useQueryFeedContext()
+
   const [query, setQuery] = React.useState("")
-  const [suggestions, setSuggestions] = React.useState<any[]>([])
+  const [suggestions, setSuggestions] = React.useState<GeoSuggestion[]>([])
   const [isLoading, setIsLoading] = React.useState(false)
   const [selectedUri, setSelectedUri] = React.useState<string | null>(null)
 
@@ -32,13 +38,13 @@ export function LocationModal() {
     if (value.length < 3) { setSuggestions([]); return; }
     setIsLoading(true)
     try {
-      const data = await handleApi<any[]>(fetch(`/api/geo/suggest?text=${encodeURIComponent(value)}`))
+      const data = await handleApi<GeoSuggestion[]>(fetch(`/api/geo/suggest?text=${encodeURIComponent(value)}`))
       setSuggestions(data || [])
     } finally { setIsLoading(false) }
   }
 
-  const handleSelect = async (item: any) => {
-    if (isLoading) return; // Педантичный блок повторных нажатий
+  const handleSelect = async (item: GeoSuggestion) => {
+    if (isLoading) return; // Педантичный затвор повторных кликов
 
     setIsLoading(true);
     setSelectedUri(item.uri);
@@ -47,10 +53,7 @@ export function LocationModal() {
       const location = await handleAction(getOrCreateLocation(item.uri));
       setGlobalLocation(location.id);
 
-      // 🔥 ВЫЖЖЕНО: queryClient.removeQueries({ queryKey: ['orders'] });
-      // Больше никакого преждевременного уничтожения данных под ногами у живого Хедера!
-
-      // Мягко переводим роутер на новый город
+      // Мягко переводим роутер на новый город через URL роутера Next.js
       router.push(`/orders/${location.slug}`);
 
     } catch (error) {
@@ -60,18 +63,15 @@ export function LocationModal() {
     }
   };
 
-
   return (
     <Dialog
       open={isModalOpen}
       onOpenChange={(open) => {
-        // Блокируем закрытие, если идет процесс перехода
-        if (!open && isLoading) return;
+        if (!open && isLoading) return; // Блокируем закрытие во время загрузки перехода
         if (!open) closeModal();
       }}
     >
       <DialogContent className="sm:max-w-[600px] p-0 border-none bg-white rounded-[3.5rem] shadow-2xl overflow-hidden">
-
         <div className="px-10 pt-12 pb-8 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">LOCATION / HUB</span>
@@ -81,7 +81,6 @@ export function LocationModal() {
             Где <span className="text-blue-600">ищем?</span>
           </DialogTitle>
 
-          {/* ФИКС ОШИБКИ Accessibility: Добавляем описание (скрыто визуально) */}
           <DialogDescription className="sr-only">
             Выберите город для поиска актуальных заказов в системе ZWORK.
           </DialogDescription>
@@ -113,7 +112,7 @@ export function LocationModal() {
                   <button
                     key={i}
                     disabled={!!selectedUri}
-                    onClick={() => handleSelect(s)} // Внутри handleSelect теперь НЕТ closeModal()
+                    onClick={() => handleSelect(s)}
                     className={cn(
                       "group w-full flex items-center justify-between p-7 border rounded-[2.5rem] transition-all animate-in fade-in slide-in-from-bottom-2",
                       selectedUri === s.uri
@@ -166,6 +165,5 @@ export function LocationModal() {
         </div>
       </DialogContent>
     </Dialog>
-
   )
 }
