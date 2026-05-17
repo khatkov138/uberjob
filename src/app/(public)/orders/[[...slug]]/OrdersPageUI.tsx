@@ -14,11 +14,9 @@ import { OrdersSidebar } from './_components/layout/orders-sidebar';
 import { OrdersToolbar } from './_components/layout/orders-toolbar';
 import { CategorySearchModal } from './_components/modals/category-search-modal';
 import { LocationModal } from './_components/modals/location-modal';
-import { OrderCardSkeleton } from './_components/shared/order-card-skeleton';
 
 import { OrdersSidebarHeader } from './_components/layout/orders-sidebar-header';
 import { ViewRenderer } from './_components/layout/view-renderer';
-import { OrderPreviewSheet } from './_components/shared/order-preview-sheet';
 
 import { useShallow } from "zustand/shallow" // Импортируем компаратор
 import { OrdersPageHeader } from './_components/layout/orders-page-header';

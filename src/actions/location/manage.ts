@@ -5,7 +5,6 @@ import prisma from "@/lib/prisma"
 import { createAction } from "@/lib/server-utils"
 import { slugify } from "@/lib/utils"
 
-
 export async function getOrCreateLocation(uri: string) {
     return createAction(async () => {
         // 1. Поиск в базе
@@ -33,16 +32,16 @@ export async function getOrCreateLocation(uri: string) {
         const [lng, lat] = geoObject.Point.pos.split(" ").map(Number);
         const officialName = geoObject.name;
 
-        // 3. Генерация слага (проверяем занятость только если нужно)
-        const baseSlug = slugify(officialName);
+        // 3. Генерация слага (🔥 Принудительный нижний регистр для идеального SEO ЧПУ)
+        const baseSlug = slugify(officialName).toLowerCase();
 
         const isSlugTaken = await prisma.location.findUnique({
             where: { slug: baseSlug }
         });
 
-        // Если слаг занят, только тогда клеим хвост
+        // 🔥 Если слаг занят, клеим чистый буквенно-цифровой хвост без точек и спецсимволов
         const finalSlug = isSlugTaken
-            ? `${baseSlug}-${Math.random().toString(36).substring(2, 5)}`
+            ? `${baseSlug}-${Date.now().toString(36).slice(-3)}`
             : baseSlug;
 
         // 4. Создание записи

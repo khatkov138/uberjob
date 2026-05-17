@@ -10,12 +10,12 @@ import { cn } from "@/lib/utils"
 
 import { RoleSwitcher } from "./_components/role-switcher"
 import { NotificationsBell } from "./_components/notifications-bell"
-import { useNavbarStore, useNavbarUser } from "./navbar-provider" 
+import { useNavbarStore, useNavbarUser } from "./navbar-provider"
 import { UnreadBadge } from "./_components/unread-badge"
 
 // 1. БРЕНД И НАВИГАЦИЯ (Автономно читает Слой Гранит и Слой Ртуть)
 function BrandNav() {
-    const pathname = usePathname() 
+    const pathname = usePathname()
     const user = useNavbarUser()
     const mode = useNavbarStore((state) => state.mode)
     const logoHref = user ? (mode === 'PRO' ? '/pro/dashboard' : '/client/dashboard') : "/"
@@ -53,6 +53,7 @@ function BrandNav() {
 function CentralActionButton() {
     const user = useNavbarUser()
     const mode = useNavbarStore((state) => state.mode)
+    
     if (!user) return null
 
     return (

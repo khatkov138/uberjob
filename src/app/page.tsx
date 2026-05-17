@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { Container } from "@/components/shared/container";
 
 export default async function HomePage() {
-    const session = await getServerSession();
+   /* const session = await getServerSession();
 
     if (session?.user) {
         const cookieStore = await cookies();
@@ -14,7 +14,7 @@ export default async function HomePage() {
         if (lastMode === 'PRO') redirect('/pro/dashboard');
         else redirect('/client/dashboard');
     }
-
+*/
     return (
 
         <Container >

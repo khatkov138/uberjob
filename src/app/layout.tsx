@@ -61,7 +61,7 @@ export default function RootLayout({
 
           <header className="flex-none z-50">
             <Suspense fallback={
-              <OrderCardSkeleton />
+              <NavbarSkeleton />
             }>
               <Navbar />
             </Suspense>

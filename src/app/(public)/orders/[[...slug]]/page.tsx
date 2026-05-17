@@ -1,57 +1,42 @@
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import prisma from "@/lib/prisma";
-
 import { serializeDeterministic, unwrap } from "@/lib/utils";
-
 import { getMyProfile } from "@/actions/profile/get";
 import { getPopularCategories } from "@/actions/category/get";
-
 import { getServerFeedState, getServerLocation } from "@/lib/server-utils";
-import OrdersPageUI from "./OrdersPageUI";
 import { getOrders } from "@/actions/order/get-feed";
-
+import OrdersPageUI from "./OrdersPageUI";
 import { FeedController } from "./_components/providers/FeedController";
 
-// 🎯 СЕТЕВОЙ СЛОЙ: Кристально чистый плоский контекст для Танстека и API
+// Контракты данных сохраняются без изменений
 export interface FeedContext {
-  locationId: string;
-  lat: number;
-  lng: number;
-  radius: number;
-  skillIds: string;
-  viewMode: 'list' | 'map';
-  categoryId: string | null;
+  locationId: string; lat: number; lng: number; radius: number;
+  skillIds: string; viewMode: 'list' | 'map'; categoryId: string | null;
 }
 
-// 🎯 UI СЛОЙ: Неизменяемая статика для рендеринга шапки, SEO и модалок
 export interface InitialFeedData {
-  cityName: string;
-  citySlug: string;
-  categoryName: string | null;
-  categorySlug: string | null;
-  initialFeedContextHash: string; // Затвор для useIsomorphicGate
+  cityName: string; citySlug: string; categoryName: string | null;
+  categorySlug: string | null; initialFeedContextHash: string;
 }
 
 interface Props {
   params: Promise<{ slug?: string[] }>;
 }
 
-export default async function OrdersPage({ params }: Props) {
-  const { slug = [] } = await params;
-  const [citySlug, categorySlug] = slug;
+/**
+ * 🎯 СЛОЙ МЕМОИЗАЦИИ: Исключает повторные удары в Postgres.
+ * Next.js автоматически дедуплицирует этот вызов между generateMetadata и OrdersPage.
+ */
+const getCachedRouteData = cache(async (citySlug: string | undefined, categorySlug: string | undefined) => {
+  if (!citySlug) return { dbLocation: null, currentCategory: null };
 
-  // 1. Быстрые данные из кук и локация (Параллельный неблокирующий сбор)
-  const [currentGeo, feedState] = await Promise.all([
-    getServerLocation(),
-    getServerFeedState()
-  ]);
-
-  if (!citySlug) return redirect(`/orders/${currentGeo.slug}`);
-
-  // 2. БД Данные (Параллельный неблокирующий сбор)
   const [dbLocation, currentCategory] = await Promise.all([
-    prisma.location.findUnique({ where: { slug: citySlug } }),
+    prisma.location.findUnique({
+      where: { slug: citySlug },
+      select: { id: true, name: true, slug: true, lat: true, lng: true } // Берем только примитивы
+    }),
     categorySlug
       ? prisma.category.findUnique({
         where: { slug: categorySlug },
@@ -60,15 +45,68 @@ export default async function OrdersPage({ params }: Props) {
       : null
   ]);
 
+  return { dbLocation, currentCategory };
+});
+
+/**
+ * 🚀 ВЫСШИЙ ПИЛОТАЖ SEO: Генерация динамических метатегов под ЧПУ
+ */
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug = [] } = await params;
+  const [citySlug, categorySlug] = slug;
+
+  if (!citySlug) return {};
+
+  // Достаем данные из кэша текущего запроса за 0мс (база не дергается второй раз)
+  const { dbLocation, currentCategory } = await getCachedRouteData(citySlug, categorySlug);
+  if (!dbLocation) return {};
+
+  const cityName = dbLocation.name;
+  const categoryName = currentCategory?.name ?? "Все заказы и мастера";
+
+  // Формируем жесткие, сочные SEO-анкоры для поисковиков
+  const seoTitle = `${categoryName} в г. ${cityName}`;
+  const seoDescription = `Актуальные предложения по направлению "${categoryName}" в локации ${cityName}. Проверенные исполнители на ZWORK: интерактивная карта, контакты мастеров, 0% скрытых комиссий.`;
+
+  return {
+    title: seoTitle, // Автоматически влетит вместо %s в твой шаблон из root layout
+    description: seoDescription,
+    // Намертво запечатываем каноническую ссылку от мусора и дублей GET-параметров фида
+    alternates: {
+      canonical: categorySlug
+        ? `/orders/${citySlug}/${categorySlug}`
+        : `/orders/${citySlug}`
+    }
+  };
+}
+
+/**
+ * 🧱 ОСНОВНОЙ СЕРВЕРНЫЙ КОМПОНЕНТ СТРАНИЦЫ
+ */
+export default async function OrdersPage({ params }: Props) {
+  const { slug = [] } = await params;
+  const [citySlug, categorySlug] = slug;
+
+  // Воронка валидации: сначала быстрые куки. Если слага нет — мгновенный редирект
+  const [currentGeo, feedState] = await Promise.all([
+    getServerLocation(),
+    getServerFeedState()
+  ]);
+
+  if (!citySlug) return redirect(`/orders/${currentGeo.slug}`);
+
+  // Тянем данные через кэшированную функцию (0ms оверхеда, если generateMetadata уже выполнился)
+  const { dbLocation, currentCategory } = await getCachedRouteData(citySlug, categorySlug);
+
+  // Обработка 404/ошибок роутинга без лишнего серверного шума
   if (!dbLocation) return redirect(`/orders/${currentGeo.slug}`);
   if (categorySlug && !currentCategory) return redirect(`/orders/${citySlug}`);
 
-  // 3. Профиль пользователя (Единая точка проверки сессии и сбора скиллов)
+  // Параллельный сбор сессии профиля
   const profileRes = await getMyProfile();
   const initialProfile = unwrap(profileRes, null);
   const skillIds = initialProfile?.skills.map(s => s.categoryId) || [];
 
-  // 🎯 1-й объект: Чистый плоский контекст для Танстека
   const initialFeedContext: FeedContext = {
     locationId: dbLocation.id,
     lat: dbLocation.lat,
@@ -79,7 +117,6 @@ export default async function OrdersPage({ params }: Props) {
     viewMode: feedState.viewMode
   };
 
-  // 🎯 2-й объект: Текстовая статика для шапки и заголовков
   const initialFeedData: InitialFeedData = {
     cityName: dbLocation.name,
     citySlug: dbLocation.slug,
@@ -88,13 +125,11 @@ export default async function OrdersPage({ params }: Props) {
     initialFeedContextHash: serializeDeterministic(initialFeedContext)
   };
 
-  // 4. Тяжелые промисы (Стриминг)
-  const ordersPromise = (async () => {
-    return getOrders({
-      ...initialFeedContext,
-      mode: feedState.viewMode
-    });
-  })();
+  // Тяжелые промисы (Стриминг чанков через React.use)
+  const ordersPromise = getOrders({
+    ...initialFeedContext,
+    mode: feedState.viewMode
+  });
 
   const popularCategoriesPromise = getPopularCategories(
     initialFeedContext.lat,
@@ -106,8 +141,8 @@ export default async function OrdersPage({ params }: Props) {
     <FeedController
       ordersPromise={ordersPromise}
       initialProfile={initialProfile}
-      initialFeedContext={initialFeedContext} // Улетел плоский контекст
-      initialFeedData={initialFeedData}       // Улетела статика для UI
+      initialFeedContext={initialFeedContext}
+      initialFeedData={initialFeedData}
     >
       <OrdersPageUI popularCategoriesPromise={popularCategoriesPromise} />
     </FeedController>

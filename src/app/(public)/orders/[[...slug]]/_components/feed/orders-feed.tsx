@@ -42,9 +42,9 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
     const envMarker = isServer ? '🧬 [SERVER-SSR]' : '💻 [CLIENT-HYDRATE]';
 
     const context = useFeedContext();
-    const ordersStream = useOrdersStream<'list'>(); // 🎯 Сужаем тип дженериком на входе за 0ms
-    const { queryKey, isServerKeyMatch, hasCachedData } = useIsomorphicGate();
 
+    const { queryKey, isServerKeyMatch, hasCachedData } = useIsomorphicGate();
+    const ordersStream = useOrdersStream<'list'>(); // 🎯 Сужаем тип дженериком на входе за 0ms
     // 🎯 БЕЗУСЛОВНЫЙ use() ДЛЯ REACT 19: Стриминг чанков работает точечно
     const resolvedStream = use(ordersStream);
 

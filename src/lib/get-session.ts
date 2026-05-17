@@ -8,8 +8,8 @@ import { delay } from "./utils"
 export const getServerSession = cache(async (source: "SERVER" | "API" = "SERVER") => {
   try {
     const h = await headers()
-  
 
+   //await delay(3000)
 
     // По источнику сразу поймешь: пришло из роута /api или из недр рендеринга
     const label = source === "API" ? "  [API-ROUTE]  " : "[SERVER-RENDER]"

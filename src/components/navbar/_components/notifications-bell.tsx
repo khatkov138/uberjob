@@ -19,13 +19,13 @@ import { markAllAsRead, markAsRead } from "@/actions/notification/manage"
 
 export function NotificationsBell() {
   const queryClient = useQueryClient()
-  
+
   // 1. Достаем пользователя из контекста (0ms, без холостых GET-запросов)
   const user = useNavbarUser()
   const userId = user?.id
 
   // 2. Стабилизируем ключ кэша строго на базе примитива ID и связываем с глобальной шиной
-  const queryKey = React.useMemo(() => ["user-notifications", userId], [userId])
+  const queryKey = ["user-notifications"]
 
   // 3. Декларативная подписка на уведомления в TanStack Query v5 через handleApi
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
@@ -47,7 +47,7 @@ export function NotificationsBell() {
       await queryClient.cancelQueries({ queryKey })
       const previous = queryClient.getQueryData<Notification[]>(queryKey)
       if (previous) {
-        queryClient.setQueryData<Notification[]>(queryKey, 
+        queryClient.setQueryData<Notification[]>(queryKey,
           previous.map(n => ({ ...n, isRead: true }))
         )
       }

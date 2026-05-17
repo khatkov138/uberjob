@@ -13,8 +13,11 @@ import { Settings, LogOut, Shield, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useNavbarStore, useNavbarUser } from "../navbar-provider"
+import { useQueryClient } from "@tanstack/react-query"
 
 export function UserDropdown() {
+  const queryClient = useQueryClient();
+
   const mode = useNavbarStore((state) => state.mode)
   const user = useNavbarUser() // 🧱 Достаем зацементированный Слой Гранит
   const router = useRouter()
@@ -92,6 +95,7 @@ export function UserDropdown() {
           <DropdownMenuItem
             onClick={async () => {
               await authClient.signOut();
+              queryClient.clear();
               router.push("/");
             }}
             className="focus:bg-red-50 rounded-xl p-3 cursor-pointer group outline-none border-none"

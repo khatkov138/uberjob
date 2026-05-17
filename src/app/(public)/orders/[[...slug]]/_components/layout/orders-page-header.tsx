@@ -7,7 +7,7 @@ import { cn, unwrap } from '@/lib/utils';
 import { GetOrdersResponse } from '@/actions/order/get-feed';
 
 import { useIsomorphicGate } from '../hooks/useIsomorphicGate';
-import { useInitialData, useOrdersStream } from '../providers/FeedController';
+import { useFeedContext, useInitialData, useOrdersStream } from '../providers/FeedController';
 
 
 // --- СТРОГИЕ КОНТРАКТЫ ДАННЫХ И ТИПИЗАЦИЯ ---
@@ -128,7 +128,6 @@ HeaderStatusBadge.displayName = 'HeaderStatusBadge';
 export const HeaderDataReader = React.memo(function HeaderDataReader() {
   // 1. Извлекаем изоморфный затвор, сырой промис и статику URL страниц
   const { isServerKeyMatch, queryKey } = useIsomorphicGate();
-  const { citySlug, categorySlug } = useInitialData();
   const ordersStream = useOrdersStream<'list'>(); // 🎯 Сужаем тип дженериком на входе за 0ms
   const globalIsFetching = useIsFetching({ queryKey }) > 0;
 
@@ -153,13 +152,7 @@ export const HeaderDataReader = React.memo(function HeaderDataReader() {
 
   // 🔒 ЖЕСТКИЙ СБРОС КЭША ПРИ СМЕНЕ СТАТИКИ (Город / Категория)
   // Гарантирует включение скелетонов при роутинге, но оставляет удержание цифр при смене радиуса
-  const currentUrlMarker = `${citySlug}::${categorySlug ?? 'all'}`;
-  const lastUrlMarkerRef = useRef(currentUrlMarker);
 
-  if (lastUrlMarkerRef.current !== currentUrlMarker) {
-    lastUrlMarkerRef.current = currentUrlMarker;
-    lastStatsSnapshotRef.current = { totalCount: 0, loadedCount: 0, isReady: false }; // Сброс под скелетоны
-  }
 
   // 4. Чистый синхронный сбор текущих метрик без побочных эффектов (БЕЗ ANY / БЕЗ AS)
   const currentStats = useMemo(() => {
@@ -240,15 +233,24 @@ export const HeaderDataReader = React.memo(function HeaderDataReader() {
  * 🧱 4. ШЛЮЗ ДАННЫХ ХЕДЕРА
  */
 export function HeaderDataBridge() {
-  // 🎯 Читаем имя города напрямую из общего монолитного контекста
-  const { cityName } = useInitialData();
+  // 🎯 Текстовая статика для шапки (0ms ссылочная стабильность)
+  const { cityName, categoryName } = useInitialData();
+  
+  // 🎯 Динамический контекст фида для отслеживания живого радиуса
+  const { radius } = useFeedContext();
 
-  console.log(`🔌 [RENDER] HeaderDataBridge | City: ${cityName}`);
+  console.log(`🔌 [RENDER] HeaderDataBridge | City: ${cityName} | Radius: ${radius}km`);
 
   return (
     <div className="flex items-baseline gap-4 flex-wrap min-h-[60px] w-full">
       <h1 className="text-5xl font-black uppercase italic tracking-tighter text-slate-900 leading-none py-1">
-        Заказы <span className="text-blue-600 ml-2 whitespace-nowrap text-4xl font-black">в {cityName}</span>
+        {categoryName ? categoryName : "Заказы"} 
+        <span className="text-blue-600 ml-2 whitespace-nowrap text-4xl font-black">
+          в {cityName}
+        </span>
+        <span className="text-slate-400 ml-3 text-2xl font-bold tracking-tight normal-case not-italic">
+          в радиусе {radius} км
+        </span>
       </h1>
 
       <Suspense fallback={
