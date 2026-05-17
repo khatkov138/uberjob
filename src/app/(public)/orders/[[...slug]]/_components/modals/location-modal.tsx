@@ -10,7 +10,7 @@ import { Search, MapPin, Loader2, Target, ArrowUpRight } from "lucide-react"
 import { handleAction, handleApi, cn } from "@/lib/utils"
 
 import { getOrCreateLocation } from "@/actions/location/manage"
-import { useQueryFeedContext } from "../providers/FeedController" // 🎯 Перешли на единую монолитную шину
+import { useFeedContext, useInitialData } from "../providers/FeedController" // 🎯 Перешли на единую монолитную шину
 
 // 🎯 Строгий интерфейс для подсказок гео-саггеста вместо any
 interface GeoSuggestion {
@@ -25,7 +25,9 @@ export function LocationModal() {
   const setGlobalLocation = useLocationStore(s => s.setGlobalLocation)
 
   // 🎯 ЧИТАЕМ МОНОЛИТ: Больше никаких useStaticFeed, имя города берем отсюда за 0ms
-  const currentContext = useQueryFeedContext()
+  const currentContext = useFeedContext()
+  const { cityName } = useInitialData();
+
 
   const [query, setQuery] = React.useState("")
   const [suggestions, setSuggestions] = React.useState<GeoSuggestion[]>([])
@@ -154,7 +156,7 @@ export function LocationModal() {
                   <div className="space-y-2">
                     <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">ВАШ РАДАР СЕЙЧАС:</p>
                     <p className="text-5xl font-black italic text-slate-900 tracking-tighter leading-none">
-                      {currentContext?.name || "Поиск..."}
+                      {cityName || "Поиск..."}
                     </p>
                   </div>
                   <Target className="w-12 h-12 text-blue-600 animate-pulse opacity-20" />

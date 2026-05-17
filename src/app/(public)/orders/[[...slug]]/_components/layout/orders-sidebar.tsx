@@ -23,7 +23,7 @@ import { cn, handleAction } from "@/lib/utils"
 import { PopularCategoryResult } from "@/actions/category/get"
 import { FullProfile } from "@/actions/profile/get"
 import { removeSkill } from "@/actions/profile/manage"
-import { useQueryFeedContext } from "../providers/FeedController"
+import { useFeedContext, useInitialData } from "../providers/FeedController"
 
 interface OrdersSidebarProps {
   popularCategories: PopularCategoryResult[]
@@ -32,8 +32,7 @@ interface OrdersSidebarProps {
 export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
   const queryClient = useQueryClient()
   const { open: openCatModal } = useCategoryModalStore()
-  const context = useQueryFeedContext()
-
+  const { citySlug, cityName } = useInitialData()
 
   const { profile, hasSkills } = useUserSkills()
 
@@ -49,13 +48,13 @@ export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
   const { mutate: handleRemoveSkill } = useMutation({
     mutationKey: ["remove-skill"],
     mutationFn: (categoryId: string) => handleAction(removeSkill(categoryId)),
-    
+
     // В onMutate мы БОЛЬШЕ НЕ ВЫРЕЗАЕМ карточку из кэша.
     // Мы просто отменяем текущие запросы чтения, позволяя лоадеру крутиться на экране.
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["user-profile"] })
     },
-    
+
     // 🔥 УМНЫЙ КЛИЕНТСКИЙ КОММИТ: Удаление из DOM происходит СТРОГО после успешного ответа сервера.
     // 0 повторных сетевых рефетчей к базе — кэш модифицируется локально в памяти.
     onSuccess: (_, categoryId) => {
@@ -106,7 +105,7 @@ export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
             <div className="space-y-4">
               <div className="flex justify-between text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
                 <span className="flex items-center gap-1.5 transition-colors group-hover:text-slate-300">
-                  <MapPin size={10} className="text-blue-500" /> {context.name}
+                  <MapPin size={10} className="text-blue-500" /> {cityName}
                 </span>
                 <span className="text-blue-400">{profile.exp} / 1000 XP</span>
               </div>
@@ -117,7 +116,7 @@ export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
                 />
               </div>
 
-              <Link 
+              <Link
                 href="/profile/settings"
                 className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors mt-2"
               >
@@ -207,7 +206,7 @@ export function OrdersSidebar({ popularCategories }: OrdersSidebarProps) {
           {popularCategories.map((cat) => (
             <Link
               key={cat.id}
-              href={`/orders/${context.slug}/${cat.slug}`}
+              href={`/orders/${citySlug}/${cat.slug}`}
               className="flex items-center justify-between group"
             >
               <div className="flex items-center gap-4">

@@ -7,7 +7,8 @@ import { cn, unwrap } from '@/lib/utils';
 import { GetOrdersResponse } from '@/actions/order/get-feed';
 
 import { useIsomorphicGate } from '../hooks/useIsomorphicGate';
-import { useOrdersStream, useQueryFeedContext } from '../providers/FeedController';
+import { useInitialData, useOrdersStream } from '../providers/FeedController';
+
 
 // --- СТРОГИЕ КОНТРАКТЫ ДАННЫХ И ТИПИЗАЦИЯ ---
 type GetOrdersResponseList = GetOrdersResponse<'list'>;
@@ -122,55 +123,60 @@ export const HeaderStatusBadge = React.memo(({ isFetching, isReady }: HeaderStat
 });
 HeaderStatusBadge.displayName = 'HeaderStatusBadge';
 
-/**
- * 🧱 3. ДЕКЛАРАТИВНЫЙ ИЗОМОРФНЫЙ РИДЕР КЭША И СТРИМА
- */
+/***/
+
 export const HeaderDataReader = React.memo(function HeaderDataReader() {
-  // 1. Подключаемся к шине данных через контексты платформы ZWORK
-
-  const ordersStream = useOrdersStream<'list'>();
-
-  // 2. Внедряем единый изоморфный затвор из кастомного хука
+  // 1. Извлекаем изоморфный затвор, сырой промис и статику URL страниц
   const { isServerKeyMatch, queryKey } = useIsomorphicGate();
+  const { citySlug, categorySlug } = useInitialData();
+  const ordersStream = useOrdersStream<'list'>(); // 🎯 Сужаем тип дженериком на входе за 0ms
   const globalIsFetching = useIsFetching({ queryKey }) > 0;
 
-  // 🔥 ФИКС 1: Вытягиваем поток ВСЕГДА на холодном старте (F5) при совпадении ключей.
-  // Локальный кэш-слот клиента больше не заблокирует SSR-распаковку стрима.
-  const serverDataRaw = isServerKeyMatch ? use(ordersStream) : null;
+  // 2. 🎯 БЕЗУСЛОВНЫЙ use() НА КОРНЕ КОМПОНЕНТА ДЛЯ REACT 19: Точечный саспенс хедера
+  const resolvedStream = use(ordersStream);
+  const serverDataRaw = isServerKeyMatch ? unwrap(resolvedStream, null) : null;
 
-  // 3. Пассивный декларативный наблюдатель за RAM-кэшем Танстека с удержанием старого кэша
+  // 3. Пассивный декларативный наблюдатель за RAM-кэшем Танстека с удержанием старого кадра
   const { data } = useQuery<InfiniteOrdersData>({
     queryKey,
     queryFn: () => { throw new Error("Observer only") },
     enabled: false,
-    // 🔥 ФИКС 2: Возвращаем канонический удержатель кадра v5.
-    // Гарантирует, что во время смены радиуса/скилов `data` НЕ превратится в undefined,
-    // а сохранит старый слепок, предотвращая падение в скелетоны.
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousData, // Канонический удержатель кадра v5
   });
 
-  // Хранилище слепка для UX Keep-Alive
-  const lastStatsSnapshotRef = useRef<{ totalCount: number; loadedCount: number; isReady: boolean } | null>(null);
+  // Хранилище слепка для UX Keep-Alive (инициализируем дефолтами)
+  const lastStatsSnapshotRef = useRef<{ totalCount: number; loadedCount: number; isReady: boolean }>({
+    totalCount: 0,
+    loadedCount: 0,
+    isReady: false
+  });
 
-  // 4. Синхронный процессор сбора метрик (работает без вызовов hooks/unwrap внутри)
+  // 🔒 ЖЕСТКИЙ СБРОС КЭША ПРИ СМЕНЕ СТАТИКИ (Город / Категория)
+  // Гарантирует включение скелетонов при роутинге, но оставляет удержание цифр при смене радиуса
+  const currentUrlMarker = `${citySlug}::${categorySlug ?? 'all'}`;
+  const lastUrlMarkerRef = useRef(currentUrlMarker);
+
+  if (lastUrlMarkerRef.current !== currentUrlMarker) {
+    lastUrlMarkerRef.current = currentUrlMarker;
+    lastStatsSnapshotRef.current = { totalCount: 0, loadedCount: 0, isReady: false }; // Сброс под скелетоны
+  }
+
+  // 4. Чистый синхронный сбор текущих метрик без побочных эффектов (БЕЗ ANY / БЕЗ AS)
   const currentStats = useMemo(() => {
-    // Сценарий А: Данные уже есть в RAM-кэше Танстека (или удерживаются через placeholderData при смене фильтров)
+    // Сценарий А: Данные удерживаются в Танстеке при смене фильтров
     if (data?.pages && data.pages.length > 0) {
-      const { pages } = data;
-      const firstPageTotal = pages[0]?.total ?? 0;
-      const loadedCount = pages.reduce((acc, page) => acc + (page?.orders?.length || 0), 0);
+      const firstPage = data.pages[0];
+      const totalCount = firstPage?.total ?? 0; // 🎯 ЧИСТЫЙ ТИП: total берется из строго типизированной структуры
+      const loadedCount = data.pages.reduce((acc, page) => acc + (page?.orders?.length || 0), 0);
 
-      // 🔥 ФИКС 3: Шапка готова показать старые цифры, пока идет фетчинг! 
-      // isReady: true защищает от сваливания в StatsSkeleton, давая цифрам красиво тускнеть.
-      return { totalCount: firstPageTotal, loadedCount, isReady: true };
+      return { totalCount, loadedCount, isReady: true };
     }
 
-    // Сценарий Б: Холодный старт (F5) — данные гарантированно развернуты выше через React.use
+    // Сценарий Б: Холодный старт (F5) — данные гарантированно развернуты через use() выше
     if (serverDataRaw) {
-      const unwrapped = unwrap(serverDataRaw, { orders: [], nextCursor: null, total: 0 });
       return {
-        totalCount: unwrapped?.total ?? 0,
-        loadedCount: unwrapped?.orders?.length || 0,
+        totalCount: serverDataRaw.total ?? 0,
+        loadedCount: serverDataRaw.orders?.length || 0,
         isReady: true
       };
     }
@@ -179,26 +185,37 @@ export const HeaderDataReader = React.memo(function HeaderDataReader() {
     return null;
   }, [data, serverDataRaw]);
 
-  // 5. Высокопроизводительный стабилизатор ссылок (Keep-Alive UX Шапки)
+  // 5. Высокопроизводительный стабилизатор ссылок БЕЗ мутаций внутри useMemo
   const stats = useMemo(() => {
     const previous = lastStatsSnapshotRef.current;
 
+    // Если текущие метрики пустые (Сценарий В) — отдаем сброшенный реф (где isReady: false -> StatsSkeleton)
     if (currentStats === null) {
-      return previous ?? { totalCount: 0, loadedCount: 0, isReady: false };
-    }
-
-    if (
-      previous &&
-      previous.totalCount === currentStats.totalCount &&
-      previous.loadedCount === currentStats.loadedCount &&
-      previous.isReady === currentStats.isReady
-    ) {
       return previous;
     }
 
-    lastStatsSnapshotRef.current = currentStats;
-    return currentStats;
+    const isIdentical = previous &&
+      previous.totalCount === currentStats.totalCount &&
+      previous.loadedCount === currentStats.loadedCount &&
+      previous.isReady === currentStats.isReady;
+
+    return isIdentical ? previous : currentStats;
   }, [currentStats]);
+
+  // 🔒 СИНХРОННЫЙ КОММИТ СЛЕПКА: Обновляем реф строго после того, как React высчитал стейт рендеринга
+  if (currentStats !== null && currentStats !== lastStatsSnapshotRef.current) {
+    lastStatsSnapshotRef.current = currentStats;
+  }
+
+  // 🔍 ЖЕСТКИЙ ПЕРЕХВАТ ТАЙМИНГОВ ГИДРАТАЦИИ
+  if (typeof window !== 'undefined') {
+    console.log(
+      `🚨 [HYDRATION_CHECK] | ` +
+      `isServerKeyMatch: ${isServerKeyMatch} | ` +
+      `serverDataRaw_Is_Null: ${serverDataRaw === null} | ` +
+      `RAM_Cache_Has_Pages: ${!!data?.pages?.length}`
+    );
+  }
 
   return (
     <>
@@ -216,12 +233,16 @@ export const HeaderDataReader = React.memo(function HeaderDataReader() {
   );
 });
 
+
+
+
 /**
  * 🧱 4. ШЛЮЗ ДАННЫХ ХЕДЕРА
  */
 export function HeaderDataBridge() {
   // 🎯 Читаем имя города напрямую из общего монолитного контекста
-  const { name: cityName } = useQueryFeedContext();
+  const { cityName } = useInitialData();
+
   console.log(`🔌 [RENDER] HeaderDataBridge | City: ${cityName}`);
 
   return (

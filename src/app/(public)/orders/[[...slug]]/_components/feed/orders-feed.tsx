@@ -1,17 +1,20 @@
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
+import React, { use, useCallback, useMemo } from 'react';
 import { useInfiniteQuery, keepPreviousData, type InfiniteData } from '@tanstack/react-query';
-import { useQueryFeedContext, useOrdersStream, type ExtendedFeedContext } from '../providers/FeedController'; // 🎯 Импортируем ExtendedFeedContext
+
 import { handleAction, unwrap } from '@/lib/utils';
 import { getOrders, type GetOrdersResponse } from '@/actions/order/get-feed';
-import { type ActionResponse } from '@/lib/server-utils';
 
 import { cn } from '@/lib/utils';
 import { EmptyState } from '../shared/empty-state';
 import { OrderCard } from './order-card';
 import { IsolatedScrollObserver } from './isolated-scroll-observer';
-import { IsomorphicOrdersQueryKey, useIsomorphicGate } from '../hooks/useIsomorphicGate';
+import { type IsomorphicOrdersQueryKey, useIsomorphicGate } from '../hooks/useIsomorphicGate';
+
+import { useFeedContext, useOrdersStream } from '../providers/FeedController';
+import { FeedContext } from '../../page';
+
 
 export type GetOrdersResponseList = GetOrdersResponse<'list'>;
 export type InfiniteOrdersData = InfiniteData<GetOrdersResponseList, string | undefined>;
@@ -23,8 +26,8 @@ export interface SelectOutput {
 
 export interface OrdersFeedCoreProps {
     queryKey: IsomorphicOrdersQueryKey;
-    context: ExtendedFeedContext; // 🎯 Обновили на расширенный тип
-    serverDataRaw: ActionResponse<GetOrdersResponseList> | null;
+    context: FeedContext;
+    serverDataRaw: GetOrdersResponseList | null;
 }
 
 let connectorRenderCount = 0;
@@ -38,18 +41,20 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
     const isServer = typeof window === 'undefined';
     const envMarker = isServer ? '🧬 [SERVER-SSR]' : '💻 [CLIENT-HYDRATE]';
 
-    const context = useQueryFeedContext();
-    const ordersStream = useOrdersStream<'list'>();
-
+    const context = useFeedContext();
+    const ordersStream = useOrdersStream<'list'>(); // 🎯 Сужаем тип дженериком на входе за 0ms
     const { queryKey, isServerKeyMatch, hasCachedData } = useIsomorphicGate();
+
+    // 🎯 БЕЗУСЛОВНЫЙ use() ДЛЯ REACT 19: Стриминг чанков работает точечно
+    const resolvedStream = use(ordersStream);
+
+    // 🔌 НИКАКИХ "AS": unwrap отдает строгий тип, так как ordersStream сужен выше хуком
+    const serverDataRaw = isServerKeyMatch ? unwrap(resolvedStream, null) : null;
 
     console.log(
         `${envMarker} 🔔 [CONNECTOR RENDER #${connectorRenderCount}] OrdersFeed | ` +
         `Match: ${isServerKeyMatch} | Cached: ${hasCachedData} `
     );
-
-    // Стрим разворачивается СТРОГО когда фильтры идентичны серверным дефолтам (F5)
-    const serverDataRaw = isServerKeyMatch ? React.use(ordersStream) : null;
 
     return (
         <OrdersFeedCore
@@ -59,6 +64,8 @@ export const OrdersFeed = React.memo(function OrdersFeed() {
         />
     );
 });
+
+OrdersFeed.displayName = 'OrdersFeed';
 
 /**
  * 🎛️ CORE COMPONENT
@@ -71,10 +78,9 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
     coreRenderCount++;
     console.log(`🎬 [CORE ENTRY #${coreRenderCount}] OrdersFeedCore начал выполнение тела функции.`);
 
-    // ⚡️ Стабильный flatMap-процессор списка
+    // ⚡️ Стабильный flatMap-процессор списка (Строгие типы без any)
     const selectProcessor = useCallback((data: InfiniteOrdersData): SelectOutput => {
-        // 👍 Безопасное чтение через опциональную цепочку на случай холостого прогрева кэша
-        const firstPage = data?.pages?.[0];
+        const firstPage = data.pages[0];
         const total = firstPage?.total ?? 0;
         const cursor = firstPage?.nextCursor ?? 'none';
 
@@ -86,8 +92,8 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
         };
     }, []);
 
-    // 🔥 ДЕКЛАРАТИВНЫЙ ИЗОМОРФНЫЙ СИДЕР
-    const computedInitialData = useMemo(() => {
+    // 🔥 ДЕКЛАРАТИВНЫЙ ИЗОМОРФНЫЙ СИДЕР (Чистый вызов без as)
+    const computedInitialData = useMemo((): InfiniteOrdersData | undefined => {
         console.log(`🌱 [INITIAL DATA SEEDER] Опрос затвора для сидинга. HasServerData: ${!!serverDataRaw}`);
 
         if (!serverDataRaw) {
@@ -95,9 +101,11 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
             return undefined;
         }
 
-        console.log(`📦 [INITIAL DATA] Подхватываем и разворачиваем готовый Edge-поток.`);
-        const unwrapped = unwrap(serverDataRaw, { orders: [], nextCursor: null, total: 0 });
-        return { pages: [unwrapped], pageParams: [undefined] };
+        console.log(`📦 [INITIAL DATA] Подхватываем готовый Edge-объект.`);
+        return {
+            pages: [serverDataRaw],
+            pageParams: [undefined]
+        };
     }, [serverDataRaw]);
 
     const query = useInfiniteQuery<
@@ -187,3 +195,5 @@ const OrdersFeedCore = React.memo(function OrdersFeedCore({
         </div>
     );
 });
+
+OrdersFeedCore.displayName = 'OrdersFeedCore';

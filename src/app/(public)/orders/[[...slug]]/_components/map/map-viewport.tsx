@@ -8,7 +8,7 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query"
 
 // Хуки, типы и экшены
 import { getOrders, type GetOrdersResponse } from "@/actions/order/get-feed"
-import { useQueryFeedContext, type ExtendedFeedContext } from "../providers/FeedController" // 🎯 Оставляем строго один монолитный импорт
+import { useFeedContext } from "../providers/FeedController" // 🎯 Оставляем строго один монолитный импорт
 
 // Динамический импорт движка (Leaflet/Google/Yandex)
 const OrdersMap = dynamic(
@@ -21,19 +21,19 @@ const OrdersMap = dynamic(
 
 export function MapViewport() {
     // 🪄 Извлекаем ПОЛНЫЙ монолитный контекст (содержит координаты lat, lng, radius, viewMode)
-    const queryContext = useQueryFeedContext();
+    const context = useFeedContext();
 
     // 2. Основной запрос за маркерами карты (0 ошибок TypeScript, 0 any!)
     const { data, isFetching } = useQuery<
-        GetOrdersResponse<'map'> | null, 
-        Error, 
+        GetOrdersResponse<'map'> | null,
+        Error,
         GetOrdersResponse<'map'> | null
     >({
         // Детерминированный ключ кэша на основе полного контекста запроса
-        queryKey: ["orders", "map", queryContext],
-        queryFn: () => handleAction(getOrders({ ...queryContext, mode: 'map' })),
+        queryKey: ["orders", "map", context],
+        queryFn: () => handleAction(getOrders({ ...context, mode: 'map' })),
         // Запрос активируется строго тогда, когда юзер физически переключился на вкладку карты
-        enabled: queryContext.viewMode === 'map', // 🎯 Читаем напрямую из монолита
+        enabled: context.viewMode === 'map', // 🎯 Читаем напрямую из монолита
         placeholderData: keepPreviousData, // Защита от мигания: удерживает маркеры при смене радиуса
         staleTime: 1000 * 60 * 5, // Маркеры на карте валидны 5 минут
     });
@@ -50,8 +50,8 @@ export function MapViewport() {
             )}>
                 <OrdersMap
                     orders={orders}
-                    center={[queryContext.lat, queryContext.lng]} // 🔥 Координаты центра города из монолита
-                    radius={queryContext.radius} // 🎯 Реактивный радиус напрямую из монолита
+                    center={[context.lat, context.lng]} // 🔥 Координаты центра города из монолита
+                    radius={context.radius} // 🎯 Реактивный радиус напрямую из монолита
                     isFetching={isFetching}
                 />
 
@@ -65,7 +65,7 @@ export function MapViewport() {
                     <div className="bg-slate-950 text-white px-6 py-3 rounded-2xl flex items-center gap-3 shadow-2xl border border-white/10">
                         <Loader2 className="w-4 h-4 animate-spin text-blue-500" strokeWidth={3} />
                         <span className="text-[10px] font-black uppercase italic tracking-[0.2em] whitespace-nowrap">
-                            Scanning Area / {queryContext.radius}km
+                            Scanning Area / {context.radius}km
                         </span>
                     </div>
                 </div>

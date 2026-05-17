@@ -118,4 +118,6 @@ export function slugify(text: string) {
 }
 
 
-
+export function serializeDeterministic<T extends Record<string, any>>(obj: T): string {
+  return JSON.stringify(obj, Object.keys(obj).sort());
+}

@@ -8,7 +8,7 @@ import { useLocationStore } from "@/store/use-location-store"
 import { LOCATION_CONFIG } from "@/lib/location-config"
 
 // 🎯 Импортируем только один монолитный хук и хук чтения Zustand стора
-import { useFeedStore, useQueryFeedContext } from "../providers/FeedController"
+import { useFeedStore, useFeedContext, useInitialData } from "../providers/FeedController"
 
 const RADIUS_OPTIONS = LOCATION_CONFIG.SETTINGS.radiusOptions;
 
@@ -19,7 +19,8 @@ export function OrdersToolbar() {
   const openModal = useLocationStore(s => s.openModal)
 
   // 2. ДАННЫЕ (Читаем ВСЁ из одного монолитного контекста за 1 такт рендеринга!)
-  const { viewMode, radius, name } = useQueryFeedContext(); 
+  const { viewMode, radius } = useFeedContext();
+  const { cityName } = useInitialData()
 
   return (
     <div className="bg-white px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-100 sticky top-0 z-30">
@@ -67,7 +68,7 @@ export function OrdersToolbar() {
               <ChevronDown size={8} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
             </div>
             <p className="text-[13px] font-black uppercase italic text-slate-900 leading-none truncate max-w-[120px]">
-              {name}
+              {cityName}
             </p>
           </div>
         </button>

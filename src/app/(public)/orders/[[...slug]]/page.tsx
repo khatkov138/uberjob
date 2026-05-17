@@ -1,9 +1,8 @@
-// src/app/orders/[[...slug]]/page.tsx
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 
-import { unwrap } from "@/lib/utils"; // 🎯 Убрали лишний импорт getServerSession
+import { serializeDeterministic, unwrap } from "@/lib/utils";
 
 import { getMyProfile } from "@/actions/profile/get";
 import { getPopularCategories } from "@/actions/category/get";
@@ -14,16 +13,24 @@ import { getOrders } from "@/actions/order/get-feed";
 
 import { FeedController } from "./_components/providers/FeedController";
 
+// 🎯 СЕТЕВОЙ СЛОЙ: Кристально чистый плоский контекст для Танстека и API
 export interface FeedContext {
   locationId: string;
   lat: number;
   lng: number;
   radius: number;
-  name: string;
-  slug: string;
-  categoryId: string | null;
-  skillIds: string; 
+  skillIds: string;
   viewMode: 'list' | 'map';
+  categoryId: string | null;
+}
+
+// 🎯 UI СЛОЙ: Неизменяемая статика для рендеринга шапки, SEO и модалок
+export interface InitialFeedData {
+  cityName: string;
+  citySlug: string;
+  categoryName: string | null;
+  categorySlug: string | null;
+  initialFeedContextHash: string; // Затвор для useIsomorphicGate
 }
 
 interface Props {
@@ -61,11 +68,9 @@ export default async function OrdersPage({ params }: Props) {
   const initialProfile = unwrap(profileRes, null);
   const skillIds = initialProfile?.skills.map(s => s.categoryId) || [];
 
-  // Наш чистый стартовый контекст
+  // 🎯 1-й объект: Чистый плоский контекст для Танстека
   const initialFeedContext: FeedContext = {
     locationId: dbLocation.id,
-    name: dbLocation.name,
-    slug: dbLocation.slug,
     lat: dbLocation.lat,
     lng: dbLocation.lng,
     radius: feedState.radius,
@@ -74,9 +79,21 @@ export default async function OrdersPage({ params }: Props) {
     viewMode: feedState.viewMode
   };
 
+  // 🎯 2-й объект: Текстовая статика для шапки и заголовков
+  const initialFeedData: InitialFeedData = {
+    cityName: dbLocation.name,
+    citySlug: dbLocation.slug,
+    categoryName: currentCategory?.name || null,
+    categorySlug: currentCategory?.slug || null,
+    initialFeedContextHash: serializeDeterministic(initialFeedContext)
+  };
+
   // 4. Тяжелые промисы (Стриминг)
   const ordersPromise = (async () => {
-    return getOrders({ ...initialFeedContext, mode: feedState.viewMode });
+    return getOrders({
+      ...initialFeedContext,
+      mode: feedState.viewMode
+    });
   })();
 
   const popularCategoriesPromise = getPopularCategories(
@@ -88,9 +105,9 @@ export default async function OrdersPage({ params }: Props) {
   return (
     <FeedController
       ordersPromise={ordersPromise}
-      initialProfile={initialProfile} // 🔌 Пробрасываем только профиль, сессия стерта намертво
-      initialFeedContext={initialFeedContext}
-      currentCategory={currentCategory}
+      initialProfile={initialProfile}
+      initialFeedContext={initialFeedContext} // Улетел плоский контекст
+      initialFeedData={initialFeedData}       // Улетела статика для UI
     >
       <OrdersPageUI popularCategoriesPromise={popularCategoriesPromise} />
     </FeedController>

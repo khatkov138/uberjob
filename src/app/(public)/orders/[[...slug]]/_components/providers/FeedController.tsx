@@ -4,33 +4,37 @@ import React, { createContext, useContext, useMemo, useRef, type ReactNode } fro
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from 'zustand';
 
-import { type FeedContext as BaseFeedContext } from '../../page';
+
 import { getMyProfile, type FullProfile } from '@/actions/profile/get';
 import { handleAction } from '@/lib/utils';
 import { type ActionResponse } from '@/lib/server-utils';
 import { type GetOrdersResponse } from '@/actions/order/get-feed';
 import { createFeedStore, type FeedState } from "@/store/use-feed-store";
+import { FeedContext, InitialFeedData } from '../../page';
 
 type OrdersStreamPromise = Promise<ActionResponse<GetOrdersResponse<'list'> | GetOrdersResponse<'map'>>>;
 type FeedStoreApi = ReturnType<typeof createFeedStore>;
 
-// 🎯 СТРОГОЕ РАСШИРЕНИЕ: Описываем технический затвор для TypeScript без изменения базового типа страницы
-export interface ExtendedFeedContext extends BaseFeedContext {
-    initialFeedContextHash: string;
-    initialFeedContext: BaseFeedContext;
-}
-
-const QueryContext = createContext<ExtendedFeedContext | null>(null);
+const FeedContextInstance = createContext<FeedContext | null>(null);
+const InitialDataContext = createContext<InitialFeedData | null>(null);
 const OrdersStreamContext = createContext<OrdersStreamPromise | null>(null);
 const FeedStoreContext = createContext<FeedStoreApi | null>(null);
 
-// 🔌 УЛЬТИМАТИВНЫЙ И ЕДИНСТВЕННЫЙ ХУК ДЛЯ ВСЕГО ЯДРА ФИДА
-export const useQueryFeedContext = (): ExtendedFeedContext => {
-    const ctx = useContext(QueryContext);
-    if (!ctx) throw new Error('useQueryFeedContext missing');
+// 🔌 ХУК №1: Чистый плоский контекст фида для TanStack Query ключа и API
+export const useFeedContext = (): FeedContext => {
+    const ctx = useContext(FeedContextInstance);
+    if (!ctx) throw new Error('useFeedContext missing');
     return ctx;
 };
 
+// 🔌 ХУК №2: Неизменяемая текстовая статика для рендеринга шапки, SEO-заголовков и модалок
+export const useInitialData = (): InitialFeedData => {
+    const ctx = useContext(InitialDataContext);
+    if (!ctx) throw new Error('useInitialData missing');
+    return ctx;
+};
+
+// 🔌 ХУК №3: Твой канонический хук с дженериком для точечного сужения типов во вложенных слоях фида/карты
 export const useOrdersStream = <M extends 'list' | 'map' = 'list' | 'map'>(): Promise<
     ActionResponse<GetOrdersResponse<M>>
 > => {
@@ -39,6 +43,7 @@ export const useOrdersStream = <M extends 'list' | 'map' = 'list' | 'map'>(): Pr
     return ctx as Promise<ActionResponse<GetOrdersResponse<M>>>;
 };
 
+// 🔌 ХУК №4: Интерфейс к Zustand-стору клиента
 export function useFeedStore<T>(selector: (state: FeedState) => T): T {
     const context = useContext(FeedStoreContext);
     if (!context) throw new Error('useFeedStore must be used within FeedController');
@@ -46,9 +51,9 @@ export function useFeedStore<T>(selector: (state: FeedState) => T): T {
 }
 
 interface FeedControllerProps {
-    initialFeedContext: BaseFeedContext;
-    currentCategory: { id: string; name: string; slug: string } | null;
-    initialProfile: FullProfile | null; // 🎯 Пропс session удален за избыточностью
+    initialFeedContext: FeedContext;
+    initialFeedData: InitialFeedData;
+    initialProfile: FullProfile | null;
     ordersPromise: OrdersStreamPromise;
     children: ReactNode;
 }
@@ -57,7 +62,7 @@ let controllerRenderCount = 0;
 
 export const FeedController = React.memo(function FeedController({
     initialFeedContext,
-    currentCategory,
+    initialFeedData,
     initialProfile,
     ordersPromise,
     children
@@ -66,7 +71,7 @@ export const FeedController = React.memo(function FeedController({
 
     console.log(`🎛️  [CONTROLLER ENTRY #${controllerRenderCount}] Инициализация жизненного цикла FeedController.`);
 
-    // 🔒 Читаем радиус и режим напрямую из серверного контекста фида при инициализации стора
+    // 🔒 Zustand: Инициализируем реактивный стор из серверных параметров строго один раз
     const storeRef = useRef<FeedStoreApi | null>(null);
     if (!storeRef.current) {
         storeRef.current = createFeedStore({
@@ -75,69 +80,53 @@ export const FeedController = React.memo(function FeedController({
         });
     }
 
-    // 🔒 СЕРВЕРНЫЙ ЗАТВОР: Сериализуем стартовый контекст строго один раз при F5
-    const initialFeedContextHash = useMemo((): string => {
-        return JSON.stringify(initialFeedContext);
-    }, [initialFeedContext]);
-
-    // Твой оригинальный рабочий блок профиля Танстека с оптимизированным затвором сети
+    // Твой оригинальный рабочий блок профиля Танстека с защитой от холостых сетевых ударов
     const { data: profile } = useQuery({
         queryKey: ["user-profile"],
         queryFn: () => handleAction(getMyProfile()),
         initialData: initialProfile,
-        enabled: !!initialProfile, // ⚡️ Завязано на профиль, холостой сетевой удар заблокирован намертво!
+        enabled: !!initialProfile,
         staleTime: 1000 * 60 * 30,
         notifyOnChangeProps: ['data'],
     });
 
-    // Атомарный выбор примитивов напрямую из Zustand-стора
+    // Извлекаем динамику из Zustand-стора клиента
     const radius = useStore(storeRef.current, s => s.radius);
     const viewMode = useStore(storeRef.current, s => s.viewMode);
 
-    // Изоморфная стабилизация строки скиллов (БЕЗ ПАДЕНИЯ В СЕРВЕРНЫЙ ДЕФОЛТ ПРИ ОЧИСТКЕ)
+    // Изоморфная стабилизация строки скиллов (БЕЗ ПАДЕНИЯ В СЕРВЕРНЫЙ ДЕФОЛТ ПРИ ОЧИСТКЕ КЭША)
     const currentSkillIdsStr = useMemo((): string => {
-        if (profile) {
-            const targetSkills = profile.skills ?? [];
-            return targetSkills.map(s => s.categoryId).sort().join(',');
-        }
-        if (initialProfile) {
-            const targetSkills = initialProfile.skills ?? [];
-            return targetSkills.map(s => s.categoryId).sort().join(',');
-        }
+        if (profile) return (profile.skills ?? []).map(s => s.categoryId).sort().join(',');
+        if (initialProfile) return (initialProfile.skills ?? []).map(s => s.categoryId).sort().join(',');
         return initialFeedContext.skillIds || '';
     }, [profile?.skills, initialProfile?.skills, initialFeedContext.skillIds]);
 
-    // 🪄 МОНОЛИТНЫЙ ОБЪЕКТ СВЕРХ-КОНТЕКСТА: Содержит в себе вообще все слои приложения
-    const fullQueryContext = useMemo((): ExtendedFeedContext => {
+    // 🎯 СБОРКА ДИНАМИЧЕСКОГО КОНТЕКСТА: Только плоские примитивы для Танстека
+    const dynamicFeedContext = useMemo((): FeedContext => {
         return {
-            // Гео-ядро и URL статика
             locationId: initialFeedContext.locationId,
-            name: initialFeedContext.name,
-            slug: initialFeedContext.slug,
             lat: initialFeedContext.lat,
             lng: initialFeedContext.lng,
-            categoryId: currentCategory?.id || null, // Железная URL статика
-
-            // Динамика UI фильтров клиента
             radius,
             viewMode,
             skillIds: currentSkillIdsStr,
-
-            // Технический изоморфный затвор для гейта
-            initialFeedContextHash,
-            initialFeedContext
+            categoryId: initialFeedContext.categoryId
         };
-    }, [initialFeedContext, currentCategory?.id, radius, viewMode, currentSkillIdsStr, initialFeedContextHash]);
+    }, [initialFeedContext, radius, viewMode, currentSkillIdsStr]);
 
-    console.log(`🏁 [CONTROLLER COMMIT #${controllerRenderCount}] Контексты сформированы, JSX уходит в провайдеры.`);
+    console.log(`🏁 [CONTROLLER COMMIT #${controllerRenderCount}] Контексты изолированы, JSX уходит в провайдеры.`);
 
     return (
         <FeedStoreContext.Provider value={storeRef.current}>
-            <QueryContext.Provider value={fullQueryContext}>
+            <InitialDataContext.Provider value={initialFeedData}>
                 <OrdersStreamContext.Provider value={ordersPromise}>
-                    {children}
+                    <FeedContextInstance.Provider value={dynamicFeedContext}>
+                        {children}
+                    </FeedContextInstance.Provider>
                 </OrdersStreamContext.Provider>
-            </QueryContext.Provider>
+            </InitialDataContext.Provider>
         </FeedStoreContext.Provider>
     );
 });
+
+FeedController.displayName = 'FeedController';
