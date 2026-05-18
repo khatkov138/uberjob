@@ -5,9 +5,6 @@ import { useStore } from "zustand"
 import { createRoleStore, RoleMode, RoleState } from "@/store/use-role-store"
 import { User } from "@/lib/auth"
 
-// Строгий контракт типа пользователя (без use of implicit/explicit any)
-
-
 type RoleStoreApi = ReturnType<typeof createRoleStore>
 
 export const NavbarStoreContext = createContext<RoleStoreApi | undefined>(undefined)
@@ -45,6 +42,5 @@ export function useNavbarStore<T>(selector: (state: RoleState) => T): T {
 // 🛡️ Абсолютная защита от холостых GET-запросов на клиенте
 export function useNavbarUser() {
   const context = useContext(NavbarUserContext)
-  // Возвращает user или null (если гость), без вызова authClient.useSession()
   return context
 }

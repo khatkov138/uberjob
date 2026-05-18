@@ -23,6 +23,7 @@ export interface InitialFeedData {
 
 interface Props {
   params: Promise<{ slug?: string[] }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 /**
@@ -84,25 +85,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  * 🧱 ОСНОВНОЙ СЕРВЕРНЫЙ КОМПОНЕНТ СТРАНИЦЫ
  */
 export default async function OrdersPage({ params }: Props) {
+  // Твоя любимая деструктуризация без лишнего шума 🚀
   const { slug = [] } = await params;
   const [citySlug, categorySlug] = slug;
 
-  // Воронка валидации: сначала быстрые куки. Если слага нет — мгновенный редирект
+  // Воронка валидации: читает куку, которую прокси уже подготовил!
   const [currentGeo, feedState] = await Promise.all([
     getServerLocation(),
-    getServerFeedState()
+    getServerFeedState() // Ничего не прокидываем сюда 🚀
   ]);
 
   if (!citySlug) return redirect(`/orders/${currentGeo.slug}`);
 
-  // Тянем данные через кэшированную функцию (0ms оверхеда, если generateMetadata уже выполнился)
   const { dbLocation, currentCategory } = await getCachedRouteData(citySlug, categorySlug);
 
-  // Обработка 404/ошибок роутинга без лишнего серверного шума
   if (!dbLocation) return redirect(`/orders/${currentGeo.slug}`);
   if (categorySlug && !currentCategory) return redirect(`/orders/${citySlug}`);
 
-  // Параллельный сбор сессии профиля
   const profileRes = await getMyProfile();
   const initialProfile = unwrap(profileRes, null);
   const skillIds = initialProfile?.skills.map(s => s.categoryId) || [];
@@ -125,7 +124,6 @@ export default async function OrdersPage({ params }: Props) {
     initialFeedContextHash: serializeDeterministic(initialFeedContext)
   };
 
-  // Тяжелые промисы (Стриминг чанков через React.use)
   const ordersPromise = getOrders({
     ...initialFeedContext,
     mode: feedState.viewMode

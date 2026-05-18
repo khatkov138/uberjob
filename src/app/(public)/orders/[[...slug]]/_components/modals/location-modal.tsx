@@ -10,7 +10,7 @@ import { Search, MapPin, Loader2, Target, ArrowUpRight } from "lucide-react"
 import { handleAction, handleApi, cn } from "@/lib/utils"
 
 import { getOrCreateLocation } from "@/actions/location/manage"
-import { useFeedContext, useInitialData } from "../providers/FeedController" // 🎯 Перешли на единую монолитную шину
+import { useInitialData } from "../providers/FeedController" // 🎯 Перешли на единую монолитную шину
 
 // 🎯 Строгий интерфейс для подсказок гео-саггеста вместо any
 interface GeoSuggestion {
@@ -21,13 +21,12 @@ interface GeoSuggestion {
 
 export function LocationModal() {
   const router = useRouter()
+  // Достаем closeModal и мутатор стора локации
   const { isModalOpen, closeModal } = useLocationStore()
   const setGlobalLocation = useLocationStore(s => s.setGlobalLocation)
 
-  // 🎯 ЧИТАЕМ МОНОЛИТ: Больше никаких useStaticFeed, имя города берем отсюда за 0ms
-  const currentContext = useFeedContext()
+  // 🎯 ЧИТАЕМ МОНОЛИТ: Имя текущего города берем отсюда за 0ms без лагов
   const { cityName } = useInitialData();
-
 
   const [query, setQuery] = React.useState("")
   const [suggestions, setSuggestions] = React.useState<GeoSuggestion[]>([])
@@ -52,10 +51,17 @@ export function LocationModal() {
     setSelectedUri(item.uri);
 
     try {
+      // Идем на бэкенд, создаем или находим локацию по URI Яндекса
       const location = await handleAction(getOrCreateLocation(item.uri));
-      setGlobalLocation(location.id);
+      
+      // 🚀 ПЕРЕХОД НА СЛАГИ: Записываем в Zustand-куку чистый ЧПУ-слаг города вместо ID!
+      setGlobalLocation(location.slug);
 
-      // Мягко переводим роутер на новый город через URL роутера Next.js
+      // После записи слага сразу мягко гасим модалку
+      closeModal();
+
+      // Мягко переводим роутер на новый ЧПУ-роут Next.js
+      // Навбар на клиенте мгновенно поймает этот слаг из Zustand и перерисует href кнопки
       router.push(`/orders/${location.slug}`);
 
     } catch (error) {

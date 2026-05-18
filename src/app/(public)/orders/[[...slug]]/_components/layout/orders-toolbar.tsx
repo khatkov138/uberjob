@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+// 🚀 Импортируем утилиты навигации Next.js
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { List, Map as MapIcon, MapPin, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -13,6 +15,11 @@ import { useFeedStore, useFeedContext, useInitialData } from "../providers/FeedC
 const RADIUS_OPTIONS = LOCATION_CONFIG.SETTINGS.radiusOptions;
 
 export function OrdersToolbar() {
+  // 🚀 Инициализируем роутер Next.js
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   // 1. ДЕЙСТВИЯ (Извлекаем мутаторы стейта напрямую из Zustand-сторов)
   const setViewMode = useFeedStore(s => s.setViewMode)
   const setRadius = useFeedStore(s => s.setRadius)
@@ -22,13 +29,27 @@ export function OrdersToolbar() {
   const { viewMode, radius } = useFeedContext();
   const { cityName } = useInitialData()
 
+  // 🎯 Универсальная функция обновления URL + Zustand по клику
+  const handleParamChange = (key: 'radius' | 'view', value: string | number) => {
+    // 1. Изменяем стейт в Zustand
+    if (key === 'radius') setRadius(value as number)
+    if (key === 'view') setViewMode(value as 'list' | 'map')
+
+    // 2. Модифицируем строку параметров браузера
+    const params = new URLSearchParams(searchParams.toString())
+    params.set(key, value.toString())
+
+    // 3. Мягко пушим новый URL без перезагрузки страницы (scroll: false спасает от прыжков экрана вверх)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
   return (
     <div className="bg-white px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-100 sticky top-0 z-30">
 
       {/* ЛЕВАЯ ЧАСТЬ: ПЕРЕКЛЮЧАТЕЛЬ ВИДА */}
       <div className="flex bg-slate-50 p-1.5 rounded-[1.25rem] border border-slate-100/80 shadow-inner w-full md:w-auto">
         <button
-          onClick={() => setViewMode("list")}
+          onClick={() => handleParamChange('view', 'list')} // 🚀 Меняем по клику
           className={cn(
             "flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase italic transition-all",
             viewMode === "list"
@@ -40,7 +61,7 @@ export function OrdersToolbar() {
           <span>Список</span>
         </button>
         <button
-          onClick={() => setViewMode("map")}
+          onClick={() => handleParamChange('view', 'map')} // 🚀 Меняем по клику
           className={cn(
             "flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase italic transition-all",
             viewMode === "map"
@@ -80,7 +101,7 @@ export function OrdersToolbar() {
           {RADIUS_OPTIONS.map((r) => (
             <button
               key={r}
-              onClick={() => setRadius(r)}
+              onClick={() => handleParamChange('radius', r)} // 🚀 Меняем по клику
               className={cn(
                 "px-3 py-2 rounded-xl text-[9px] font-black uppercase transition-all",
                 radius === r

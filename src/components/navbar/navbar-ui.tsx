@@ -10,8 +10,11 @@ import { cn } from "@/lib/utils"
 
 import { RoleSwitcher } from "./_components/role-switcher"
 import { NotificationsBell } from "./_components/notifications-bell"
+// 🚀 Чистый импорт без вызова вырезанного серверного useNavbarCitySlug
 import { useNavbarStore, useNavbarUser } from "./navbar-provider"
 import { UnreadBadge } from "./_components/unread-badge"
+import { useLocationStore } from "@/store/use-location-store"
+import { LOCATION_CONFIG } from "@/lib/location-config"
 
 // 1. БРЕНД И НАВИГАЦИЯ (Автономно читает Слой Гранит и Слой Ртуть)
 function BrandNav() {
@@ -49,11 +52,17 @@ function BrandNav() {
     )
 }
 
-// 2. ЦЕНТРАЛЬНАЯ КНОПКА (Автономно читает Слой Гранит и Слой Ртуть)
+// 2. ЦЕНТРАЛЬНАЯ КНОПКА (Автономно читает Слой Гранит, Слой Ртуть и Слой Слага из Zustand)
 function CentralActionButton() {
     const user = useNavbarUser()
     const mode = useNavbarStore((state) => state.mode)
     
+    // 🚀 РЕАКТИВНЫЙ ОБХОД КЭША: Вытаскиваем текущий ЧПУ-слаг города напрямую из Zustand
+    const currentCitySlug = useLocationStore(s => s.globalLocationSlug)
+    
+    // Безопасный фолбэк на случай первой загрузки, пока куки на клиенте еще не гидрировались
+    const activeCitySlug = currentCitySlug || LOCATION_CONFIG.DEFAULT.slug
+
     if (!user) return null
 
     return (
@@ -68,7 +77,8 @@ function CentralActionButton() {
                 </Link>
             ) : (
                 <Link
-                    href="/orders"
+                    // 🚀 Абсолютно живая ссылка на любой странице: пересчитывается за доли миллисекунды
+                    href={`/orders/${activeCitySlug}`}
                     className="w-full h-12 flex items-center justify-center gap-3 bg-slate-900 hover:bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] transition-all shadow-xl shadow-slate-200 active:scale-95"
                 >
                     <Search size={18} className="stroke-[3px]" />

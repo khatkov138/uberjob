@@ -82,35 +82,45 @@ export const getServerLocation = cache(async (
     preference: 'global' | 'lastOrder' = 'global'
 ) => {
     const cookieStore = await cookies();
+    // Читаем ту же самую куку ядра локации
     const storageRaw = cookieStore.get("zwork-core-loc")?.value;
 
-    let globalId: string | null = null;
-    let lastOrderId: string | null = null;
+    // Переводим внутренние переменные со старых ID на ЧПУ Слаги 🚀
+    let globalSlug: string | null = null;
+    let lastOrderSlug: string | null = null;
 
     if (storageRaw) {
         try {
             const parsed = JSON.parse(decodeURIComponent(storageRaw));
-            globalId = parsed?.state?.globalLocationId || null;
-            lastOrderId = parsed?.state?.lastOrderLocationId || null;
+
+            // Извлекаем именно слаги, которые туда теперь пишет Zustand и прокси 🚀
+            if (parsed?.state) {
+                globalSlug = parsed.state.globalLocationSlug || null;
+                lastOrderSlug = parsed.state.lastOrderLocationSlug || null;
+            }
         } catch (e) {
-            console.error("ZWORK_LOCATION_PARSE_ERROR:", e);
+            console.error("❌ [SERVER LOCATION HELP] Parse error:", e);
         }
     }
 
-    const targetId = preference === 'lastOrder'
-        ? (lastOrderId || globalId)
-        : (globalId || lastOrderId);
+    // Вычисляем целевой слаг в зависимости от приоритета (lastOrder или global)
+    const targetSlug = preference === 'lastOrder'
+        ? (lastOrderSlug || globalSlug)
+        : (globalSlug || lastOrderSlug);
 
-    let dbLocation = targetId
-        ? await prisma.location.findUnique({ where: { id: targetId } })
+    // 🚀 ИЩЕМ В БАЗЕ ДАННЫХ ПО УНИКАЛЬНОМУ СЛАГУ ВМЕСТО ID
+    let dbLocation = targetSlug
+        ? await prisma.location.findUnique({ where: { slug: targetSlug } })
         : null;
 
+    // Если по слагу ничего не нашли (или кука пустая) — берем дефолтный город по yandexUri из твоего конфига
     if (!dbLocation) {
         dbLocation = await prisma.location.findUnique({
             where: { yandexUri: LOCATION_CONFIG.DEFAULT.yandexUri }
         });
     }
 
+    // Если в базе вообще шаром покати (первый запуск на чистой БД) — создаем дефолтный город
     if (!dbLocation) {
         dbLocation = await prisma.location.create({
             data: {
@@ -123,7 +133,7 @@ export const getServerLocation = cache(async (
         });
     }
 
-    // Возвращаем объект. TypeScript сам выведет его форму.
+    // Возвращаем объект. Форма и типы данных для остального бэкенда сохранены без изменений! 🚀
     return {
         id: dbLocation.id,
         name: dbLocation.name,
@@ -140,20 +150,21 @@ export type ServerLocation = Awaited<ReturnType<typeof getServerLocation>>;
 export const getServerFeedState = cache(async () => {
     const cookieStore = await cookies();
 
-    // 1. Используем Тот же ключ, что и в persist стора
+    // Читаем Zustand-куку с клиента (которую прокси уже синхронизировал с URL)
     const storageRaw = cookieStore.get("zwork-feed-state")?.value;
 
-    let radius = LOCATION_CONFIG.SETTINGS.radius;
+    // Инициализируем дефолты напрямую из твоего LOCATION_CONFIG
+    let radius: number = LOCATION_CONFIG.SETTINGS.radius;
     let viewMode: "list" | "map" = "list";
 
+    // Слой КУК: Перезаписываем дефолты сохраненным состоянием пользователя
     if (storageRaw) {
         try {
             // Zustand хранит данные в формате { state: { ... }, version: 0 }
-            // Нам нужно вытащить именно state
             const parsed = JSON.parse(decodeURIComponent(storageRaw));
 
             if (parsed?.state) {
-                radius = (parsed.state.radius) || radius;
+                radius = parsed.state.radius || radius;
                 viewMode = parsed.state.viewMode || viewMode;
             }
         } catch (e) {
@@ -163,7 +174,6 @@ export const getServerFeedState = cache(async () => {
 
     return { radius, viewMode };
 });
-
 
 
 
