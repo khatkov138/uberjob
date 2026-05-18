@@ -8,6 +8,7 @@ export default async function NewOrderPage() {
   // Достаем локацию напрямую из кук на сервере
   const serverLocation = await getServerLocation("lastOrder")
 
+  
   return (
     <Container className="bg-white h-full flex flex-col">
       {/* Уменьшили mb и размер для экономии места */}
