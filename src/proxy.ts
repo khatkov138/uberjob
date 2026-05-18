@@ -3,11 +3,10 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { LOCATION_CONFIG } from '@/lib/location-config'
 
-// 🚀 ОБНОВЛЯЕМ ТИПИЗАЦИЮ: Теперь кука локации хранит строго слаги, как и твой Zustand
 interface ZustandLocationCookie {
   state?: {
-    globalLocationSlug?: string | null    // 🚀 Сменили ID на Slug
-    lastOrderLocationSlug?: string | null  // 🚀 Сменили ID на Slug
+    globalLocationSlug?: string | null
+    lastOrderLocationSlug?: string | null
     [key: string]: unknown
   }
   version?: number
@@ -27,7 +26,7 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers)
   const searchParams = request.nextUrl.searchParams
 
-  // 1. ЛОГИКА UI-РЕЖИМОВ (CLIENT / PRO) — ПОЛНЫЙ ПРИОРИТЕТ URL
+  // 1. ЛОГИКА UI-РЕЖИМОВ (CLIENT / PRO)
   const currentMode = request.cookies.get('zwork-mode')?.value || 'CLIENT'
   let targetMode = currentMode
 
@@ -44,13 +43,10 @@ export async function proxy(request: NextRequest) {
   let shouldUpdateLocationCookie = false
   let newLocationCookieValue = ''
 
-  let shouldUpdateFeedCookie = false
-  let newFeedCookieValue = ''
-
   if (isOrdersPage) {
-    // 🚀 А) НОВАЯ МОЛНИЕНОСНАЯ ЛОГИКА ВАЛИДАЦИИ ГОРОДА (БЕЗ FETCH!)
+    // 📍 А) ВАЛИДАЦИЯ ГОРОДА ПО ЧПУ СЛАГАМ (0мс в памяти)
     if (pathParts[1]) {
-      const urlCitySlug = pathParts[1] // Извлекли слаг из ЧПУ урла (например, "angarsk")
+      const urlCitySlug = pathParts[1]
       const rawLocCookie = request.cookies.get('zwork-core-loc')?.value
 
       let currentGlobalLocationSlug: string | null = null
@@ -61,94 +57,62 @@ export async function proxy(request: NextRequest) {
           const decoded = decodeURIComponent(rawLocCookie)
           parsedLocState = JSON.parse(decoded) as ZustandLocationCookie
           currentGlobalLocationSlug = parsedLocState?.state?.globalLocationSlug || null
-        } catch (e) {
-          console.error("❌ [PROXY] Location Cookie parse error:", e)
-        }
+        } catch (e) { console.error("❌ [PROXY] Location Cookie parse error:", e) }
       }
 
-      // Если город в URL изменился (юзер перешел на другой город) — 
-      // синхронизируем куку локации Zustand прямо в памяти за 0мс!
       if (urlCitySlug !== currentGlobalLocationSlug) {
         shouldUpdateLocationCookie = true
         if (!parsedLocState.state) parsedLocState.state = {}
-        
-        parsedLocState.state.globalLocationSlug = urlCitySlug // Записали слаг 🚀
+        parsedLocState.state.globalLocationSlug = urlCitySlug
         newLocationCookieValue = encodeURIComponent(JSON.stringify(parsedLocState))
       }
     }
 
-    // ⚡ Б) АБСОЛЮТНАЯ СИНХРОНИЗАЦИЯ URL И КУКИ ФИДА
+    // ⚡ Б) СУПЕР-ВАЛИДАТОР ПАРАМЕТРОВ ФИДА (ЗАЩИТА ОТ ЛЕВАКА 🛡️)
     const urlRadiusStr = searchParams.get('radius')
     const urlViewModeStr = searchParams.get('view')
 
-    const rawFeedCookie = request.cookies.get('zwork-feed-state')?.value
-    let parsedFeedState: ZustandFeedCookie = { 
-      state: { radius: LOCATION_CONFIG.SETTINGS.radius, viewMode: 'list' }, 
-      version: 0 
-    }
+    // Проверяем валидность того, что вбито в URL
+    const parsedRadius = urlRadiusStr ? parseInt(urlRadiusStr, 10) : NaN
+    const isRadiusValid = LOCATION_CONFIG.SETTINGS.radiusOptions.some(r => r === parsedRadius)
+    const isViewValid = urlViewModeStr === 'list' || urlViewModeStr === 'map'
 
-    if (rawFeedCookie) {
-      try {
-        const decoded = decodeURIComponent(rawFeedCookie)
-        parsedFeedState = JSON.parse(decoded) as ZustandFeedCookie
-      } catch (e) {
-        console.error("❌ [PROXY] Feed Cookie parse error:", e)
+    // 🚨 ЕСЛИ В УРЛ ЧУШЬ ИЛИ ОН ПУСТОЙ (F5) — КОРРЕКТИРУЕМ РЕДИРЕКТОМ НАМЕРТВО
+    if (!isRadiusValid || !isViewValid) {
+      const rawFeedCookie = request.cookies.get('zwork-feed-state')?.value
+      let parsedFeedState: ZustandFeedCookie = { 
+        state: { radius: LOCATION_CONFIG.SETTINGS.radius, viewMode: 'list' }, 
+        version: 0 
       }
-    }
 
-    if (!parsedFeedState.state) parsedFeedState.state = {}
-
-    let finalRadius = parsedFeedState.state.radius || LOCATION_CONFIG.SETTINGS.radius
-    let finalViewMode = parsedFeedState.state.viewMode || 'list'
-    let urlNeedsCorrection = false
-
-    if (urlRadiusStr) {
-      const parsedRadius = parseInt(urlRadiusStr, 10)
-      const hasValidRadius = LOCATION_CONFIG.SETTINGS.radiusOptions.some(r => r === parsedRadius)
-
-      if (hasValidRadius) {
-        if (finalRadius !== parsedRadius) {
-          finalRadius = parsedRadius
-          shouldUpdateFeedCookie = true
-        }
-      } else {
-        urlNeedsCorrection = true // Кривой радиус -> на исправление
+      if (rawFeedCookie) {
+        try {
+          parsedFeedState = JSON.parse(decodeURIComponent(rawFeedCookie))
+        } catch (e) { console.error("❌ [PROXY] Feed Cookie parse error:", e) }
       }
-    } else {
-      urlNeedsCorrection = true // Нет радиуса -> на исправление
-    }
+      if (!parsedFeedState.state) parsedFeedState.state = {}
 
-    if (urlViewModeStr === 'list' || urlViewModeStr === 'map') {
-      if (finalViewMode !== urlViewModeStr) {
-        finalViewMode = urlViewModeStr
-        shouldUpdateFeedCookie = true
-      }
-    } else {
-      urlNeedsCorrection = true // Кривой/отсутствующий view -> на исправление
-    }
+      // Берем безопасный эталон из куки либо дефолт из твоего конфига
+      const fallbackRadius = isRadiusValid ? parsedRadius : (parsedFeedState.state.radius || LOCATION_CONFIG.SETTINGS.radius)
+      const fallbackViewMode = isViewValid ? urlViewModeStr : (parsedFeedState.state.viewMode || 'list')
 
-    // Редирект для исправления адресной строки, если параметры неполные или кривые
-    if (urlNeedsCorrection) {
       const redirectUrl = request.nextUrl.clone()
-      redirectUrl.searchParams.set('radius', finalRadius.toString())
-      redirectUrl.searchParams.set('view', finalViewMode)
+      redirectUrl.searchParams.set('radius', fallbackRadius.toString())
+      redirectUrl.searchParams.set('view', fallbackViewMode)
+
+      // Жестко выправляем строку браузера
       return NextResponse.redirect(redirectUrl, 302)
     }
 
-    if (shouldUpdateFeedCookie) {
-      parsedFeedState.state.radius = finalRadius
-      parsedFeedState.state.viewMode = finalViewMode
-      newFeedCookieValue = encodeURIComponent(JSON.stringify(parsedFeedState))
-    }
+    // 🚀 ЕСЛИ ПАРАМЕТРЫ ИДЕАЛЬНЫЕ (КОГДА ЮЗЕР КЛИКАЕТ В UI):
+    // Прокси просто молча пропускает запрос дальше! 
+    // Никаких мутаций кук фида на сервере -> 0 лишних ререндеров Next.js.
   }
 
-  // 3. ОДНОВРЕМЕННАЯ МОДИФИКАЦИЯ ЗАПРОСА И ОТВЕТА
-  const hasChanges = targetMode !== currentMode || shouldUpdateLocationCookie || shouldUpdateFeedCookie
-
-  if (hasChanges) {
+  // 3. ПРИМЕНЕНИЕ ИЗМЕНЕНИЙ КУК ЛОКАЦИИ (ЕСЛИ СМЕНИЛСЯ ГОРОД)
+  if (shouldUpdateLocationCookie || targetMode !== currentMode) {
     if (targetMode !== currentMode) request.cookies.set('zwork-mode', targetMode)
     if (shouldUpdateLocationCookie) request.cookies.set('zwork-core-loc', newLocationCookieValue)
-    if (shouldUpdateFeedCookie) request.cookies.set('zwork-feed-state', newFeedCookieValue)
 
     const allCookies = request.cookies.getAll()
     const cookieString = allCookies.map(c => `${c.name}=${c.value}`).join('; ')
@@ -156,15 +120,8 @@ export async function proxy(request: NextRequest) {
 
     const response = NextResponse.next({ request: { headers: requestHeaders } })
 
-    if (targetMode !== currentMode) {
-      response.cookies.set('zwork-mode', targetMode, { maxAge: 31536000, path: '/' })
-    }
-    if (shouldUpdateLocationCookie) {
-      response.cookies.set('zwork-core-loc', newLocationCookieValue, { maxAge: 31536000, path: '/' })
-    }
-    if (shouldUpdateFeedCookie) {
-      response.cookies.set('zwork-feed-state', newFeedCookieValue, { maxAge: 31536000, path: '/' })
-    }
+    if (targetMode !== currentMode) response.cookies.set('zwork-mode', targetMode, { maxAge: 31536000, path: '/' })
+    if (shouldUpdateLocationCookie) response.cookies.set('zwork-core-loc', newLocationCookieValue, { maxAge: 31536000, path: '/' })
 
     return response
   }

@@ -30,8 +30,9 @@ export function OrdersToolbar() {
   const { cityName } = useInitialData()
 
   // 🎯 Универсальная функция обновления URL + Zustand по клику
+
   const handleParamChange = (key: 'radius' | 'view', value: string | number) => {
-    // 1. Изменяем стейт в Zustand
+    // 1. Изменяем стейт в Zustand (клиент сразу реагирует)
     if (key === 'radius') setRadius(value as number)
     if (key === 'view') setViewMode(value as 'list' | 'map')
 
@@ -39,10 +40,12 @@ export function OrdersToolbar() {
     const params = new URLSearchParams(searchParams.toString())
     params.set(key, value.toString())
 
-    // 3. Мягко пушим новый URL без перезагрузки страницы (scroll: false спасает от прыжков экрана вверх)
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    // 3. 🚀 ЧИСТЫЙ ХАК ДЛЯ ВЫЛИЗЫВАНИЯ РЕРЕНДЕРОВ:
+    // Вместо router.replace используем чистый History API браузера.
+    // Это меняет URL в строке без триггера фонового серверного рендера Next.js!
+    const newUrl = `${pathname}?${params.toString()}`
+    window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, "", newUrl)
   }
-
   return (
     <div className="bg-white px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-100 sticky top-0 z-30">
 
