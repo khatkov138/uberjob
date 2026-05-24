@@ -9,14 +9,16 @@
  */
 
 import React from "react";
-import { useActiveFeed } from "../providers/FeedController";
+
 import { useIsFetching } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
 import { Loader2, RefreshCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFeedContext } from "../providers/FeedController";
+import { FeedContext } from "../../page";
 
 interface IsolatedScrollObserverProps {
-    queryKey: readonly ['orders', 'list', ReturnType<typeof useActiveFeed>];
+    queryKey: readonly ['orders', 'list', FeedContext];
     ordersCount: number;
     hasNextPage: boolean;
     fetchNextPage: () => void;

@@ -106,10 +106,10 @@ model Order {
   scheduledDate DateTime? // <--- ДОБАВЬ ЭТУ СТРОКУ
   lat           Float
   lng           Float
-
+  address       String?
   // Кто создал
-  clientId String
-  client   User   @relation("ClientOrders", fields: [clientId], references: [id])
+  clientId      String
+  client        User            @relation("ClientOrders", fields: [clientId], references: [id])
 
   // Кто выполняет (выбирается из откликов)
   workerId String?

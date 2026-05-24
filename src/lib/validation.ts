@@ -10,28 +10,30 @@ export const passwordSchema = z
 
 
 
-// @/lib/validation.ts
 
-// 1. Базовая схема (для сервера)
+// 1. Основная схема для бэкенда (база данных)
 export const createOrderSchema = z.object({
-  description: z.string().min(10, "Опишите задачу подробнее"),
+  description: z.string().min(10, "Опишите задачу подробнее (минимум 10 символов)"),
   locationId: z.string().min(1, "Локация не определена"),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
+  
+  lat: z.number({ message: "Поставьте точку на карте" }),
+  lng: z.number({ message: "Поставьте точку на карте" }),
+  
+  // 🔥 ИСПРАВЛЕНО: Поле адреса теперь полностью опционально!
+  address: z.string().optional(),
+  
   price: z.coerce.number().min(0, "Цена не может быть отрицательной"),
   dateType: z.enum(["ASAP", "SCHEDULED"]),
   scheduledDate: z.date().optional(),
-});
+})
 
-// 2. Схема для формы (добавляем city)
+// 2. Схема для фронтенд-формы (добавляем чисто интерфейсное поле city)
 export const createOrderFormSchema = createOrderSchema.extend({
-  city: z.string().optional(),
-});
+  city: z.string().min(1, "Выберите населенный пункт"),
+})
 
-// 3. Генерируем типы ТОЛЬКО из схем (это критично для типизации RHF)
-export type CreateOrderValues = z.infer<typeof createOrderSchema>;
-export type CreateOrderFormValues = z.infer<typeof createOrderFormSchema>;
-
+export type CreateOrderValues = z.infer<typeof createOrderSchema>
+export type CreateOrderFormValues = z.infer<typeof createOrderFormSchema>
 
 
 

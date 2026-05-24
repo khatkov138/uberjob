@@ -11,7 +11,7 @@ import { MapPin, Wallet, ArrowRight, Loader2, AlertCircle } from "lucide-react"
 import { createOrderFormSchema, type CreateOrderFormValues } from "@/lib/validation"
 import { cn, handleAction } from "@/lib/utils"
 import { createOrder } from "@/actions/order/create"
-import { OrderGeoModal } from "./order-geo-modal"
+import { OrderGeoModal } from "./_components/order-geo-modal"
 import { ServerLocation } from "@/lib/server-utils"
 
 interface CreateOrderFormProps {
@@ -22,8 +22,6 @@ export function CreateOrderForm({ initialLocation }: CreateOrderFormProps) {
     const router = useRouter()
     const [isGeoOpen, setIsGeoOpen] = React.useState(false)
 
-    // ВАЖНО: Убираем <CreateOrderFormValues> здесь. 
-    // TS сам выведет типы из zodResolver(createOrderFormSchema)
     const methods = useForm({
         resolver: zodResolver(createOrderFormSchema),
         defaultValues: {
@@ -31,26 +29,27 @@ export function CreateOrderForm({ initialLocation }: CreateOrderFormProps) {
             locationId: initialLocation?.id ?? "",
             city: initialLocation?.name ?? "",
             price: 0,
-            dateType: "ASAP", // Явно указываем литерал для enum
+            dateType: "ASAP",
             lat: initialLocation?.lat,
             lng: initialLocation?.lng,
+            address: "", // Поле опционально, изначально пустая строка
             scheduledDate: undefined,
         }
     })
 
-
-    const { control, handleSubmit, watch } = methods
+    const { control, handleSubmit, watch, register, formState: { errors } } = methods
     const description = watch("description")
     const cityName = watch("city")
+    const preciseAddress = watch("address") 
 
     const mutation = useMutation({
-        // Используем наш тип CreateOrderFormValues здесь для входящих данных
         mutationFn: async (data: CreateOrderFormValues) => {
+            // Отрезаем чисто интерфейсное поле `city`, оставляя payload валидным для Prisma бэкенда
             const { city, ...payload } = data
             return handleAction(createOrder(payload))
         },
         onSuccess: (data) => {
-            toast.success("ЗАДАЧА ЗАПУЩЕНА")
+            toast.success("ЗАЗАЧА ЗАПУЩЕНА")
             router.push(`/order/${data.slug}`)
         },
         onError: (err: Error) => {
@@ -58,7 +57,6 @@ export function CreateOrderForm({ initialLocation }: CreateOrderFormProps) {
         }
     })
 
-    // Теперь onSubmit будет идеально совместим с handleSubmit
     const onSubmit = (data: CreateOrderFormValues) => {
         mutation.mutate(data)
     }
@@ -66,6 +64,8 @@ export function CreateOrderForm({ initialLocation }: CreateOrderFormProps) {
     return (
         <FormProvider {...methods}>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-12">
+                {/* Скрытый инпут для отправки строкового адреса, если пользователь его указал */}
+                <input type="hidden" {...register("address")} />
 
                 {/* 1. ТЕКСТ ЗАДАЧИ */}
                 <div className="relative group cursor-text">
@@ -101,27 +101,57 @@ export function CreateOrderForm({ initialLocation }: CreateOrderFormProps) {
 
                     {/* 2. ЛОКАЦИЯ */}
                     <div className="space-y-3">
-                        <div className="flex items-center gap-2 ml-2">
-                            <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Локация</span>
+                        <div className="flex items-center justify-between ml-2">
+                            <div className="flex items-center gap-2">
+                                <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Локация</span>
+                            </div>
+                            
+                            {preciseAddress && (
+                                <span className="text-[9px] font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-950 px-2 py-0.5 rounded uppercase tracking-tight animate-fade-in">
+                                    Точка установлена
+                                </span>
+                            )}
                         </div>
+                        
                         <Controller
                             control={control}
                             name="city"
                             render={({ fieldState }) => (
-                                <button
-                                    type="button"
-                                    onClick={() => setIsGeoOpen(true)}
-                                    className={cn(
-                                        "w-full h-20 px-8 flex items-center justify-between bg-slate-50 rounded-[2rem] border-2 transition-all shadow-inner group",
-                                        fieldState.invalid ? "border-red-500 bg-red-50/20" : "border-transparent hover:border-blue-100 hover:bg-white"
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsGeoOpen(true)}
+                                        // 🔥 Подсвечиваем красным только если не выбран сам населенный пункт
+                                        className={cn(
+                                            "w-full h-20 px-8 flex flex-col items-start justify-center bg-slate-50 rounded-[2rem] border-2 transition-all shadow-inner group relative",
+                                            fieldState.invalid ? "border-red-500 bg-red-50/10" : "border-transparent hover:border-blue-100 hover:bg-white"
+                                        )}
+                                    >
+                                        <div className="w-full flex items-center justify-between pr-8">
+                                            <span className={cn(
+                                                "font-black uppercase italic tracking-tighter truncate text-slate-900 transition-all",
+                                                preciseAddress ? "text-base leading-none text-slate-400" : "text-2xl"
+                                            )}>
+                                                {cityName || "ВЫБРАТЬ ГОРОД..."}
+                                            </span>
+                                            <MapPin className="w-6 h-6 text-blue-600 group-hover:scale-110 transition-transform absolute right-8 top-1/2 -translate-y-1/2" />
+                                        </div>
+                                        
+                                        {/* Если точный адрес откалиброван на карте или введен — рендерим его жирным */}
+                                        {preciseAddress && (
+                                            <span className="text-2xl font-black uppercase italic tracking-tighter truncate text-slate-900 mt-1 leading-none w-[85%] text-left animate-fade-in">
+                                                {preciseAddress}
+                                            </span>
+                                        )}
+                                    </button>
+
+                                    {fieldState.error && (
+                                        <p className="text-[10px] font-black uppercase text-red-500 mt-2 ml-2 flex items-center gap-2 italic tracking-widest">
+                                            <AlertCircle size={14} /> {fieldState.error.message}
+                                        </p>
                                     )}
-                                >
-                                    <span className="text-2xl font-black uppercase italic tracking-tighter truncate text-slate-900">
-                                        {cityName || "ВЫБРАТЬ ГОРОД..."}
-                                    </span>
-                                    <MapPin className="w-6 h-6 text-blue-600 group-hover:scale-110 transition-transform" />
-                                </button>
+                                </>
                             )}
                         />
                     </div>
@@ -134,7 +164,7 @@ export function CreateOrderForm({ initialLocation }: CreateOrderFormProps) {
                         </div>
                         <input
                             type="number"
-                            {...methods.register("price")}
+                            {...methods.register("price", { valueAsNumber: true })}
                             className="w-full h-20 px-8 bg-slate-50 rounded-[2rem] border-2 border-transparent focus:border-blue-600 outline-none text-2xl font-black uppercase italic tracking-tighter text-slate-900 transition-all placeholder:text-slate-200"
                             placeholder="0"
                         />

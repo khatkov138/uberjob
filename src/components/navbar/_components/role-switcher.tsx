@@ -1,38 +1,28 @@
-// components/navbar/role-switcher.tsx
 "use client"
 
 import { cn } from "@/lib/utils"
 import { User, BriefcaseBusiness } from "lucide-react"
-import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { useNavbarStore } from "../navbar-provider"
-// Импортируем наш новый хук-селектор вместо старого синглтона
 
+interface RoleSwitcherProps {
+  mode: 'CLIENT' | 'PRO'
+  onSwitch: (newMode: 'CLIENT' | 'PRO') => void
+}
 
-export function RoleSwitcher() {
-  // Атомарно подписываемся на динамический стейт режима из контекста Навбара
-  const mode = useNavbarStore((state) => state.mode)
-  const setMode = useNavbarStore((state) => state.setMode)
-
-  const router = useRouter()
-
-  const handleSwitch = (newMode: 'CLIENT' | 'PRO') => {
-    if (mode === newMode) return
-    setMode(newMode)
-    router.push(newMode === 'PRO' ? '/pro/dashboard' : '/client/dashboard')
-  }
-
+export function RoleSwitcher({ mode, onSwitch }: RoleSwitcherProps) {
   return (
-    <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 relative overflow-hidden">
+    <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 relative overflow-hidden w-full">
+      {/* КНОПКА ЗАКАЗЧИКА */}
       <button
-        onClick={() => handleSwitch('CLIENT')}
+        type="button"
+        onClick={() => onSwitch('CLIENT')}
         className={cn(
-          "relative z-10 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer select-none",
+          "relative z-10 flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer select-none min-w-0",
           mode === 'CLIENT' ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
         )}
       >
-        <User className="w-4 h-4" />
-        <span>КЛИЕНТ</span>
+        <User className="w-4 h-4 shrink-0" />
+        <span className="truncate">КЛИЕНТ</span>
 
         {mode === 'CLIENT' && (
           <motion.div
@@ -43,15 +33,17 @@ export function RoleSwitcher() {
         )}
       </button>
 
+      {/* КНОПКА ИСПОЛНИТЕЛЯ */}
       <button
-        onClick={() => handleSwitch('PRO')}
+        type="button"
+        onClick={() => onSwitch('PRO')}
         className={cn(
-          "relative z-10 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer select-none",
+          "relative z-10 flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer select-none min-w-0",
           mode === 'PRO' ? "text-white" : "text-slate-400 hover:text-slate-600"
         )}
       >
-        <BriefcaseBusiness className="w-4 h-4" />
-        <span>Исполнитель</span>
+        <BriefcaseBusiness className="w-4 h-4 shrink-0" />
+        <span className="truncate">Исполнитель</span>
 
         {mode === 'PRO' && (
           <motion.div

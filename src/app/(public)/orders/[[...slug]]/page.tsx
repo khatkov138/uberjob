@@ -89,23 +89,43 @@ export default async function OrdersPage({ params }: Props) {
   const { slug = [] } = await params;
   const [citySlug, categorySlug] = slug;
 
-  // Воронка валидации: читает куку, которую прокси уже подготовил!
+  /**
+   * 📡 ШАГ 1: ПОЛУЧЕНИЕ ГЕОДАННЫХ И ДЕФОЛТНОГО СОСТОЯНИЯ (Server Utilities)
+   * Читаем куки, заранее подготовленные прокси-сервером или middleware.
+   * Тянем параллельно текущую локацию пользователя и состояние ленты (радиус, режим отображения).
+   */
   const [currentGeo, feedState] = await Promise.all([
     getServerLocation(),
-    getServerFeedState() // Ничего не прокидываем сюда 🚀
+    getServerFeedState() 
   ]);
 
+  /**
+   * 🚦 ШАГ 2: ВОРОНКА ВАЛИДАЦИИ И РЕДИРЕКТЫ
+   * Защищаем роутинг. Если в URL нет города, принудительно отправляем наSlug текущей гео-позиции.
+   */
   if (!citySlug) return redirect(`/orders/${currentGeo.slug}`);
 
+  // Извлекаем мемоизированные данные по городу и категории из БД
   const { dbLocation, currentCategory } = await getCachedRouteData(citySlug, categorySlug);
 
+  // Если город в URL не валидный — дропаем пользователя на его дефолтный город
   if (!dbLocation) return redirect(`/orders/${currentGeo.slug}`);
+  // Если категория в URL — фейк, мягко откатываем пользователя на корень текущего города
   if (categorySlug && !currentCategory) return redirect(`/orders/${citySlug}`);
 
+  /**
+   * 👤 ШАГ 3: ПРОФИЛЬ И СКИЛЛЫ ПОЛЬЗОВАТЕЛЯ
+   * Получаем профиль текущего юзера, разворачиваем монаду и вытаскиваем массив ID его навыков.
+   * Сортируем навыки для детерминированного хэширования контекста.
+   */
   const profileRes = await getMyProfile();
   const initialProfile = unwrap(profileRes, null);
   const skillIds = initialProfile?.skills.map(s => s.categoryId) || [];
 
+  /**
+   * ⚙️ ШАГ 4: ФОРМИРОВАНИЕ ИНСТРУМЕНТАЛЬНОГО КОНТЕКСТА ФИДА (FeedContext)
+   * Собираем слепок параметров, по которым будет фильтроваться лента на сервере и клиенте.
+   */
   const initialFeedContext: FeedContext = {
     locationId: dbLocation.id,
     lat: dbLocation.lat,
@@ -116,6 +136,11 @@ export default async function OrdersPage({ params }: Props) {
     viewMode: feedState.viewMode
   };
 
+  /**
+   * 📦 ШАГ 5: ИНИЦИАЛИЗАЦИЯ ДАННЫХ И ХЭШИРОВАНИЕ (InitialFeedData)
+   * Формируем JSON-объект для гидратации клиента.
+   * Детерминировано сериализуем контекст в строку-хэш для быстрого сравнения состояний на фронте.
+   */
   const initialFeedData: InitialFeedData = {
     cityName: dbLocation.name,
     citySlug: dbLocation.slug,
@@ -124,9 +149,14 @@ export default async function OrdersPage({ params }: Props) {
     initialFeedContextHash: serializeDeterministic(initialFeedContext)
   };
 
+  /**
+   * ⚡ ШАГ 6: ЗАПУСК АСИНХРОННЫХ ПРОМИСОВ (Streaming / Запросы без блокировки)
+   * Запускаем тяжелые запросы за заказами и популярными категориями параллельно.
+   * Промисы прокидываются сквозь провайдер напрямую в UI-компоненты через Suspense / use().
+   */
   const ordersPromise = getOrders({
     ...initialFeedContext,
-    mode: feedState.viewMode
+    mode: initialFeedContext.viewMode
   });
 
   const popularCategoriesPromise = getPopularCategories(
@@ -135,6 +165,10 @@ export default async function OrdersPage({ params }: Props) {
     initialFeedContext.radius
   );
 
+  /**
+   * 🎛 ШАГ 7: РЕНДЕРИНГ И ПЕРЕДАЧА ДАННЫХ В КЛИЕНТСКИЙ КОНТЕКСТ
+   * Оборачиваем страницу в контроллер фида, обеспечивая бесшовную синхронизацию SSR и CSR.
+   */
   return (
     <FeedController
       ordersPromise={ordersPromise}
